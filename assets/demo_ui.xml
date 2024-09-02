@@ -1,0 +1,7 @@
+<div background="#00FF00" padding="10px">
+	<button width="500px"
+		hover:padding="100px"
+		hover:background="#0000FF" active:background="#005000" background="#000F00" height="50px">
+		<text>Hello World</text>
+	</button>
+</div>
