@@ -1,13 +1,7 @@
+use crate::parse::{parse_color, parse_ui_rect, parse_val};
 use bevy::prelude::*;
 use quick_xml::events::attributes::Attribute;
 use serde::{Deserialize, Serialize};
-
-use crate::{
-    error::{ParseError, StyleParserError},
-    parse::{parse_color, parse_ui_rect, parse_val},
-};
-
-// use crate::build::{ClickStyle, HoverStyle};
 
 #[derive(Serialize, Debug, PartialEq, Deserialize, Clone)]
 pub enum StyleAttr {
@@ -69,13 +63,11 @@ pub enum StyleAttr {
     // color
     Background(Color),
     BorderColor(Color),
-    BorderRadius(Val),
+    BorderRadius(UiRect),
 
     // -----
-    // conditions
     Hover(Box<StyleAttr>),
     Active(Box<StyleAttr>),
-
     // -----
     // animations
     Duration(f32),
@@ -111,7 +103,12 @@ impl StyleAttr {
                 cmd.entity(entity).insert(BackgroundColor(*color));
             }
             StyleAttr::BorderRadius(val) => {
-                cmd.entity(entity).insert(BorderRadius::all(*val));
+                cmd.entity(entity).insert(BorderRadius {
+                    top_left: val.top,
+                    top_right: val.right,
+                    bottom_right: val.bottom,
+                    bottom_left: val.left,
+                });
             }
             StyleAttr::BorderColor(color) => {
                 cmd.entity(entity).insert(BorderColor(*color));
@@ -154,6 +151,7 @@ impl StyleAttr {
 impl<'a> TryFrom<&'a Attribute<'a>> for StyleAttr {
     type Error = nom::Err<nom::error::Error<&'a [u8]>>;
 
+    #[rustfmt::skip]
     fn try_from(value: &'a Attribute<'a>) -> Result<Self, Self::Error> {
         let style = match value.key.local_name().as_ref() {
             b"height" => StyleAttr::Height(parse_val(&value.value).map(|(_, val)| val)?),
@@ -162,6 +160,8 @@ impl<'a> TryFrom<&'a Attribute<'a>> for StyleAttr {
             b"margin" => StyleAttr::Margin(parse_ui_rect(&value.value).map(|(_, val)| val)?),
             b"border" => StyleAttr::Border(parse_ui_rect(&value.value).map(|(_, val)| val)?),
             b"background" => StyleAttr::Background(parse_color(&value.value).map(|(_, val)| val)?),
+            b"border_color" => StyleAttr::BorderColor(parse_color(&value.value).map(|( _,val )| val)?),
+            b"border_radius" => StyleAttr::BorderRadius(parse_ui_rect(&value.value).map(|( _,val )| val)?),
             _ => {
                 return Err(nom::Err::Error(nom::error::Error::new(
                     value.key.as_ref(),

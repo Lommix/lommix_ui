@@ -1,7 +1,4 @@
-use crate::{
-    parse::{parse_xml, XNode},
-    prelude::UiError,
-};
+use crate::{error::ParseError, node::NNode, parse::parse_xml_new};
 use bevy::{
     asset::{AssetLoader, AsyncReadExt},
     ecs::system::SystemId,
@@ -12,7 +9,7 @@ use bevy::{
 pub struct LoaderPlugin;
 impl Plugin for LoaderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_asset::<XmlUi>();
+        app.init_asset::<NNode>();
         app.init_asset_loader::<LayoutLoader>();
         app.add_systems(Update, interaction_observer);
 
@@ -69,18 +66,17 @@ fn on_click(ent: In<Entity>, cmd: Commands, server: Res<AssetServer>) {
     print!("hello world \n");
 }
 
-#[derive(Asset, TypePath)]
-pub struct XmlUi {
-    pub root: XNode,
-}
+// #[derive(Asset, TypePath)]
+// pub struct XmlUi {
+//     pub root: XNode,
+// }
 
 #[derive(Default)]
 pub struct LayoutLoader;
-
 impl AssetLoader for LayoutLoader {
-    type Asset = XmlUi;
+    type Asset = NNode;
     type Settings = ();
-    type Error = UiError;
+    type Error = ParseError;
 
     fn load<'a>(
         &'a self,
@@ -93,10 +89,10 @@ impl AssetLoader for LayoutLoader {
             reader
                 .read_to_end(&mut bytes)
                 .await
-                .map_err(|err| UiError::Unkown(err.to_string()))?;
+                .map_err(|err| ParseError::Failed(err.to_string()))?;
 
-            let root = parse_xml(&bytes).unwrap();
-            Ok(XmlUi { root })
+            let root = parse_xml_new(&bytes).unwrap();
+            Ok(root)
         })
     }
 }

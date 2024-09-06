@@ -1,15 +1,14 @@
 use bevy::prelude::*;
 
-use crate::{
-    load::{ClickAction, XmlUi},
-    parse::{NodeToken, XAttribute, XNode},
-    prelude::StyleAttr,
-};
+use crate::{node::NNode, prelude::StyleAttr};
 
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, ((rebuild_ui, build_ui).chain(), update_interaction));
+        app.add_systems(
+            Update,
+            ((hotrealod, build_ui, style_ui).chain(), update_interaction),
+        );
     }
 }
 
@@ -19,9 +18,12 @@ pub struct StyleAttributes(pub Vec<StyleAttr>);
 #[derive(Component, Default)]
 pub struct UnbuildTag;
 
+#[derive(Component, Default)]
+pub struct UnStyled;
+
 #[derive(Bundle, Default)]
 pub struct RonUiBundle {
-    pub handle: Handle<XmlUi>,
+    pub handle: Handle<NNode>,
     pub tag: UnbuildTag,
 }
 
@@ -49,19 +51,17 @@ fn update_interaction(
                 *style = Style::default();
                 style_attr.iter().for_each(|attr| match attr {
                     StyleAttr::Hover(_) | StyleAttr::Active(_) => (),
-                    any => {
-                        any.apply(entity, &mut cmd, &mut style);
-                    }
+                    any => any.apply(entity, &mut cmd, &mut style),
                 });
             }
         },
     );
 }
 
-fn rebuild_ui(
+fn hotrealod(
     mut cmd: Commands,
-    mut events: EventReader<AssetEvent<XmlUi>>,
-    nodes: Query<(Entity, &Handle<XmlUi>, Option<&Parent>), Without<UnbuildTag>>,
+    mut events: EventReader<AssetEvent<NNode>>,
+    nodes: Query<(Entity, &Handle<NNode>, Option<&Parent>), Without<UnbuildTag>>,
 ) {
     events.read().for_each(|ev| {
         let AssetEvent::LoadedWithDependencies { id } = ev else {
@@ -81,99 +81,113 @@ fn rebuild_ui(
     });
 }
 
+fn style_ui(
+    mut cmd: Commands,
+    mut unstyled: Query<(Entity, &mut Style, &StyleAttributes), With<UnStyled>>,
+) {
+    unstyled
+        .iter_mut()
+        .for_each(|(entity, mut style, style_attr)| {
+            cmd.entity(entity).remove::<UnStyled>();
+            style_attr.iter().for_each(|attr| match attr {
+                StyleAttr::Hover(_) | StyleAttr::Active(_) => (),
+                any => any.apply(entity, &mut cmd, &mut style),
+            });
+        });
+}
+
 fn build_ui(
     mut cmd: Commands,
-    unbuild: Query<(Entity, &Handle<XmlUi>), With<UnbuildTag>>,
-    assets: Res<Assets<XmlUi>>,
+    unbuild: Query<(Entity, &Handle<NNode>), With<UnbuildTag>>,
+    assets: Res<Assets<NNode>>,
     server: Res<AssetServer>,
 ) {
     unbuild.iter().for_each(|(ent, handle)| {
         let Some(ui_node) = assets.get(handle) else {
             return;
         };
-
-        build_recursive(ent, &ui_node.root, &mut cmd, &assets, &server);
+        build_recursive(ent, &ui_node, &mut cmd, &assets, &server);
         cmd.entity(ent).remove::<UnbuildTag>();
     });
 }
 
 fn build_recursive(
     entity: Entity,
-    node: &XNode,
+    node: &NNode,
     cmd: &mut Commands,
-    assets: &Assets<XmlUi>,
+    assets: &Assets<NNode>,
     server: &AssetServer,
 ) {
     // build node
-    match &node.ty {
-        NodeToken::Div => {
-            cmd.entity(entity).insert(NodeBundle::default());
-        }
-        NodeToken::Image => {
-            let Some(path) = node
-                .attributes
-                .iter()
-                .flat_map(|attr| match attr {
-                    XAttribute::Path(path) => Some(path),
-                    XAttribute::Click(_) => None,
-                })
-                .next()
-            else {
-                warn!("missing path for img");
-                return;
-            };
-
-            cmd.entity(entity).insert(ImageBundle {
-                image: UiImage::new(server.load(path)),
-                ..default()
-            });
-        }
-        // NodeToken::Text =>
-        //     cmd.entity(entity).insert(TextBundle {
-        //         text: Text::from_section(
-        //             "",
-        //             TextStyle {
-        //                 font_size: 20.,
-        //                 color: Color::WHITE,
-        //                 ..default()
-        //             },
-        //         ),
-        //         ..default()
-        //     });
-        // },
-        NodeToken::Button => {
+    let children = match &node {
+        NNode::Div(div) => {
             cmd.entity(entity).insert((
+                Name::new("Div"),
+                NodeBundle::default(),
+                StyleAttributes(div.styles.clone()),
+                UnStyled,
+            ));
+            Some(&div.children)
+        }
+        NNode::Image(img) => {
+            cmd.entity(entity).insert((
+                Name::new("Image"),
+                ImageBundle {
+                    image: UiImage::new(server.load(&img.path)),
+                    ..default()
+                },
+                StyleAttributes(img.styles.clone()),
+                UnStyled,
+            ));
+            Some(&img.children)
+        }
+        NNode::Text(text) => {
+            cmd.entity(entity).insert((
+                Name::new("Text"),
+                TextBundle::from_section(
+                    &text.content,
+                    TextStyle {
+                        font_size: 20.,
+                        ..default()
+                    },
+                ),
+                StyleAttributes(text.styles.clone()),
+                UnStyled,
+            ));
+            Some(&text.children)
+        }
+        NNode::Button(btn) => {
+            cmd.entity(entity).insert((
+                Name::new("Button"),
                 ButtonBundle::default(),
+                StyleAttributes(btn.styles.clone()),
+                UnStyled,
                 //ClickAction
             ));
+            None
         }
-        // NodeToken::Include =>
-        //     let handle = server.load::<UiNode>(path);
-        //     cmd.entity(entity).insert((handle, UnbuildTag));
-        //     if let Some(click_action) = click {
-        //         cmd.entity(entity).insert(ClickAction(click_action.into()));
-        //     }
-        // }
+        NNode::Include(inc) => {
+            let handle = server.load::<NNode>(&inc.path);
+            cmd.entity(entity)
+                .insert((UnStyled, Name::new("Include"), handle, UnbuildTag));
+
+            // if let Some(click_action) = click {
+            //     cmd.entity(entity).insert(ClickAction(click_action.into()));
+            // }
+
+            Some(&inc.children)
+        }
         _ => {
             return;
         }
     };
 
-    if node.styles.len() > 0 {
-        dbg!(&node.styles);
-        cmd.entity(entity)
-            .insert(StyleAttributes(node.styles.clone()));
-
-        build_style(cmd, entity, &node.styles)
-    }
-
-    // cmd.entity(parent).add_child(node_entity);
-
-    // children
-    node.children.iter().for_each(|node| {
-        let child = cmd.spawn_empty().id();
-        cmd.entity(entity).add_child(child);
-        build_recursive(child, node, cmd, assets, server);
+    children.map(|children| {
+        children.iter().for_each(|child_node| {
+            let child = cmd.spawn_empty().id();
+            cmd.entity(entity).add_child(child);
+            build_recursive(child, child_node, cmd, assets, server);
+        });
     });
 }
 
@@ -196,12 +210,6 @@ fn build_style(cmd: &mut Commands, target: Entity, style_attributes: &Vec<StyleA
         StyleAttr::Padding(rect) => style.padding = *rect,
         StyleAttr::Background(color) => {
             cmd.entity(target).insert(BackgroundColor(*color));
-        }
-        StyleAttr::Active(attrs) => {
-            // cmd.entity(target).insert(ClickStyle(attrs.clone()));
-        }
-        StyleAttr::Hover(attrs) => {
-            // cmd.entity(target).insert(HoverStyle(attrs.clone()));
         }
         _ => (),
         // StyleAttr::MinWidth(_) => todo!(),

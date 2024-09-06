@@ -1,140 +1,111 @@
 use crate::prelude::*;
-use xml::{reader::XmlEvent, ParserConfig};
+use bevy::prelude::*;
 
-#[derive(Debug, PartialEq)]
-pub enum XmlNode {
-    Img(Image),
+#[derive(Debug, Asset, TypePath)]
+pub enum NNode {
     Div(Div),
+    Image(Image),
+    Text(Text),
+    Button(Button),
+    Include(Include),
+    Unkown,
 }
 
-#[derive(Debug, PartialEq)]
+impl PartialEq for NNode {
+    fn eq(&self, other: &Self) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+    }
+}
+
+impl NNode {
+    #[rustfmt::skip]
+    #[allow(unused)]
+    pub fn add_child(&mut self, child: NNode) -> Result<(), ()> {
+        match self {
+            NNode::Div(div) => div.children.push(child),
+            NNode::Image(img) => img.children.push(child),
+            NNode::Button(btn) => btn.children.push(child),
+            NNode::Include(inc) => inc.children.push(child),
+            _=> return Err(()),
+        }
+        Ok(())
+    }
+
+    #[allow(unused)]
+    pub fn add_text(&mut self, txt: &str) -> Result<(), ()> {
+        match self {
+            NNode::Text(text) => {
+                text.content = txt.to_string();
+            }
+            _ => return Err(()),
+        }
+        Ok(())
+    }
+
+    #[rustfmt::skip]
+    #[allow(unused)]
+    pub fn add_styles(&mut self, style: Vec<StyleAttr>) -> Result<(), ()> {
+        match self {
+            NNode::Div(div) => div.styles.extend(style),
+            NNode::Image(img) => img.styles.extend(style),
+            NNode::Text(text) => text.styles.extend(style),
+            NNode::Button(btn) => btn.styles.extend(style),
+            NNode::Include(inc) => inc.styles.extend(style),
+            _ => return Err(()),
+        }
+        Ok(())
+    }
+
+    #[rustfmt::skip]
+    #[allow(unused)]
+    pub fn set_path(&mut self, path: &str) -> Result<(), ()> {
+        match self {
+            NNode::Include(inc) => inc.path = path.to_string(),
+            NNode::Image(img) => img.path = path.to_string(),
+            _ => return Err(()),
+        }
+
+        Ok(())
+    }
+
+    #[rustfmt::skip]
+    pub fn spawn(&self, cmd: &mut Commands, server: &AssetServer, assets: &Assets<NNode>){
+        todo!()
+    }
+}
+
+// -------------------------------
+#[derive(Debug, Default)]
 pub struct Div {
-    pub children: Vec<XmlNode>,
-    pub style: Vec<StyleAttr>,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<NNode>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default)]
 pub struct Image {
-    pub style: Vec<StyleAttr>,
-    pub children: Vec<XmlNode>,
     pub path: String,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<NNode>,
 }
 
-pub fn deserialize(str: &str) -> Result<XmlNode, ParseError> {
-
-    let config = ParserConfig::new()
-        .ignore_comments(true)
-        .add_entity("hover", "http://www.example.com/hover")
-        .ignore_invalid_encoding_declarations(true);
-
-    let mut parser = xml::EventReader::new_with_config(str.as_bytes(), config);
-
-    loop {
-        let next = parser
-            .next()
-            .map_err(|err| ParseError::Failed(err.to_string()))?;
-
-        match next {
-            XmlEvent::StartElement {
-                name,
-                attributes,
-                namespace,
-            } => {
-                return next_node(
-                    XmlEvent::StartElement {
-                        name,
-                        attributes,
-                        namespace,
-                    },
-                    &mut parser,
-                );
-            }
-            _ => (),
-        }
-    }
+#[derive(Debug, Default)]
+pub struct Text {
+    pub content: String,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<NNode>,
 }
 
-fn next_node(
-    start: XmlEvent,
-    parser: &mut xml::EventReader<&[u8]>
-) -> Result<XmlNode, ParseError> {
+#[derive(Debug, Default)]
+pub struct Button {
+    pub action: String,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<NNode>,
+}
 
-    let XmlEvent::StartElement {
-        name: start_name,
-        attributes: start_attributes,
-        namespace: start_namespace,
-    } = start
-    else {
-        return Err(ParseError::Failed("Not a start".into()));
-    };
-
-    let mut children = Vec::new();
-
-    loop {
-        let next = parser
-            .next()
-            .map_err(|err| ParseError::Failed(err.to_string()))?;
-
-        match next {
-            XmlEvent::StartElement {
-                name,
-                attributes,
-                namespace,
-            } => {
-                let child_node = next_node(
-                    XmlEvent::StartElement {
-                        name,
-                        attributes,
-                        namespace,
-                    },
-                    parser,
-                )?;
-
-                children.push(child_node);
-            }
-            XmlEvent::EndElement { name } => {
-                if name.local_name != start_name.local_name {
-                    return Err(ParseError::Failed("start and end does not match".into()));
-                }
-
-                // gen styles
-                let style = start_attributes
-                    .iter()
-                    .flat_map(|attr| StyleAttr::try_from(attr))
-                    .collect();
-
-                match start_name.local_name.to_lowercase().as_str() {
-                    "div" => {
-                        return Ok(XmlNode::Div(Div { children, style }));
-                    }
-                    "img" => {
-                        let path = start_attributes
-                            .iter()
-                            .find(|attr| attr.name.local_name == "path")
-                            .map(|attr| attr.value.clone())
-                            .unwrap_or_default();
-
-                        return Ok(XmlNode::Img(Image {
-                            children,
-                            path,
-                            style,
-                        }));
-                    }
-                    unknown => {
-                        return Err(ParseError::UnknownToken(
-                            format!("what is this {unknown}").into(),
-                        ));
-                    }
-                };
-            }
-            _ => (),
-            // XmlEvent::StartDocument { version, encoding, standalone } => todo!(),
-            // XmlEvent::EndDocument => todo!(),
-            // XmlEvent::ProcessingInstruction { name, data } => todo!(),
-            // XmlEvent::CData(_) => todo!(),
-            // XmlEvent::Comment(_) => todo!(),
-            // XmlEvent::Characters(_) => todo!(),
-            // XmlEvent::Whitespace(_) => todo!(),
-        }
-    }
+#[derive(Debug, Default)]
+pub struct Include {
+    pub path: String,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<NNode>,
+    pub slot: Option<Entity>,
 }

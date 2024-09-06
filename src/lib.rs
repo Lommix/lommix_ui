@@ -3,17 +3,17 @@ use bevy::prelude::*;
 mod build;
 mod error;
 mod load;
+mod node;
+mod parse;
 mod style;
 mod tests;
-mod parse;
-// mod node;
 
 pub mod prelude {
     pub use crate::build::{RonUiBundle, StyleAttributes};
-    pub use crate::error::{ UiError, ParseError };
-    pub use crate::load::XmlUi;
+    pub use crate::error::{ParseError, StyleParserError};
+    pub use crate::node::{Button, Div, Image, Include, NNode, Text};
+    pub use crate::parse::parse_xml_new;
     pub use crate::style::StyleAttr;
-    // pub use crate::node::XmlNode;
     pub use crate::LommixUiPlugin;
 }
 

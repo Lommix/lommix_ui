@@ -4,7 +4,10 @@ use lommix_ui::prelude::*;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(LommixUiPlugin)
+        .add_plugins((
+            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+            LommixUiPlugin,
+        ))
         .add_systems(Startup, setup)
         .run();
 }

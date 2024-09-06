@@ -1,39 +1,39 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum UiError {
-    #[error("failed to parse ron file")]
-    FailedToParse(String),
-    #[error("something broke")]
-    Unkown(String),
-}
-
 #[derive(Debug, Default)]
 pub struct Span {
     pub line: i64,
     pub col: i64,
 }
 
+impl std::fmt::Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}:{}]", self.line, self.col)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ParseError {
-    #[error("failed to parse ui file")]
-    FailedToParse { span: Span, msg: String },
-    #[error("unknown token")]
+    #[error("Encountered unkown token `{0}`")]
     UnknownToken(String),
-    #[error("Fucked up")]
-    Failed(String),
-    #[error("Fucked up")]
+    #[error("Encountered Unclosed Tag `{0}`")]
     Unclosed(String),
+    #[error("{0}")]
+    StyleError(#[from] StyleParserError),
+    #[error("`{0}`")]
+    Failed(String),
 }
 
 #[derive(Error, Debug)]
 pub enum StyleParserError {
-    #[error("Fucked up")]
+    #[error("Failed to parse `{0}` to value")]
     FailedToParseVal(String),
-    #[error("Fucked up")]
+    #[error("`{0}` does not represent a ui rect")]
+    FailedToParseRect(String),
+    #[error("UnkownToken `{0}`")]
     UnkownToken(String),
-    #[error("It's 1, 2 or 4 attributes to describe a uirect")]
-    UnexpectedRectPattern(String),
-    #[error("is this a number?")]
-    FailedToParseNumber,
+    #[error("Failed to parse `{0}`")]
+    FailedToParse(String),
+    #[error("Failed to parse as color `{0}`")]
+    FailedToParseColor(String),
 }
