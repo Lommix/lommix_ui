@@ -1,4 +1,7 @@
-use crate::parse::{parse_color, parse_ui_rect, parse_val};
+use crate::{
+    error::AttributeError,
+    parse::{parse_color, parse_ui_rect, parse_val},
+};
 use bevy::prelude::*;
 use quick_xml::events::attributes::Attribute;
 use serde::{Deserialize, Serialize};
@@ -90,7 +93,6 @@ impl StyleAttr {
             StyleAttr::Margin(rect) => style.margin = *rect,
             StyleAttr::Padding(rect) => style.padding = *rect,
             StyleAttr::Border(rect) => style.border = *rect,
-
             StyleAttr::AlignItems(val) => style.align_items = *val,
             StyleAttr::JustifyItems(val) => style.justify_items = *val,
             StyleAttr::AlignSelf(val) => style.align_self = *val,
@@ -141,32 +143,26 @@ impl StyleAttr {
             // StyleAttr::Font(_) => todo!(),
             // StyleAttr::FontColor(_) => todo!(),
         }
-
-        cmd.entity(entity).add(|mut ent: EntityWorldMut| {
-            ent.get::<Style>().map(|mut style| {});
-        });
     }
 }
 
 impl<'a> TryFrom<&'a Attribute<'a>> for StyleAttr {
-    type Error = nom::Err<nom::error::Error<&'a [u8]>>;
+    type Error = crate::error::AttributeError;
 
     #[rustfmt::skip]
     fn try_from(value: &'a Attribute<'a>) -> Result<Self, Self::Error> {
         let style = match value.key.local_name().as_ref() {
-            b"height" => StyleAttr::Height(parse_val(&value.value).map(|(_, val)| val)?),
-            b"width" => StyleAttr::Width(parse_val(&value.value).map(|(_, val)| val)?),
-            b"padding" => StyleAttr::Padding(parse_ui_rect(&value.value).map(|(_, val)| val)?),
-            b"margin" => StyleAttr::Margin(parse_ui_rect(&value.value).map(|(_, val)| val)?),
-            b"border" => StyleAttr::Border(parse_ui_rect(&value.value).map(|(_, val)| val)?),
-            b"background" => StyleAttr::Background(parse_color(&value.value).map(|(_, val)| val)?),
-            b"border_color" => StyleAttr::BorderColor(parse_color(&value.value).map(|( _,val )| val)?),
-            b"border_radius" => StyleAttr::BorderRadius(parse_ui_rect(&value.value).map(|( _,val )| val)?),
+            b"height" => StyleAttr::Height(to_value(&value.value)?),
+            b"width" => StyleAttr::Width(to_value(&value.value)?),
+            b"padding" => StyleAttr::Padding(to_rect(&value.value)?),
+            b"margin" => StyleAttr::Margin(to_rect(&value.value)?),
+            b"border" => StyleAttr::Border(to_rect(&value.value)?),
+            b"background" => StyleAttr::Background(to_color(&value.value)?),
+            b"border_color" => StyleAttr::Background(to_color(&value.value)?),
+            b"border_radius" => StyleAttr::BorderRadius(to_rect(&value.value)?),
             _ => {
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    value.key.as_ref(),
-                    nom::error::ErrorKind::Tag,
-                )));
+                let token = String::from_utf8(value.value.to_vec()).unwrap_or_default();
+                return Err(AttributeError::UnkownToken(token));
             }
         };
 
@@ -180,4 +176,31 @@ impl<'a> TryFrom<&'a Attribute<'a>> for StyleAttr {
             None => Ok(style),
         }
     }
+}
+
+fn to_value(input: &[u8]) -> Result<Val, AttributeError> {
+    parse_val(input).map(|(_, val)| val).map_err(|_| {
+        let code = std::str::from_utf8(input)
+            .map(|c| c.to_string())
+            .unwrap_or_default();
+        AttributeError::FailedToParseVal(code)
+    })
+}
+
+fn to_rect(input: &[u8]) -> Result<UiRect, AttributeError> {
+    parse_ui_rect(input).map(|(_, val)| val).map_err(|_| {
+        let code = std::str::from_utf8(input)
+            .map(|c| c.to_string())
+            .unwrap_or_default();
+        AttributeError::FailedToParseRect(code)
+    })
+}
+
+fn to_color(input: &[u8]) -> Result<Color, AttributeError> {
+    parse_color(input).map(|(_, color)| color).map_err(|_| {
+        let code = std::str::from_utf8(input)
+            .map(|c| c.to_string())
+            .unwrap_or_default();
+        AttributeError::FailedToParseColor(code)
+    })
 }

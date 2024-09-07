@@ -1,4 +1,4 @@
-use crate::{error::ParseError, node::NNode, parse::parse_xml_new};
+use crate::{error::ParseError, node::NNode, parse::parse_xml_bytes};
 use bevy::{
     asset::{AssetLoader, AsyncReadExt},
     ecs::system::SystemId,
@@ -91,7 +91,7 @@ impl AssetLoader for LayoutLoader {
                 .await
                 .map_err(|err| ParseError::Failed(err.to_string()))?;
 
-            let root = parse_xml_new(&bytes).unwrap();
+            let (root, err) = parse_xml_bytes(&bytes).unwrap();
             Ok(root)
         })
     }

@@ -10,9 +10,9 @@ mod tests;
 
 pub mod prelude {
     pub use crate::build::{RonUiBundle, StyleAttributes};
-    pub use crate::error::{ParseError, StyleParserError};
+    pub use crate::error::{ParseError, AttributeError};
     pub use crate::node::{Button, Div, Image, Include, NNode, Text};
-    pub use crate::parse::parse_xml_new;
+    pub use crate::parse::parse_xml_bytes;
     pub use crate::style::StyleAttr;
     pub use crate::LommixUiPlugin;
 }

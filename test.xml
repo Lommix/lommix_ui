@@ -1,2 +1,5 @@
-<div width="20px" height="10px" padding="15px 20% 10px 10px" background="#FFFFFF">
+<div width="20px" height="50px">
+	<text>
+		hello world
+	</text>
 </div>

@@ -92,7 +92,6 @@ pub struct Image {
 pub struct Text {
     pub content: String,
     pub styles: Vec<StyleAttr>,
-    pub children: Vec<NNode>,
 }
 
 #[derive(Debug, Default)]

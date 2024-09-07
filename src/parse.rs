@@ -1,3 +1,4 @@
+use crate::error::{AttributeError, ParseError};
 use crate::style::StyleAttr;
 use crate::{
     node::{Button, Div, Image, Include, Text},
@@ -7,6 +8,10 @@ use bevy::{
     color::Color,
     ui::{UiRect, Val},
 };
+use nom::bytes::complete::take_while1;
+use nom::combinator::{flat_map, map_parser};
+use nom::error::context;
+use nom::multi::{many0, many1};
 use nom::{
     branch::alt,
     bytes::{
@@ -20,27 +25,33 @@ use nom::{
     IResult, Parser,
 };
 
-pub fn parse_xml_new(input: &[u8]) -> Result<NNode, ()> {
+pub fn parse_xml_bytes(input: &[u8]) -> Result<(NNode, Vec<AttributeError>), ParseError> {
     let mut reader = quick_xml::reader::Reader::from_reader(input);
     reader.config_mut().trim_text(true);
     reader.config_mut().check_end_names = true;
-    parse_next_enum_node(None, &mut reader)
+
+    parse_next_node(None, &mut reader)
 }
 
-fn parse_next_enum_node(
+fn parse_next_node(
     current: Option<NNode>,
     reader: &mut quick_xml::reader::Reader<&[u8]>,
-) -> Result<NNode, ()> {
+) -> Result<(NNode, Vec<AttributeError>), ParseError> {
     loop {
         let next_event = match reader.read_event() {
             Ok(ev) => ev,
-            //@todo: handle
-            Err(err) => panic!("{err}"),
+            //@todo: handle, clean this
+            Err(err) => {
+                return Err(ParseError::Failed(format!(
+                    "error when?: {}",
+                    err.to_string()
+                )))
+            }
         };
+
         match next_event {
             quick_xml::events::Event::Start(start) => {
-                let (_, mut next_node) =
-                    parse_enum_node_type(start.name().as_ref()).map_err(|err| ())?;
+                let (_, mut next_node) = parse_enum_node_type(start.name().as_ref())?;
 
                 let mut styles = Vec::new();
                 for attr in start.attributes().flatten() {
@@ -54,22 +65,37 @@ fn parse_next_enum_node(
                     styles.push(style);
                 }
 
+                let (styles, errors) = start
+                    .attributes()
+                    .map(|res| res.map_err(|err| AttributeError::FailedToParse(err.to_string())))
+                    .map(|res| res.map(|attr| StyleAttr::try_from(&attr)))
+                    .flatten()
+                    .fold((Vec::new(), Vec::new()), |(mut attrs, mut errs), res| {
+                        match res {
+                            Ok(attr) => attrs.push(attr),
+                            Err(err) => errs.push(err),
+                        };
+                        (attrs, errs)
+                    });
+
                 next_node.add_styles(styles);
 
                 match current {
                     Some(mut node) => {
-                        let child = parse_next_enum_node(Some(next_node), reader)?;
+                        let (child, attr_errors) = parse_next_node(Some(next_node), reader)?;
                         node.add_child(child);
-                        return parse_next_enum_node(Some(node), reader);
+                        return parse_next_node(Some(node), reader).map(|(n, mut e)| {
+                            e.extend(attr_errors);
+                            (n, e)
+                        });
                     }
                     None => {
-                        return parse_next_enum_node(Some(next_node), reader);
+                        return parse_next_node(Some(next_node), reader);
                     }
                 }
             }
             quick_xml::events::Event::Empty(start) => {
-                let (_, mut new_node) =
-                    parse_enum_node_type(start.name().as_ref()).map_err(|err| ())?;
+                let (_, mut new_node) = parse_enum_node_type(start.name().as_ref())?;
 
                 let mut styles = Vec::new();
                 for attr in start.attributes().flatten() {
@@ -88,20 +114,23 @@ fn parse_next_enum_node(
                 match current {
                     Some(mut node) => {
                         node.add_child(new_node);
-                        return parse_next_enum_node(Some(node), reader);
+                        return parse_next_node(Some(node), reader);
                     }
-                    None => return Ok(new_node),
+                    None => {
+                        todo!()
+                        // return Ok(new_node),
+                    }
                 }
             }
             quick_xml::events::Event::End(end) => {
                 //@todo: unkown node
-                let (_, node) = parse_enum_node_type(end.name().as_ref()).map_err(|err| ())?;
+                let (_, node) = parse_enum_node_type(end.name().as_ref())?;
 
                 if let Some(n) = current.filter(|n| *n == node).take() {
-                    return Ok(n);
+                    // return Ok(n);
+                    todo!()
                 }
-                // @todo: mismatching tags
-                return Err(());
+                return Err(ParseError::Unclosed("".into()));
             }
             quick_xml::events::Event::Eof => {
                 panic!("end of file?");
@@ -115,7 +144,6 @@ fn parse_next_enum_node(
             // quick_xml::events::Event::DocType(_) => todo!(),
         }
     }
-    Err(())
 }
 
 #[rustfmt::skip]
@@ -129,6 +157,142 @@ fn parse_enum_node_type(input: &[u8]) -> IResult<&[u8], NNode> {
         b"text" => Ok((remaining, NNode::Text(Text::default()) )),
         _ => Ok((remaining, NNode::Unkown)),
     }
+}
+
+#[rustfmt::skip]
+fn parse_element(input: &[u8]) -> IResult<&[u8], NNode> {
+    let (input, _) = multispace0(input)?;
+    let (input, (start_tag, attributes, is_empty)) = parse_start_tag(input)?;
+    let (input, _) = multispace0(input)?;
+
+    // children?
+    let (input, content, children ) = if !is_empty {
+
+        let (input, children) = many0(parse_element)(input)?;
+        let (input, content) = parse_content(input)?;
+        let (input, end_tag) = parse_end_tag(input)?;
+
+        if start_tag != end_tag {
+            return Err(nom::Err::Failure(nom::error::make_error(end_tag, nom::error::ErrorKind::TagClosure)));
+        }
+
+        ( input, content, children )
+
+    } else {( input, "", vec![] )};
+
+    match start_tag {
+        b"div" => Ok((input, NNode::Div(Div { styles: attributes, children }))),
+        b"img" => Ok((input, NNode::Image(Image { styles: attributes, children, path: String::new() }))),
+        b"include" => Ok((input, NNode::Include(Include { styles: attributes, children, path: String::new(), slot: None }))),
+        b"button" => Ok((input, NNode::Button(Button { styles: attributes, children, action: String::new() }))),
+        b"text" => Ok((input, NNode::Text(Text { styles: attributes, content: content.to_string() }))),
+        unkown => Err(nom::Err::Failure(nom::error::make_error(unkown, nom::error::ErrorKind::Tag)))
+    }
+}
+
+fn parse_start_tag(input: &[u8]) -> IResult<&[u8], (&[u8], Vec<StyleAttr>, bool)> {
+    let (input, (_, element_tag, attributes, _, is_empty)) = tuple((
+        tag("<"),
+        take_while1(|c: u8| c.is_ascii_alphabetic()),
+        many0(parse_attribute),
+        multispace0,
+        alt((map(tag("/>"), |_| true), map(tag(">"), |_| false))),
+    ))(input)?;
+
+    Ok((input, (element_tag, attributes, is_empty)))
+}
+
+fn parse_end_tag(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    let (input, (_, end_tag, _)) = tuple((
+        tag("</"),
+        take_while1(|c: u8| c.is_ascii_alphabetic()),
+        tag(">"),
+    ))(input)?;
+
+    Ok((input, end_tag))
+}
+
+fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
+    let (input, content) = map_res(take_while(|c: u8| c != b'>' && c != b'<'), |c| {
+        std::str::from_utf8(c)
+    })(input)?;
+    Ok((input, content.trim().trim_end()))
+}
+
+pub enum Attribute {
+    Style(StyleAttr),
+    Path(String),
+    Action(String),
+}
+
+fn parse_attribute(input: &[u8]) -> IResult<&[u8], StyleAttr> {
+    // add an optional prefix like hover:`ident`
+    let (input, (_, prefix, ident, _, value)) = tuple((
+        multispace0,
+        parse_prefix0,
+        take_while(|c: u8| c.is_ascii_alphabetic()),
+        tag("="),
+        delimited(tag("\""), take_while(|b: u8| b != b'"'), tag("\"")),
+    ))(input)?;
+
+    let attribute = match ident {
+        b"height" => {
+            let (_, val) = parse_val(value)?;
+            Ok((input, StyleAttr::Height(val)))
+        }
+        b"width" => {
+            let (_, val) = parse_val(value)?;
+            Ok((input, StyleAttr::Width(val)))
+        }
+        b"padding" => {
+            let (_, val) = parse_ui_rect(value)?;
+            Ok((input, StyleAttr::Padding(val)))
+        }
+        b"margin" => {
+            let (_, val) = parse_ui_rect(value)?;
+            Ok((input, StyleAttr::Margin(val)))
+        }
+        _ => Err(nom::Err::Error(nom::error::make_error(
+            ident,
+            nom::error::ErrorKind::Tag,
+        ))),
+    };
+
+    match prefix {
+        Some(prefix) => match prefix {
+            b"hover" => attribute.map(|(input, attr)| (input, StyleAttr::Hover(Box::new(attr)))),
+            b"active" => attribute.map(|(input, attr)| (input, StyleAttr::Active(Box::new(attr)))),
+            _ => attribute,
+        },
+        None => attribute,
+    }
+}
+
+#[rustfmt::skip]
+fn parse_prefix0(input: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
+    let res : IResult<&[u8], (&[u8], &[u8])>= tuple((
+        take_while1(|b: u8| b.is_ascii_alphabetic()),
+        tag(":"),
+    ))(input);
+
+    match res {
+        Ok((input, (prefix,_))) => Ok((input, Some(prefix))),
+        Err(_) => Ok((input, None)),
+    }
+}
+
+#[test]
+fn test_parse_element() {
+    let input = std::fs::read_to_string("test.xml").unwrap();
+    match parse_element(input.as_bytes()) {
+        Ok((input, node)) => {
+            dbg!(node);
+        }
+        Err(err) => {
+            let err = err.map_input(|i| std::str::from_utf8(i));
+            dbg!(err);
+        }
+    };
 }
 
 /// convert string values to uirect

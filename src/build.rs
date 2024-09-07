@@ -154,7 +154,7 @@ fn build_recursive(
                 StyleAttributes(text.styles.clone()),
                 UnStyled,
             ));
-            Some(&text.children)
+            None
         }
         NNode::Button(btn) => {
             cmd.entity(entity).insert((

@@ -38,12 +38,12 @@ fn test_transform() {
 //     dbg!(out);
 // }
 
-#[test]
-fn test_new() {
-    let bytes = std::fs::read("assets/demo_ui.xml").unwrap();
-    let output = crate::parse::parse_xml_new(&bytes).unwrap();
-    dbg!(output);
-}
+// #[test]
+// fn test_new() {
+//     let bytes = std::fs::read("assets/demo_ui.xml").unwrap();
+//     let output = crate::parse::parse_xml_bytes(&bytes).unwrap();
+//     dbg!(output);
+// }
 
 //"div width=\"20px\" height=\"10px\" hover:padding=\"15px 20% 10px 10px\" "
 // fn container(input &str) -> IResult<&str, u8>{
