@@ -1,7 +1,0 @@
-<div background="#00FF00" padding="10px 10px">
-	<button width="50px"
-		padding="5px"
-		hover:padding="100px"
-		hover:background="#0000FF" active:background="#005000" background="#FFFFFF" height="50px">
-	</button>
-</div>

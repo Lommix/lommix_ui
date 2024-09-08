@@ -16,7 +16,7 @@ fn setup(mut cmd: Commands, server: Res<AssetServer>) {
     cmd.spawn(Camera2dBundle::default());
 
     cmd.spawn(RonUiBundle {
-        handle: server.load("demo_ui.xml"),
+        handle: server.load("demo_ui.html"),
         ..default()
     });
 

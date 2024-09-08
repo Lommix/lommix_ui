@@ -1,53 +1,27 @@
 use miette::Diagnostic;
 use thiserror::Error;
 
-#[derive(Debug, Default)]
-pub struct Span {
-    pub line: i64,
-    pub col: i64,
-}
-
-impl std::fmt::Display for Span {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}:{}]", self.line, self.col)
-    }
-}
-
 #[derive(Error, Debug)]
 pub enum ParseError {
-    #[error("Encountered unkown token `{0}`")]
-    UnknownToken(String),
-    #[error("Encountered Unclosed Tag `{0}`")]
-    Unclosed(String),
-    #[error("`{0}`")]
-    Failed(String),
+    #[error("could not read provided bytes stream to end `{0}`")]
+    FailedToRead(String),
+
+    #[error("provided content is not utf8")]
+    Utf8Error,
+
+    #[error("Failed to parse {0}")]
+    Nom(nom::error::Error<String>),
+    #[error("Failed with incomplete parse")]
+    Incomplete,
 }
 
-impl From<nom::Err<nom::error::Error<&[u8]>>> for ParseError {
-    fn from(value: nom::Err<nom::error::Error<&[u8]>>) -> Self {
-        ParseError::UnknownToken(value.to_string())
+impl<'a> From<nom::Err<nom::error::Error<&'a [u8]>>> for ParseError {
+    fn from(err: nom::Err<nom::error::Error<&'a [u8]>>) -> Self {
+        match err.map_input(|i| String::from_utf8_lossy(i).to_string()) {
+            nom::Err::Incomplete(_) => ParseError::Incomplete,
+            nom::Err::Error(err) => ParseError::Nom(err),
+            nom::Err::Failure(err) => ParseError::Nom(err),
+        }
     }
 }
 
-#[derive(Error, Debug, Diagnostic)]
-pub enum AttributeError {
-    #[error("Failed to parse `{0}` to value")]
-    #[diagnostic(help("lol you failed"))]
-    FailedToParseVal(String),
-
-    #[error("`{0}` does not represent a ui rect")]
-    #[diagnostic(help("lol you failed"))]
-    FailedToParseRect(String),
-
-    #[error("UnkownToken `{0}`")]
-    #[diagnostic(help("lol you failed"))]
-    UnkownToken(String),
-
-    #[error("Failed to parse `{0}`")]
-    #[diagnostic(help("lol you failed"))]
-    FailedToParse(String),
-
-    #[error("Failed to parse as color `{0}`")]
-    #[diagnostic(help("lol you failed"))]
-    FailedToParseColor(String),
-}

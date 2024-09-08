@@ -1,12 +1,60 @@
-use crate::{
-    error::AttributeError,
-    parse::{parse_color, parse_ui_rect, parse_val},
-};
+use crate::prelude::*;
 use bevy::prelude::*;
-use quick_xml::events::attributes::Attribute;
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Debug, PartialEq, Deserialize, Clone)]
+
+#[derive(Debug, Asset, TypePath)]
+pub enum XNode {
+    Div(Div),
+    Image(Image),
+    Text(Text),
+    Button(Button),
+    Include(Include),
+    Unkown,
+}
+
+// -------------------------------
+#[derive(Debug, Default)]
+pub struct Div {
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<XNode>,
+}
+
+#[derive(Debug, Default)]
+pub struct Image {
+    pub path: String,
+    pub styles: Vec<StyleAttr>,
+}
+
+#[derive(Debug, Default)]
+pub struct Text {
+    pub content: String,
+    pub styles: Vec<StyleAttr>,
+}
+
+#[derive(Debug, Default)]
+pub struct Button {
+    pub action: String,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<XNode>,
+}
+
+#[derive(Debug, Default)]
+pub struct Include {
+    pub path: String,
+    pub styles: Vec<StyleAttr>,
+    pub children: Vec<XNode>,
+}
+
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Attribute {
+    Style(StyleAttr),
+    Path(String),
+    Click(String),
+    Compontent(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum StyleAttr {
     Display(Display),
     Position(PositionType),
@@ -76,6 +124,12 @@ pub enum StyleAttr {
     Duration(f32),
 }
 
+impl From<StyleAttr> for Attribute {
+    fn from(value: StyleAttr) -> Self {
+        Attribute::Style(value)
+    }
+}
+
 impl StyleAttr {
     pub fn apply(&self, entity: Entity, cmd: &mut Commands, style: &mut Style) {
         match self {
@@ -101,6 +155,10 @@ impl StyleAttr {
             StyleAttr::JustifyContent(val) => style.justify_content = *val,
             StyleAttr::RowGap(val) => style.row_gap = *val,
             StyleAttr::ColumnGap(val) => style.column_gap = *val,
+            StyleAttr::MinWidth(val) => style.min_width = *val,
+            StyleAttr::MinHeight(val) => style.min_height = *val,
+            StyleAttr::MaxWidth(val) => style.max_width = *val,
+            StyleAttr::MaxHeight(val) => style.max_height = *val,
             StyleAttr::Background(color) => {
                 cmd.entity(entity).insert(BackgroundColor(*color));
             }
@@ -122,10 +180,6 @@ impl StyleAttr {
             // StyleAttr::Hover(attrs) => {
             //     // cmd.entity(entity).insert(HoverStyle(attrs.clone()));
             // }
-            // StyleAttr::MinWidth(_) => todo!(),
-            // StyleAttr::MinHeight(_) => todo!(),
-            // StyleAttr::MaxWidth(_) => todo!(),
-            // StyleAttr::MaxHeight(_) => todo!(),
             // StyleAttr::AspectRatio(_) => todo!(),
 
             // StyleAttr::FlexWrap(_) => todo!(),
@@ -144,63 +198,4 @@ impl StyleAttr {
             // StyleAttr::FontColor(_) => todo!(),
         }
     }
-}
-
-impl<'a> TryFrom<&'a Attribute<'a>> for StyleAttr {
-    type Error = crate::error::AttributeError;
-
-    #[rustfmt::skip]
-    fn try_from(value: &'a Attribute<'a>) -> Result<Self, Self::Error> {
-        let style = match value.key.local_name().as_ref() {
-            b"height" => StyleAttr::Height(to_value(&value.value)?),
-            b"width" => StyleAttr::Width(to_value(&value.value)?),
-            b"padding" => StyleAttr::Padding(to_rect(&value.value)?),
-            b"margin" => StyleAttr::Margin(to_rect(&value.value)?),
-            b"border" => StyleAttr::Border(to_rect(&value.value)?),
-            b"background" => StyleAttr::Background(to_color(&value.value)?),
-            b"border_color" => StyleAttr::Background(to_color(&value.value)?),
-            b"border_radius" => StyleAttr::BorderRadius(to_rect(&value.value)?),
-            _ => {
-                let token = String::from_utf8(value.value.to_vec()).unwrap_or_default();
-                return Err(AttributeError::UnkownToken(token));
-            }
-        };
-
-        // wrap into
-        match value.key.prefix() {
-            Some(prefix) => match prefix.as_ref() {
-                b"hover" => Ok(StyleAttr::Hover(Box::new(style))),
-                b"active" => Ok(StyleAttr::Active(Box::new(style))),
-                _ => todo!(),
-            },
-            None => Ok(style),
-        }
-    }
-}
-
-fn to_value(input: &[u8]) -> Result<Val, AttributeError> {
-    parse_val(input).map(|(_, val)| val).map_err(|_| {
-        let code = std::str::from_utf8(input)
-            .map(|c| c.to_string())
-            .unwrap_or_default();
-        AttributeError::FailedToParseVal(code)
-    })
-}
-
-fn to_rect(input: &[u8]) -> Result<UiRect, AttributeError> {
-    parse_ui_rect(input).map(|(_, val)| val).map_err(|_| {
-        let code = std::str::from_utf8(input)
-            .map(|c| c.to_string())
-            .unwrap_or_default();
-        AttributeError::FailedToParseRect(code)
-    })
-}
-
-fn to_color(input: &[u8]) -> Result<Color, AttributeError> {
-    parse_color(input).map(|(_, color)| color).map_err(|_| {
-        let code = std::str::from_utf8(input)
-            .map(|c| c.to_string())
-            .unwrap_or_default();
-        AttributeError::FailedToParseColor(code)
-    })
 }

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{node::NNode, prelude::StyleAttr};
+use crate::{data::XNode, load::ClickAction, prelude::StyleAttr};
 
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
@@ -23,7 +23,7 @@ pub struct UnStyled;
 
 #[derive(Bundle, Default)]
 pub struct RonUiBundle {
-    pub handle: Handle<NNode>,
+    pub handle: Handle<XNode>,
     pub tag: UnbuildTag,
 }
 
@@ -60,8 +60,8 @@ fn update_interaction(
 
 fn hotrealod(
     mut cmd: Commands,
-    mut events: EventReader<AssetEvent<NNode>>,
-    nodes: Query<(Entity, &Handle<NNode>, Option<&Parent>), Without<UnbuildTag>>,
+    mut events: EventReader<AssetEvent<XNode>>,
+    nodes: Query<(Entity, &Handle<XNode>, Option<&Parent>), Without<UnbuildTag>>,
 ) {
     events.read().for_each(|ev| {
         let AssetEvent::LoadedWithDependencies { id } = ev else {
@@ -98,8 +98,8 @@ fn style_ui(
 
 fn build_ui(
     mut cmd: Commands,
-    unbuild: Query<(Entity, &Handle<NNode>), With<UnbuildTag>>,
-    assets: Res<Assets<NNode>>,
+    unbuild: Query<(Entity, &Handle<XNode>), With<UnbuildTag>>,
+    assets: Res<Assets<XNode>>,
     server: Res<AssetServer>,
 ) {
     unbuild.iter().for_each(|(ent, handle)| {
@@ -113,14 +113,14 @@ fn build_ui(
 
 fn build_recursive(
     entity: Entity,
-    node: &NNode,
+    node: &XNode,
     cmd: &mut Commands,
-    assets: &Assets<NNode>,
+    assets: &Assets<XNode>,
     server: &AssetServer,
 ) {
     // build node
     let children = match &node {
-        NNode::Div(div) => {
+        XNode::Div(div) => {
             cmd.entity(entity).insert((
                 Name::new("Div"),
                 NodeBundle::default(),
@@ -129,7 +129,7 @@ fn build_recursive(
             ));
             Some(&div.children)
         }
-        NNode::Image(img) => {
+        XNode::Image(img) => {
             cmd.entity(entity).insert((
                 Name::new("Image"),
                 ImageBundle {
@@ -139,15 +139,17 @@ fn build_recursive(
                 StyleAttributes(img.styles.clone()),
                 UnStyled,
             ));
-            Some(&img.children)
+            None
+            // Some(&img.children)
         }
-        NNode::Text(text) => {
+        XNode::Text(text) => {
             cmd.entity(entity).insert((
                 Name::new("Text"),
                 TextBundle::from_section(
                     &text.content,
                     TextStyle {
-                        font_size: 20.,
+                        font_size: 44.,
+                        color: Color::WHITE,
                         ..default()
                     },
                 ),
@@ -156,18 +158,18 @@ fn build_recursive(
             ));
             None
         }
-        NNode::Button(btn) => {
+        XNode::Button(btn) => {
             cmd.entity(entity).insert((
                 Name::new("Button"),
                 ButtonBundle::default(),
                 StyleAttributes(btn.styles.clone()),
+                ClickAction(btn.action.clone()),
                 UnStyled,
-                //ClickAction
             ));
-            None
+            Some(&btn.children)
         }
-        NNode::Include(inc) => {
-            let handle = server.load::<NNode>(&inc.path);
+        XNode::Include(inc) => {
+            let handle = server.load::<XNode>(&inc.path);
             cmd.entity(entity)
                 .insert((UnStyled, Name::new("Include"), handle, UnbuildTag));
 
@@ -189,60 +191,4 @@ fn build_recursive(
             build_recursive(child, child_node, cmd, assets, server);
         });
     });
-}
-
-fn build_style(cmd: &mut Commands, target: Entity, style_attributes: &Vec<StyleAttr>) {
-    let mut style = Style::default();
-
-    style_attributes.iter().for_each(|attr| match attr {
-        StyleAttr::Display(display) => style.display = *display,
-        StyleAttr::Position(position) => style.position_type = *position,
-        StyleAttr::Overflow(overflow) => style.overflow = *overflow,
-        StyleAttr::Direction(dir) => style.direction = *dir,
-        StyleAttr::Left(left) => style.left = *left,
-        StyleAttr::Right(right) => style.right = *right,
-        StyleAttr::Top(top) => style.top = *top,
-        StyleAttr::Bottom(bottom) => style.bottom = *bottom,
-        StyleAttr::Width(width) => style.width = *width,
-        StyleAttr::Height(height) => style.height = *height,
-        StyleAttr::FlexDirection(dir) => style.flex_direction = *dir,
-        StyleAttr::Margin(rect) => style.margin = *rect,
-        StyleAttr::Padding(rect) => style.padding = *rect,
-        StyleAttr::Background(color) => {
-            cmd.entity(target).insert(BackgroundColor(*color));
-        }
-        _ => (),
-        // StyleAttr::MinWidth(_) => todo!(),
-        // StyleAttr::MinHeight(_) => todo!(),
-        // StyleAttr::MaxWidth(_) => todo!(),
-        // StyleAttr::MaxHeight(_) => todo!(),
-        // StyleAttr::AspectRatio(_) => todo!(),
-        // StyleAttr::AlignItems(_) => todo!(),
-        // StyleAttr::JustifyItems(_) => todo!(),
-        // StyleAttr::AlignSelf(_) => todo!(),
-        // StyleAttr::JustifySelf(_) => todo!(),
-        // StyleAttr::AlignContent(_) => todo!(),
-        // StyleAttr::JustifyContent(_) => todo!(),
-        // StyleAttr::Border(_) => todo!(),
-        // StyleAttr::FlexWrap(_) => todo!(),
-        // StyleAttr::FlexGrow(_) => todo!(),
-        // StyleAttr::FlexShrink(_) => todo!(),
-        // StyleAttr::FlexBasis(_) => todo!(),
-        // StyleAttr::RowGap(_) => todo!(),
-        // StyleAttr::ColumnGap(_) => todo!(),
-        // StyleAttr::GridAutoFlow(_) => todo!(),
-        // StyleAttr::GridTemplateRows(_) => todo!(),
-        // StyleAttr::GridTemplateColumns(_) => todo!(),
-        // StyleAttr::GridAutoRows(_) => todo!(),
-        // StyleAttr::GridAutoColumns(_) => todo!(),
-        // StyleAttr::GridRow(_) => todo!(),
-        // StyleAttr::GridColumn(_) => todo!(),
-        // StyleAttr::FontSize(_) => todo!(),
-        // StyleAttr::Font(_) => todo!(),
-        // StyleAttr::FontColor(_) => todo!(),
-        // StyleAttr::Background(_) => todo!(),
-        // StyleAttr::BorderRadius(_) => todo!(),
-    });
-
-    cmd.entity(target).insert(style);
 }
