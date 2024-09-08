@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-
+use bevy::text::Text as UiText;
 
 #[derive(Debug, Asset, TypePath)]
 pub enum XNode {
@@ -45,7 +45,6 @@ pub struct Include {
     pub children: Vec<XNode>,
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
@@ -59,7 +58,6 @@ pub enum StyleAttr {
     Display(Display),
     Position(PositionType),
     Overflow(Overflow),
-    Direction(Direction),
     Left(Val),
     Right(Val),
     Top(Val),
@@ -106,9 +104,10 @@ pub enum StyleAttr {
 
     // -----
     // font
+    Direction(Direction),
     FontSize(f32),
     Font(String),
-    FontColor(LinearRgba),
+    FontColor(Color),
 
     // -----
     // color
@@ -118,7 +117,7 @@ pub enum StyleAttr {
 
     // -----
     Hover(Box<StyleAttr>),
-    Active(Box<StyleAttr>),
+    Pressed(Box<StyleAttr>),
     // -----
     // animations
     Duration(f32),
@@ -131,7 +130,14 @@ impl From<StyleAttr> for Attribute {
 }
 
 impl StyleAttr {
-    pub fn apply(&self, entity: Entity, cmd: &mut Commands, style: &mut Style) {
+    pub fn apply(
+        &self,
+        entity: Entity,
+        cmd: &mut Commands,
+        style: &mut Style,
+        text: &mut Option<Mut<UiText>>,
+        server: &AssetServer,
+    ) {
         match self {
             StyleAttr::Display(display) => style.display = *display,
             StyleAttr::Position(position) => style.position_type = *position,
@@ -159,6 +165,32 @@ impl StyleAttr {
             StyleAttr::MinHeight(val) => style.min_height = *val,
             StyleAttr::MaxWidth(val) => style.max_width = *val,
             StyleAttr::MaxHeight(val) => style.max_height = *val,
+            StyleAttr::FlexWrap(val) => style.flex_wrap = *val,
+            StyleAttr::FlexGrow(val) => style.flex_grow = *val,
+            StyleAttr::FlexShrink(val) => style.flex_shrink = *val,
+            StyleAttr::FlexBasis(val) => style.flex_basis = *val,
+
+            StyleAttr::FontSize(val) => {
+                _ = text.as_mut().map(|txt| {
+                    txt.sections
+                        .iter_mut()
+                        .for_each(|section| section.style.font_size = *val)
+                });
+            }
+            StyleAttr::Font(val) => {
+                _ = text.as_mut().map(|txt| {
+                    txt.sections
+                        .iter_mut()
+                        .for_each(|section| section.style.font = server.load(val))
+                });
+            }
+            StyleAttr::FontColor(val) => {
+                _ = text.as_mut().map(|txt| {
+                    txt.sections
+                        .iter_mut()
+                        .for_each(|section| section.style.color = *val)
+                });
+            }
             StyleAttr::Background(color) => {
                 cmd.entity(entity).insert(BackgroundColor(*color));
             }
@@ -174,18 +206,7 @@ impl StyleAttr {
                 cmd.entity(entity).insert(BorderColor(*color));
             }
             _ => (),
-            // StyleAttr::Clicked(attrs) => {
-            //     // cmd.entity(entity).insert(ClickStyle(attrs.clone()));
-            // }
-            // StyleAttr::Hover(attrs) => {
-            //     // cmd.entity(entity).insert(HoverStyle(attrs.clone()));
-            // }
             // StyleAttr::AspectRatio(_) => todo!(),
-
-            // StyleAttr::FlexWrap(_) => todo!(),
-            // StyleAttr::FlexGrow(_) => todo!(),
-            // StyleAttr::FlexShrink(_) => todo!(),
-            // StyleAttr::FlexBasis(_) => todo!(),
             // StyleAttr::GridAutoFlow(_) => todo!(),
             // StyleAttr::GridTemplateRows(_) => todo!(),
             // StyleAttr::GridTemplateColumns(_) => todo!(),
@@ -193,9 +214,6 @@ impl StyleAttr {
             // StyleAttr::GridAutoColumns(_) => todo!(),
             // StyleAttr::GridRow(_) => todo!(),
             // StyleAttr::GridColumn(_) => todo!(),
-            // StyleAttr::FontSize(_) => todo!(),
-            // StyleAttr::Font(_) => todo!(),
-            // StyleAttr::FontColor(_) => todo!(),
         }
     }
 }

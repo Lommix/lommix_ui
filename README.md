@@ -1,24 +1,37 @@
-# Lommix ui
+# Effortless Bevy ui
 
-# Colors
+bevy ui loader for html-like syntax files. Work in Progress.
 
-## valid values:
+## Featuring
 
--   `20px`: Val::Px(20.)
--   `20vw`: Val::Vw(20.)
--   `20%`: Val::Percent(20.)
+-   Hotreload, iteratate fast.
+-   Conditional styling with prefix like `hover:..` & `pressed:..`
+-   Simple templating with `<include>` elements.
+-   Function bindings mapping strings to `systemId`
+-   Transition animations.
 
-## valid ui rects:
+## Example
 
--   `20px`: Uirect::all(value)
--   `20px 10px`: Uirect::axis(value, value)
--   `20px 10p% 5vw 3px`: Uirect::new(value,value,value,value)
+```html
+<div padding="10px">
+    <button
+        padding="5px"
+        hover:background="#0000FF"
+        background="#000000"
+        height="80px"
+        width="210px"
+        click="start_game"
+        border="10px"
+        border_color="#FFF"
+        border_radius="30px"
+    >
+        <text font_size="20" font_color="#FFF">click me</text>
+    </button>
+</div>
+```
 
-## valid colors:
+## Syntax
 
--   `#FFF`
--   `#FFFA` with alpha
--   `#FFFFFF`
--   `#FFFFFFAA` with alpha
--   `rgb(1,1,0.5)`
--   `rgba(1,1,0.8,1)`
+strict unified syntax. Take any Bevy naming, make it `snake_case`.
+
+[checkout the full syntax here](docs/styles.md)

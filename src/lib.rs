@@ -7,7 +7,7 @@ mod data;
 mod parse;
 
 pub mod prelude {
-    pub use crate::build::{RonUiBundle, StyleAttributes};
+    pub use crate::build::{UiBundle, StyleAttributes};
     pub use crate::error::ParseError;
     pub use crate::data::{Button, Div, Image, Include, Text, XNode, Attribute, StyleAttr};
     pub use crate::LommixUiPlugin;

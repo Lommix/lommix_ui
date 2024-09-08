@@ -5,7 +5,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins((
-            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+            // bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
             LommixUiPlugin,
         ))
         .add_systems(Startup, setup)
@@ -15,7 +15,7 @@ fn main() {
 fn setup(mut cmd: Commands, server: Res<AssetServer>) {
     cmd.spawn(Camera2dBundle::default());
 
-    cmd.spawn(RonUiBundle {
+    cmd.spawn(UiBundle {
         handle: server.load("demo_ui.html"),
         ..default()
     });

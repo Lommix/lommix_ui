@@ -22,36 +22,46 @@ pub struct UnbuildTag;
 pub struct UnStyled;
 
 #[derive(Bundle, Default)]
-pub struct RonUiBundle {
+pub struct UiBundle {
     pub handle: Handle<XNode>,
     pub tag: UnbuildTag,
 }
 
 fn update_interaction(
     mut cmd: Commands,
-    mut nodes: Query<(Entity, &mut Style, &StyleAttributes, &Interaction), Changed<Interaction>>,
+    mut nodes: Query<
+        (
+            Entity,
+            &mut Style,
+            &StyleAttributes,
+            &Interaction,
+            Option<&mut Text>,
+        ),
+        Changed<Interaction>,
+    >,
+    server: Res<AssetServer>,
 ) {
     nodes.iter_mut().for_each(
-        |(entity, mut style, style_attr, interaction)| match interaction {
+        |(entity, mut style, style_attr, interaction, mut maybe_text)| match interaction {
             Interaction::Pressed => {
                 style_attr.iter().for_each(|attr| {
-                    if let StyleAttr::Active(val) = attr {
-                        val.apply(entity, &mut cmd, &mut style);
+                    if let StyleAttr::Pressed(val) = attr {
+                        val.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server);
                     }
                 });
             }
             Interaction::Hovered => {
                 style_attr.iter().for_each(|attr| {
                     if let StyleAttr::Hover(val) = attr {
-                        val.apply(entity, &mut cmd, &mut style);
+                        val.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server);
                     }
                 });
             }
             Interaction::None => {
                 *style = Style::default();
                 style_attr.iter().for_each(|attr| match attr {
-                    StyleAttr::Hover(_) | StyleAttr::Active(_) => (),
-                    any => any.apply(entity, &mut cmd, &mut style),
+                    StyleAttr::Hover(_) | StyleAttr::Pressed(_) => (),
+                    any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
                 });
             }
         },
@@ -83,16 +93,24 @@ fn hotrealod(
 
 fn style_ui(
     mut cmd: Commands,
-    mut unstyled: Query<(Entity, &mut Style, &StyleAttributes), With<UnStyled>>,
+    mut unstyled: Query<(Entity, &mut Style, &StyleAttributes, Option<&mut Text>), With<UnStyled>>,
+    server: Res<AssetServer>,
 ) {
     unstyled
         .iter_mut()
-        .for_each(|(entity, mut style, style_attr)| {
+        .for_each(|(entity, mut style, style_attr, mut maybe_text)| {
             cmd.entity(entity).remove::<UnStyled>();
+
             style_attr.iter().for_each(|attr| match attr {
-                StyleAttr::Hover(_) | StyleAttr::Active(_) => (),
-                any => any.apply(entity, &mut cmd, &mut style),
+                StyleAttr::Hover(_) | StyleAttr::Pressed(_) => (),
+                any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
             });
+
+            // _ = texts.get_mut(entity).map(|mut text| {
+            //     for section in text.sections.iter_mut() {
+            //         section.style.font_size = 20.;
+            //     }
+            // });
         });
 }
 
@@ -148,7 +166,7 @@ fn build_recursive(
                 TextBundle::from_section(
                     &text.content,
                     TextStyle {
-                        font_size: 44.,
+                        font_size: 16., // default
                         color: Color::WHITE,
                         ..default()
                     },

@@ -4,6 +4,10 @@ use crate::{
     data::{Button, Div, Image, Include, Text},
     prelude::XNode,
 };
+use bevy::ui::{
+    AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap,
+    JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis, PositionType,
+};
 use bevy::{
     color::Color,
     ui::{UiRect, Val},
@@ -134,15 +138,47 @@ fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     Ok((input, attribute))
 }
 
+#[rustfmt::skip]
 fn parse_style<'a>(
     prefix: Option<&'a [u8]>,
     ident: &'a [u8],
     value: &'a [u8],
 ) -> IResult<&'a [u8], StyleAttr> {
     let (input, style) = match ident {
-        // b"duration" => map(nom::number::complete::f32, |val| StyleAttr::Duration(val))(value)?,
-        b"column_gap" => map(parse_val, |val| StyleAttr::ColumnGap(val))(value)?,
+        b"position" => map(parse_position_type, |val| StyleAttr::Position(val))(value)?,
+        b"display" => map(parse_display, |val| StyleAttr::Display(val))(value)?,
+        b"overflow" => map(parse_overflow, |val| StyleAttr::Overflow(val))(value)?,
+        b"direction" => map(parse_direction, |val| StyleAttr::Direction(val))(value)?,
+        // align & justify
+        b"align_self" => map(parse_align_self, |val| StyleAttr::AlignSelf(val))(value)?,
+        b"align_items" => map(parse_align_items, |val| StyleAttr::AlignItems(val))(value)?,
+        b"align_content" => map(parse_align_content, |val| StyleAttr::AlignContent(val))(value)?,
+        b"justify_self" => map(parse_justify_self, |val| StyleAttr::JustifySelf(val))(value)?,
+        b"justify_items" => map(parse_justify_items, |val| StyleAttr::JustifyItems(val))(value)?,
+        b"justify_content" => map(parse_justify_content, |val| StyleAttr::JustifyContent(val))(value)?,
+        // flex
+        b"flex_direction" => map(parse_flex_direction, |val| StyleAttr::FlexDirection(val))(value)?,
+        b"flex_wrap" => map(parse_flex_wrap, |val| StyleAttr::FlexWrap(val))(value)?,
+        b"flex_grow" => map(float, |val| StyleAttr::FlexGrow(val))(value)?,
+        b"flex_shrink" => map(float, |val| StyleAttr::FlexShrink(val))(value)?,
+        b"flex_basis" => map(parse_val, |val| StyleAttr::FlexBasis(val))(value)?,
         b"row_gap" => map(parse_val, |val| StyleAttr::RowGap(val))(value)?,
+        b"column_gap" => map(parse_val, |val| StyleAttr::ColumnGap(val))(value)?,
+
+        // grid
+        b"grid_auto_flow" => todo!(),
+        b"grid_auto_rows" => todo!(),
+        b"grid_auto_columns" => todo!(),
+        b"grid_template_rows" => todo!(),
+        b"grid_template_columns" => todo!(),
+        b"grid_row" => todo!(),
+        b"grid_column" => todo!(),
+
+        // values
+        b"font" => map(as_string, |val| StyleAttr::Font(val))(value)?,
+        b"font_color" => map(parse_color, |val| StyleAttr::FontColor(val))(value)?,
+        b"font_size" => map(parse_float, |val| StyleAttr::FontSize(val))(value)?,
+        b"duration" => map(parse_float, |val| StyleAttr::Duration(val))(value)?,
         b"max_height" => map(parse_val, |val| StyleAttr::MaxHeight(val))(value)?,
         b"max_width" => map(parse_val, |val| StyleAttr::MaxWidth(val))(value)?,
         b"min_height" => map(parse_val, |val| StyleAttr::MinHeight(val))(value)?,
@@ -168,10 +204,144 @@ fn parse_style<'a>(
     };
 
     match prefix {
-        Some(b"active") => Ok((input, StyleAttr::Hover(Box::new(style)))),
+        Some(b"pressed") => Ok((input, StyleAttr::Pressed(Box::new(style)))),
         Some(b"hover") => Ok((input, StyleAttr::Hover(Box::new(style)))),
         _ => Ok((input, style)),
     }
+}
+
+fn parse_float(input: &[u8]) -> IResult<&[u8], f32> {
+    nom::number::streaming::float(input)
+}
+
+fn parse_position_type(input: &[u8]) -> IResult<&[u8], PositionType> {
+    alt((
+        map(tag("absolute"), |_| PositionType::Absolute),
+        map(tag("relative"), |_| PositionType::Relative),
+    ))(input)
+}
+
+fn parse_display(input: &[u8]) -> IResult<&[u8], Display> {
+    alt((
+        map(tag("none"), |_| Display::None),
+        map(tag("flex"), |_| Display::Flex),
+        map(tag("block"), |_| Display::Block),
+        map(tag("grid"), |_| Display::Grid),
+    ))(input)
+}
+
+fn parse_direction(input: &[u8]) -> IResult<&[u8], Direction> {
+    alt((
+        map(tag("inherit"), |_| Direction::Inherit),
+        map(tag("left_to_right"), |_| Direction::LeftToRight),
+        map(tag("right_to_left"), |_| Direction::RightToLeft),
+    ))(input)
+}
+
+fn parse_overflow(input: &[u8]) -> IResult<&[u8], Overflow> {
+    let (input, (x, _, y)) = tuple((parse_overflow_axis, multispace0, parse_overflow_axis))(input)?;
+    Ok((input, Overflow { x, y }))
+}
+
+fn parse_overflow_axis(input: &[u8]) -> IResult<&[u8], OverflowAxis> {
+    alt((
+        map(tag("visible"), |_| OverflowAxis::Visible),
+        map(tag("hidden"), |_| OverflowAxis::Hidden),
+        map(tag("clip"), |_| OverflowAxis::Clip),
+    ))(input)
+}
+
+fn parse_align_items(input: &[u8]) -> IResult<&[u8], AlignItems> {
+    alt((
+        map(tag("default"), |_| AlignItems::Default),
+        map(tag("center"), |_| AlignItems::Center),
+        map(tag("start"), |_| AlignItems::Start),
+        map(tag("flex_end"), |_| AlignItems::FlexEnd),
+        map(tag("stretch"), |_| AlignItems::Stretch),
+        map(tag("end"), |_| AlignItems::End),
+        map(tag("baseline"), |_| AlignItems::Baseline),
+        map(tag("flex_start"), |_| AlignItems::FlexStart),
+    ))(input)
+}
+
+fn parse_align_content(input: &[u8]) -> IResult<&[u8], AlignContent> {
+    alt((
+        map(tag("center"), |_| AlignContent::Center),
+        map(tag("start"), |_| AlignContent::Start),
+        map(tag("flex_end"), |_| AlignContent::FlexEnd),
+        map(tag("stretch"), |_| AlignContent::Stretch),
+        map(tag("end"), |_| AlignContent::End),
+        map(tag("space_evenly"), |_| AlignContent::SpaceEvenly),
+        map(tag("space_around"), |_| AlignContent::SpaceAround),
+        map(tag("space_between"), |_| AlignContent::SpaceBetween),
+        map(tag("flex_start"), |_| AlignContent::FlexStart),
+    ))(input)
+}
+
+fn parse_align_self(input: &[u8]) -> IResult<&[u8], AlignSelf> {
+    alt((
+        map(tag("auto"), |_| AlignSelf::Auto),
+        map(tag("center"), |_| AlignSelf::Center),
+        map(tag("start"), |_| AlignSelf::Start),
+        map(tag("flex_end"), |_| AlignSelf::FlexEnd),
+        map(tag("stretch"), |_| AlignSelf::Stretch),
+        map(tag("end"), |_| AlignSelf::End),
+        map(tag("flex_start"), |_| AlignSelf::FlexStart),
+    ))(input)
+}
+
+fn parse_justify_items(input: &[u8]) -> IResult<&[u8], JustifyItems> {
+    alt((
+        map(tag("default"), |_| JustifyItems::Default),
+        map(tag("center"), |_| JustifyItems::Center),
+        map(tag("start"), |_| JustifyItems::Start),
+        map(tag("stretch"), |_| JustifyItems::Stretch),
+        map(tag("end"), |_| JustifyItems::End),
+        map(tag("baseline"), |_| JustifyItems::Baseline),
+    ))(input)
+}
+
+fn parse_justify_content(input: &[u8]) -> IResult<&[u8], JustifyContent> {
+    alt((
+        map(tag("center"), |_| JustifyContent::Center),
+        map(tag("start"), |_| JustifyContent::Start),
+        map(tag("flex_end"), |_| JustifyContent::FlexEnd),
+        map(tag("stretch"), |_| JustifyContent::Stretch),
+        map(tag("end"), |_| JustifyContent::End),
+        map(tag("space_evenly"), |_| JustifyContent::SpaceEvenly),
+        map(tag("space_around"), |_| JustifyContent::SpaceAround),
+        map(tag("space_between"), |_| JustifyContent::SpaceBetween),
+        map(tag("flex_start"), |_| JustifyContent::FlexStart),
+    ))(input)
+}
+
+fn parse_justify_self(input: &[u8]) -> IResult<&[u8], JustifySelf> {
+    alt((
+        map(tag("auto"), |_| JustifySelf::Auto),
+        map(tag("center"), |_| JustifySelf::Center),
+        map(tag("start"), |_| JustifySelf::Start),
+        map(tag("stretch"), |_| JustifySelf::Stretch),
+        map(tag("end"), |_| JustifySelf::End),
+        map(tag("baseline"), |_| JustifySelf::Baseline),
+    ))(input)
+}
+
+fn parse_flex_direction(input: &[u8]) -> IResult<&[u8], FlexDirection> {
+    alt((
+        map(tag("row"), |_| FlexDirection::Row),
+        map(tag("column"), |_| FlexDirection::Column),
+        map(tag("column_reverse"), |_| FlexDirection::ColumnReverse),
+        map(tag("row_reverse"), |_| FlexDirection::RowReverse),
+        map(tag("default"), |_| FlexDirection::DEFAULT),
+    ))(input)
+}
+
+fn parse_flex_wrap(input: &[u8]) -> IResult<&[u8], FlexWrap> {
+    alt((
+        map(tag("wrap"), |_| FlexWrap::Wrap),
+        map(tag("no_wrap"), |_| FlexWrap::NoWrap),
+        map(tag("wrap_reverse"), |_| FlexWrap::WrapReverse),
+    ))(input)
 }
 
 fn as_string(input: &[u8]) -> IResult<&[u8], String> {
@@ -195,7 +365,7 @@ fn parse_prefix0(input: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
 /// 20px/% single
 /// 10px/% 10px axis
 /// 10px 10px 10px 10px rect
-pub(crate) fn parse_ui_rect(input: &[u8]) -> IResult<&[u8], UiRect> {
+fn parse_ui_rect(input: &[u8]) -> IResult<&[u8], UiRect> {
     alt((
         // 10px 10px 10px 10px
         complete(map(
