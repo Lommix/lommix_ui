@@ -45,7 +45,9 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
     let (input, content, children ) = if !is_empty {
 
         let (input, children) = many0(parse_element)(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, content) = parse_content(input)?;
+        let (input, _) = multispace0(input)?;
         let (input, end_tag) = parse_end_tag(input)?;
 
         if start_tag != end_tag {
@@ -83,7 +85,8 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
         b"include" => Ok((input, XNode::Include(Include { styles, children, path: path? }))),
         b"button" => Ok((input, XNode::Button(Button { styles, children, action: click? }))),
         b"text" => Ok((input, XNode::Text(Text { styles, content: content.to_string() }))),
-        unkown => Err(nom::Err::Failure(nom::error::make_error(unkown, nom::error::ErrorKind::Tag)))
+        b"slot" => Ok((input, XNode::Slot)),
+        unkown => Err(nom::Err::Failure(nom::error::make_error(unkown, nom::error::ErrorKind::Tag))),
     }
 }
 
@@ -113,6 +116,7 @@ fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
     let (input, content) = map_res(take_while(|c: u8| c != b'>' && c != b'<'), |c| {
         std::str::from_utf8(c)
     })(input)?;
+
     Ok((input, content.trim().trim_end()))
 }
 
@@ -120,7 +124,7 @@ fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     let (input, (_, prefix, ident, _, value)) = tuple((
         multispace0,
         parse_prefix0,
-        take_while_m_n(1, 32, |c: u8| c != b'='),
+        take_while(|c: u8| c != b'='),
         tag("="),
         delimited(tag("\""), take_while(|b: u8| b != b'"'), tag("\"")),
     ))(input)?;
@@ -600,17 +604,11 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
-    #[test]
-    fn test_parse_element() {
-        let input = std::fs::read_to_string("test.xml").unwrap();
-        let result = parse_element(input.as_bytes());
-
-        match result {
-            Ok((_, _)) => (),
-            Err(err) => {
-                let err = err.map_input(|i| std::str::from_utf8(i));
-                dbg!(err);
-            }
-        };
+    #[test_case("./assets/panel.html")]
+    #[test_case("./assets/menu.html")]
+    #[test_case("./assets/button.html")]
+    fn parse_file(file_path: &str) {
+        let input = std::fs::read_to_string(file_path).unwrap();
+        parse_bytes(input.as_bytes()).unwrap();
     }
 }

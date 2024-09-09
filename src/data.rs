@@ -9,6 +9,7 @@ pub enum XNode {
     Text(Text),
     Button(Button),
     Include(Include),
+    Slot,
     Unkown,
 }
 
@@ -169,7 +170,14 @@ impl StyleAttr {
             StyleAttr::FlexGrow(val) => style.flex_grow = *val,
             StyleAttr::FlexShrink(val) => style.flex_shrink = *val,
             StyleAttr::FlexBasis(val) => style.flex_basis = *val,
-
+            StyleAttr::AspectRatio(val) => style.aspect_ratio = Some(*val),
+            StyleAttr::GridRow(val) => style.grid_row = *val,
+            StyleAttr::GridAutoFlow(val) => style.grid_auto_flow = *val,
+            StyleAttr::GridTemplateRows(val) => style.grid_template_rows = val.clone(),
+            StyleAttr::GridTemplateColumns(val) => style.grid_template_columns = val.clone(),
+            StyleAttr::GridAutoRows(val) => style.grid_auto_rows = val.clone(),
+            StyleAttr::GridAutoColumns(val) => style.grid_auto_columns = val.clone(),
+            StyleAttr::GridColumn(val) => style.grid_column = *val,
             StyleAttr::FontSize(val) => {
                 _ = text.as_mut().map(|txt| {
                     txt.sections
@@ -206,14 +214,6 @@ impl StyleAttr {
                 cmd.entity(entity).insert(BorderColor(*color));
             }
             _ => (),
-            // StyleAttr::AspectRatio(_) => todo!(),
-            // StyleAttr::GridAutoFlow(_) => todo!(),
-            // StyleAttr::GridTemplateRows(_) => todo!(),
-            // StyleAttr::GridTemplateColumns(_) => todo!(),
-            // StyleAttr::GridAutoRows(_) => todo!(),
-            // StyleAttr::GridAutoColumns(_) => todo!(),
-            // StyleAttr::GridRow(_) => todo!(),
-            // StyleAttr::GridColumn(_) => todo!(),
         }
     }
 }

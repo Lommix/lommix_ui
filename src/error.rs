@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ParseError {
-    #[error("could not read provided bytes stream to end `{0}`")]
+    #[error("failed to read bytes to end `{0}`")]
     FailedToRead(String),
 
     #[error("provided content is not utf8")]
@@ -11,6 +11,7 @@ pub enum ParseError {
 
     #[error("Failed to parse {0}")]
     Nom(nom::error::Error<String>),
+
     #[error("Failed with incomplete parse")]
     Incomplete,
 }
@@ -18,10 +19,12 @@ pub enum ParseError {
 impl<'a> From<nom::Err<nom::error::Error<&'a [u8]>>> for ParseError {
     fn from(err: nom::Err<nom::error::Error<&'a [u8]>>) -> Self {
         match err.map_input(|i| String::from_utf8_lossy(i).to_string()) {
-            nom::Err::Incomplete(_) => ParseError::Incomplete,
+            nom::Err::Incomplete(needed) => {
+                dbg!(needed);
+                ParseError::Incomplete
+            }
             nom::Err::Error(err) => ParseError::Nom(err),
             nom::Err::Failure(err) => ParseError::Nom(err),
         }
     }
 }
-

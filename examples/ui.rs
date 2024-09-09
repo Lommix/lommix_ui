@@ -1,11 +1,17 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResolution};
 use lommix_ui::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Effortless Ui".into(),
+                ..default()
+            }),
+            ..default()
+        }))
         .add_plugins((
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
             LommixUiPlugin,
         ))
         .add_systems(Startup, setup)
@@ -14,16 +20,8 @@ fn main() {
 
 fn setup(mut cmd: Commands, server: Res<AssetServer>) {
     cmd.spawn(Camera2dBundle::default());
-
     cmd.spawn(UiBundle {
-        handle: server.load("demo_ui.html"),
+        handle: server.load("menu.html"),
         ..default()
     });
-
-    // let root = cmd.spawn(NodeBundle::default()).id();
-    // let ui = server.load::<UiNode>("demo_ui.ron");
-    // cmd.spawn_empty().insert(ui);
-    // cmd.select_ui(root).spawn(NodeBundle::default(), |n| {
-    //     n.spawn(ButtonBundle::default(), |n| {});
-    // });
 }

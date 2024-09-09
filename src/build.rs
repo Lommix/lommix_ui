@@ -7,16 +7,28 @@ impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            ((hotrealod, build_ui, style_ui).chain(), update_interaction),
+            (
+                (hotreload, spawn_ui, move_children_to_slot, style_ui).chain(),
+                update_interaction,
+            ),
         );
     }
 }
+
+#[derive(Component)]
+pub struct SlotTag;
+
+#[derive(Component)]
+pub struct UnslotedChildren(Entity);
 
 #[derive(Component, Deref)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
 
 #[derive(Component, Default)]
 pub struct UnbuildTag;
+
+#[derive(Component, Default)]
+pub struct JustIncluded;
 
 #[derive(Component, Default)]
 pub struct UnStyled;
@@ -68,25 +80,36 @@ fn update_interaction(
     );
 }
 
-fn hotrealod(
+// [] includes:preserve slot on hotreload
+fn hotreload(
     mut cmd: Commands,
     mut events: EventReader<AssetEvent<XNode>>,
-    nodes: Query<(Entity, &Handle<XNode>, Option<&Parent>), Without<UnbuildTag>>,
+    nodes: Query<(Entity, Option<&Parent>, &Handle<XNode>), With<Node>>,
 ) {
     events.read().for_each(|ev| {
-        let AssetEvent::LoadedWithDependencies { id } = ev else {
-            return;
+        let id = match ev {
+            AssetEvent::Modified { id } => id,
+            _ => {
+                return;
+            }
         };
 
         nodes
             .iter()
-            .filter(|(_, handle, _)| handle.id() == *id)
-            .for_each(|(ent, handle, parent)| {
+            .filter(|(_, _, handle)| handle.id() == *id)
+            .for_each(|(ent, maybe_parent, handle)| {
                 cmd.entity(ent).despawn_recursive();
-                let id = cmd.spawn((handle.clone(), UnbuildTag)).id();
-                parent.map(|p| {
-                    cmd.entity(p.get()).add_child(id);
-                });
+
+                let ent = cmd
+                    .spawn(UiBundle {
+                        handle: handle.clone(),
+                        ..default()
+                    })
+                    .id();
+
+                if let Some(parent) = maybe_parent {
+                    cmd.entity(parent.get()).add_child(ent);
+                }
             });
     });
 }
@@ -99,22 +122,62 @@ fn style_ui(
     unstyled
         .iter_mut()
         .for_each(|(entity, mut style, style_attr, mut maybe_text)| {
-            cmd.entity(entity).remove::<UnStyled>();
-
             style_attr.iter().for_each(|attr| match attr {
                 StyleAttr::Hover(_) | StyleAttr::Pressed(_) => (),
                 any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
             });
-
-            // _ = texts.get_mut(entity).map(|mut text| {
-            //     for section in text.sections.iter_mut() {
-            //         section.style.font_size = 20.;
-            //     }
-            // });
+            cmd.entity(entity).remove::<UnStyled>();
         });
 }
 
-fn build_ui(
+fn move_children_to_slot(
+    mut cmd: Commands,
+    unsloted_includes: Query<(Entity, &UnslotedChildren)>,
+    children: Query<&Children>,
+    slots: Query<&SlotTag>,
+) {
+    unsloted_includes
+        .iter()
+        .for_each(|(entity, UnslotedChildren(slot_holder))| {
+            let Some(slot) = find_slot(entity, &slots, &children) else {
+                return;
+            };
+
+            info!("found slot! {slot}");
+            _ = children.get(*slot_holder).map(|children| {
+                children.iter().for_each(|child| {
+                    cmd.entity(slot).add_child(*child);
+                })
+            });
+
+            cmd.entity(entity).remove::<UnslotedChildren>();
+            cmd.entity(*slot_holder).despawn();
+        });
+}
+
+fn find_slot(
+    entity: Entity,
+    slots: &Query<&SlotTag>,
+    children: &Query<&Children>,
+) -> Option<Entity> {
+    if slots.get(entity).is_ok() {
+        return Some(entity);
+    }
+
+    let Ok(ent_children) = children.get(entity) else {
+        return None;
+    };
+
+    for child in ent_children.iter() {
+        if let Some(slot) = find_slot(*child, slots, children) {
+            return Some(slot);
+        }
+    }
+
+    None
+}
+
+fn spawn_ui(
     mut cmd: Commands,
     unbuild: Query<(Entity, &Handle<XNode>), With<UnbuildTag>>,
     assets: Res<Assets<XNode>>,
@@ -124,12 +187,18 @@ fn build_ui(
         let Some(ui_node) = assets.get(handle) else {
             return;
         };
-        build_recursive(ent, &ui_node, &mut cmd, &assets, &server);
+
+        info!(
+            "spawning ui {}",
+            handle.path().map(|p| p.to_string()).unwrap_or_default()
+        );
+
+        build_node(ent, &ui_node, &mut cmd, &assets, &server);
         cmd.entity(ent).remove::<UnbuildTag>();
     });
 }
 
-fn build_recursive(
+fn build_node(
     entity: Entity,
     node: &XNode,
     cmd: &mut Commands,
@@ -158,7 +227,6 @@ fn build_recursive(
                 UnStyled,
             ));
             None
-            // Some(&img.children)
         }
         XNode::Text(text) => {
             cmd.entity(entity).insert((
@@ -188,14 +256,28 @@ fn build_recursive(
         }
         XNode::Include(inc) => {
             let handle = server.load::<XNode>(&inc.path);
+
             cmd.entity(entity)
-                .insert((UnStyled, Name::new("Include"), handle, UnbuildTag));
+                .insert((handle, UnbuildTag, NodeBundle::default(), UnStyled));
 
-            // if let Some(click_action) = click {
-            //     cmd.entity(entity).insert(ClickAction(click_action.into()));
-            // }
+            if inc.children.len() > 0 {
+                let slot_holder = cmd.spawn_empty().id();
 
-            Some(&inc.children)
+                inc.children.iter().for_each(|child_node| {
+                    let child = cmd.spawn_empty().id();
+                    build_node(child, child_node, cmd, assets, server);
+                    cmd.entity(slot_holder).add_child(child);
+                });
+
+                info!("found unsloted children");
+                cmd.entity(entity).insert(UnslotedChildren(slot_holder));
+            }
+
+            None
+        }
+        XNode::Slot => {
+            cmd.entity(entity).insert((SlotTag, NodeBundle::default()));
+            return;
         }
         _ => {
             return;
@@ -205,8 +287,10 @@ fn build_recursive(
     children.map(|children| {
         children.iter().for_each(|child_node| {
             let child = cmd.spawn_empty().id();
+            build_node(child, child_node, cmd, assets, server);
             cmd.entity(entity).add_child(child);
-            build_recursive(child, child_node, cmd, assets, server);
         });
     });
+
+    // add slot
 }
