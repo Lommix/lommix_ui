@@ -1,14 +1,8 @@
-<div justify_content="center" align_items="center" padding="20px">
-    <div
-        padding="20px 30px"
-        flex_direction="column"
-        row_gap="20px"
-        border="5px"
-        border_color="#FFF"
-        border_radius="30px"
-        justify_content="center"
-        background="#338"
-    >
+<div flex_direction="column">
+
+	<custom />
+
+    <include path="panel.html">
         <img align_self="center" width="100px" path="bevy_bird_dark.png" />
 
         <div justify_content="center" flex_direction="row">
@@ -22,31 +16,5 @@
         <include path="button.html">
             <text>Credits</text>
         </include>
-
-        <button
-            hover:background="#0000FF"
-            pressed:background="#FF0000"
-            background="#000000"
-            height="80px"
-            width="250px"
-            click="start_game"
-            border="2px"
-            border_color="#FFF"
-            border_radius="10px"
-            justify_content="center"
-            align_items="center"
-        >
-            <div
-                justify_content="center"
-                align_items="center"
-                border="12px"
-                background="#445"
-                width="100%"
-                height="100%"
-                border_radius="18px"
-            >
-                <text>Exit</text>
-            </div>
-        </button>
-    </div>
+    </include>
 </div>

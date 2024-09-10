@@ -2,56 +2,39 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::text::Text as UiText;
 
-#[derive(Debug, Asset, TypePath)]
-pub enum XNode {
-    Div(Div),
-    Image(Image),
-    Text(Text),
-    Button(Button),
-    Include(Include),
+#[derive(Debug)]
+pub enum NodeType {
+    Div,
+    Image,
+    Text,
+    Button,
+    Include,
     Slot,
-    Unkown,
+    Custom(String),
 }
 
-// -------------------------------
-#[derive(Debug, Default)]
-pub struct Div {
-    pub styles: Vec<StyleAttr>,
+#[derive(Debug, Asset, TypePath)]
+pub struct XNode {
+    pub attributes: Vec<Attribute>,
+    pub content: Option<String>,
     pub children: Vec<XNode>,
-}
-
-#[derive(Debug, Default)]
-pub struct Image {
-    pub path: String,
-    pub styles: Vec<StyleAttr>,
-}
-
-#[derive(Debug, Default)]
-pub struct Text {
-    pub content: String,
-    pub styles: Vec<StyleAttr>,
-}
-
-#[derive(Debug, Default)]
-pub struct Button {
-    pub action: String,
-    pub styles: Vec<StyleAttr>,
-    pub children: Vec<XNode>,
-}
-
-#[derive(Debug, Default)]
-pub struct Include {
-    pub path: String,
-    pub styles: Vec<StyleAttr>,
-    pub children: Vec<XNode>,
+    pub node_type: NodeType,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
+    Prop(String, String),
+    Action(Action),
     Path(String),
-    Click(String),
-    Compontent(String),
+    SpawnFunction(String),
+}
+
+#[derive(Component, Debug, PartialEq, Clone)]
+pub enum Action {
+    OnPress(String),
+    OnEnter(String),
+    OnExit(String),
 }
 
 #[derive(Debug, PartialEq, Clone)]

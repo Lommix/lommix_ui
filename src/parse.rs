@@ -1,9 +1,6 @@
-use crate::data::{Attribute, StyleAttr};
+use crate::data::{Action, Attribute, StyleAttr};
 use crate::error::ParseError;
-use crate::{
-    data::{Button, Div, Image, Include, Text},
-    prelude::XNode,
-};
+use crate::prelude::{NodeType, XNode};
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap,
     JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis, PositionType,
@@ -46,7 +43,7 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
 
         let (input, children) = many0(parse_element)(input)?;
         let (input, _) = multispace0(input)?;
-        let (input, content) = parse_content(input)?;
+        let (input, content) = map(parse_content,|content| if content.len() > 0 { Some(content.to_string())  } else {None})(input)?;
         let (input, _) = multispace0(input)?;
         let (input, end_tag) = parse_end_tag(input)?;
 
@@ -56,38 +53,34 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
 
         ( input, content, children )
 
-    } else {( input, "", vec![] )};
+    } else {( input, None, vec![] )};
 
 
-    let styles = attributes.iter().flat_map(|attr|
-        match  attr { Attribute::Style(style) => Some(style),
-            _ => None }).cloned().collect::<Vec<_>>();
+    let (_, node_type) = parse_node_type(start_tag)?;
 
-    // @todo: move
-    let path = attributes.iter().flat_map(|attr|
-        match attr {
-            Attribute::Path(path) => Some(path.clone()),
-            _ => None
-        }
-    ).next().ok_or(nom::Err::Failure(nom::error::make_error(start_tag, nom::error::ErrorKind::Tag)));
+    let node = XNode{
+        node_type,
+        children,
+        attributes,
+        content,
+    };
 
-    // @todo: move
-    let click = attributes.iter().flat_map(|attr|
-        match attr {
-            Attribute::Click(path) => Some(path.clone()),
-            _ => None
-        }
-    ).next().ok_or(nom::Err::Failure(nom::error::make_error(start_tag, nom::error::ErrorKind::Tag)));
+    Ok((input, node))
+}
 
-    match start_tag {
-        b"div" => Ok((input, XNode::Div(Div { styles, children }))),
-        b"img" => Ok((input, XNode::Image(Image { styles, path: path? }))),
-        b"include" => Ok((input, XNode::Include(Include { styles, children, path: path? }))),
-        b"button" => Ok((input, XNode::Button(Button { styles, children, action: click? }))),
-        b"text" => Ok((input, XNode::Text(Text { styles, content: content.to_string() }))),
-        b"slot" => Ok((input, XNode::Slot)),
-        unkown => Err(nom::Err::Failure(nom::error::make_error(unkown, nom::error::ErrorKind::Tag))),
-    }
+fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
+    alt((
+        map(tag("div"), |_| NodeType::Div),
+        map(tag("img"), |_| NodeType::Image),
+        map(tag("include"), |_| NodeType::Include),
+        map(tag("button"), |_| NodeType::Button),
+        map(tag("text"), |_| NodeType::Text),
+        map(tag("slot"), |_| NodeType::Slot),
+        map(take_while1(|u: u8| u.is_ascii_alphabetic()), |val| {
+            let custom = String::from_utf8_lossy(val).to_string();
+            NodeType::Custom(custom)
+        }),
+    ))(input)
 }
 
 fn parse_start_tag(input: &[u8]) -> IResult<&[u8], (&[u8], Vec<Attribute>, bool)> {
@@ -129,10 +122,39 @@ fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
         delimited(tag("\""), take_while(|b: u8| b != b'"'), tag("\"")),
     ))(input)?;
 
+    match prefix {
+        Some(b"on") => match ident {
+            b"exit" => {
+                return Ok((
+                    input,
+                    Attribute::Action(Action::OnExit(as_string(value).map(|(_, string)| string)?)),
+                ));
+            }
+            b"enter" => {
+                return Ok((
+                    input,
+                    Attribute::Action(Action::OnEnter(as_string(value).map(|(_, string)| string)?)),
+                ));
+            }
+            b"press" => {
+                return Ok((
+                    input,
+                    Attribute::Action(Action::OnPress(as_string(value).map(|(_, string)| string)?)),
+                ));
+            }
+            _ => (),
+        },
+        Some(b"prop") => {
+            let (_, prop_ident) = as_string(ident)?;
+            let (_, prop_value) = as_string(value)?;
+            return Ok((input, Attribute::Prop(prop_ident, prop_value)));
+        }
+        _ => (),
+    };
+
     let attribute = match ident {
-        b"comp" => Attribute::Compontent(as_string(value).map(|(_, string)| string)?),
+        b"spawn" => Attribute::SpawnFunction(as_string(value).map(|(_, string)| string)?),
         b"path" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
-        b"click" => Attribute::Click(as_string(value).map(|(_, string)| string)?),
         ident => {
             let (_, style) = parse_style(prefix, ident, value)?;
             Attribute::Style(style)
@@ -579,7 +601,6 @@ mod tests {
     fn test_color(input: &str, expected: Color) {
         let result = parse_color(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
-        // assert_eq!(color.to_linear(), Color::WHITE.to_linear());
     }
 
     #[test_case("20vw", Val::Vw(20.))]
@@ -609,6 +630,7 @@ mod tests {
     #[test_case("./assets/button.html")]
     fn parse_file(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
-        parse_bytes(input.as_bytes()).unwrap();
+        let node = parse_bytes(input.as_bytes()).unwrap();
+        // dbg!(node);
     }
 }
