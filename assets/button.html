@@ -1,16 +1,15 @@
 <button
-    hover:background="#0000FF"
+    hover:background="#333"
     pressed:background="#0aa"
-    background="#000000"
+    background="${color}"
     height="80px"
     width="100%"
-    on:press="start_game"
+	on:press="${press}"
     border="2px"
-    border_color="#000"
-    border_radius="25px"
+    border_color="${color}"
+    border_radius="5px"
     justify_content="center"
     align_items="center"
 >
-
     <slot />
 </button>

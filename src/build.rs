@@ -1,10 +1,9 @@
-use bevy::prelude::*;
-
 use crate::{
-    data::{Action, Attribute, NodeType, XNode},
-    load::ClickAction,
+    data::{Action, Attribute, NodeType, Property, XNode},
     prelude::{SpawnBindings, StyleAttr},
+    properties::{PropTree, PropertyDefintions, ToCompile},
 };
+use bevy::prelude::*;
 
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
@@ -31,11 +30,22 @@ pub struct UnslotedChildren(Entity);
 #[derive(Component, Deref)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
 
+impl StyleAttributes {}
+
 #[derive(Component, Default)]
 pub struct UnbuildTag;
 
 #[derive(Component, Default)]
 pub struct UnStyled;
+
+#[derive(Component)]
+pub struct OnPress(pub String);
+
+#[derive(Component)]
+pub struct OnEnter(pub String);
+
+#[derive(Component)]
+pub struct OnExit(pub String);
 
 #[derive(Bundle, Default)]
 pub struct UiBundle {
@@ -164,22 +174,6 @@ fn find_sloted_children(
     out
 }
 
-fn find_parent_template(
-    entity: Entity,
-    parents: &Query<&Parent>,
-    templates: &Query<(Entity, &Handle<XNode>)>,
-) -> Option<(Entity, Handle<XNode>)> {
-    let Ok(parent_ent) = parents.get(entity).map(|p| p.get()) else {
-        return None;
-    };
-
-    if let Ok((entity, handle)) = templates.get(parent_ent) {
-        return Some((entity, handle.clone()));
-    }
-
-    find_parent_template(parent_ent, parents, templates)
-}
-
 fn style_ui(
     mut cmd: Commands,
     mut unstyled: Query<(Entity, &mut Style, &StyleAttributes, Option<&mut Text>), With<UnStyled>>,
@@ -259,6 +253,9 @@ fn spawn_ui(
     assets: Res<Assets<XNode>>,
     server: Res<AssetServer>,
     spawn_bindings: Res<SpawnBindings>,
+    parents: Query<&Parent>,
+    loaded_props: Query<&PropertyDefintions>,
+    mut prop_tree: ResMut<PropTree>,
 ) {
     unbuild.iter().for_each(|(ent, handle)| {
         let Some(ui_node) = assets.get(handle) else {
@@ -270,56 +267,26 @@ fn spawn_ui(
             handle.path().map(|p| p.to_string()).unwrap_or_default()
         );
 
-        build_node(ent, &ui_node, &mut cmd, &assets, &server, &spawn_bindings);
+        if parents.get(ent).is_ok() {
+            info!("hass prent ",);
+        }
+
+        build_node(
+            ent,
+            &ui_node,
+            &mut cmd,
+            &assets,
+            &server,
+            &spawn_bindings,
+            &mut prop_tree,
+        );
+
         cmd.entity(ent).remove::<UnbuildTag>();
     });
 }
 
-fn filter_styles(attributes: &Vec<Attribute>) -> Vec<StyleAttr> {
-    attributes
-        .iter()
-        .flat_map(|attr| {
-            if let Attribute::Style(style) = attr {
-                return Some(style.clone());
-            }
-            None
-        })
-        .collect::<Vec<_>>()
-}
-
-fn get_path(attributes: &Vec<Attribute>) -> Option<String> {
-    for attr in attributes.iter() {
-        if let Attribute::Path(path) = attr {
-            return Some(path.to_string());
-        }
-    }
-    None
-}
-
-fn filter_action(attributes: &Vec<Attribute>) -> Vec<Action> {
-    attributes
-        .iter()
-        .flat_map(|attr| {
-            if let Attribute::Action(action) = attr {
-                return Some(action.clone());
-            }
-            None
-        })
-        .collect::<Vec<_>>()
-}
-
-fn filter_spawn_function(attributes: &Vec<Attribute>) -> Vec<String> {
-    attributes
-        .iter()
-        .flat_map(|attr| {
-            if let Attribute::SpawnFunction(action) = attr {
-                return Some(action.clone());
-            }
-            None
-        })
-        .collect::<Vec<_>>()
-}
-
+/// big recursive boy
+#[allow(clippy::too_many_arguments)]
 fn build_node(
     entity: Entity,
     node: &XNode,
@@ -327,32 +294,44 @@ fn build_node(
     assets: &Assets<XNode>,
     server: &AssetServer,
     spawn_bindings: &SpawnBindings,
+    prop_tree: &mut PropTree,
 ) {
-    filter_spawn_function(&node.attributes)
-        .iter()
-        .for_each(|spawn_fn| {
-            spawn_bindings.maybe_run(spawn_fn, entity, cmd);
-        });
+    let mut attributes = SortedAttributes::from(&node.attributes);
+    // parent later
+    for (key, value) in attributes.definitions.drain(..) {
+        prop_tree.insert(entity, key, value);
+    }
+
+    if attributes.properties.len() > 0 {
+        cmd.entity(entity).insert(ToCompile(
+            attributes.properties.drain(..).collect::<Vec<_>>(),
+        ));
+    }
+
+    // todo --> move to seperate system
+    attributes.spawn_functions_keys.iter().for_each(|key| {
+        spawn_bindings.maybe_run(key, entity, cmd);
+    });
 
     // build node
     match &node.node_type {
-        NodeType::Div => {
+        NodeType::Node => {
             cmd.entity(entity).insert((
                 Name::new("Div"),
                 NodeBundle::default(),
-                StyleAttributes(filter_styles(&node.attributes)),
+                StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
                 UnStyled,
             ));
         }
         NodeType::Image => {
-            if let Some(path) = get_path(&node.attributes) {
+            if let Some(path) = attributes.path {
                 cmd.entity(entity).insert((
                     Name::new("Image"),
                     ImageBundle {
                         image: UiImage::new(server.load(path)),
                         ..default()
                     },
-                    StyleAttributes(filter_styles(&node.attributes)),
+                    StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
                     UnStyled,
                 ));
             } else {
@@ -370,7 +349,7 @@ fn build_node(
                         ..default()
                     },
                 ),
-                StyleAttributes(filter_styles(&node.attributes)),
+                StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
                 UnStyled,
             ));
         }
@@ -378,16 +357,16 @@ fn build_node(
             cmd.entity(entity).insert((
                 Name::new("Button"),
                 ButtonBundle::default(),
-                StyleAttributes(filter_styles(&node.attributes)),
+                StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
                 UnStyled,
             ));
 
-            for action in filter_action(&node.attributes).drain(..) {
-                cmd.entity(entity).insert(action);
+            for action in attributes.actions.drain(..) {
+                action.apply(cmd.entity(entity));
             }
         }
         NodeType::Include => {
-            let path = get_path(&node.attributes).unwrap_or_default();
+            let path = attributes.path.unwrap_or_default();
             info!("loading component {path}");
             let handle = server.load::<XNode>(path);
 
@@ -399,7 +378,19 @@ fn build_node(
 
                 node.children.iter().for_each(|child_node| {
                     let child = cmd.spawn(SlotedNode).id();
-                    build_node(child, child_node, cmd, assets, server, spawn_bindings);
+
+                    // save the real parent after slot insert
+                    prop_tree.set_parent(child, entity);
+
+                    build_node(
+                        child,
+                        child_node,
+                        cmd,
+                        assets,
+                        server,
+                        spawn_bindings,
+                        prop_tree,
+                    );
                     cmd.entity(slot_holder).add_child(child);
                 });
 
@@ -421,9 +412,46 @@ fn build_node(
 
     for child_node in node.children.iter() {
         let child = cmd.spawn_empty().id();
-        build_node(child, child_node, cmd, assets, server, spawn_bindings);
+        // prop_tree.hirachy.insert(child, entity);
+        prop_tree.set_parent(child, entity);
+
+        build_node(
+            child,
+            child_node,
+            cmd,
+            assets,
+            server,
+            spawn_bindings,
+            prop_tree,
+        );
+
         cmd.entity(entity).add_child(child);
     }
+}
 
-    // add slot
+#[derive(Default)]
+struct SortedAttributes {
+    pub styles: Vec<StyleAttr>,
+    pub actions: Vec<Action>,
+    pub path: Option<String>,
+    pub spawn_functions_keys: Vec<String>,
+    pub definitions: Vec<(String, String)>,
+    pub properties: Vec<Property>,
+}
+
+impl From<&Vec<Attribute>> for SortedAttributes {
+    fn from(value: &Vec<Attribute>) -> Self {
+        let mut sorted = SortedAttributes::default();
+        for attr in value.iter().cloned() {
+            _ = match attr {
+                Attribute::Style(style) => sorted.styles.push(style),
+                Attribute::Action(action) => sorted.actions.push(action),
+                Attribute::Path(path) => sorted.path = Some(path),
+                Attribute::SpawnFunction(spawn) => sorted.spawn_functions_keys.push(spawn),
+                Attribute::PropertyDefinition(key, val) => sorted.definitions.push((key, val)),
+                Attribute::Property(prop) => sorted.properties.push(prop),
+            };
+        }
+        sorted
+    }
 }

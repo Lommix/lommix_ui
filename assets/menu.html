@@ -1,20 +1,33 @@
-<div flex_direction="column">
-
-	<custom />
-
+<node flex_direction="column" prop:press="start_game">
     <include path="panel.html">
         <img align_self="center" width="100px" path="bevy_bird_dark.png" />
 
-        <div justify_content="center" flex_direction="row">
+        <node justify_content="center" flex_direction="row">
             <text font_size="40,0"> Effortless Ui </text>
-        </div>
+        </node>
 
-        <include path="button.html" prop:click="start_game">
-            <text>Play this game</text>
+        <include path="panel.html" prop:color="#8F2">
+            <include path="button.html">
+                <text>Play this game</text>
+            </include>
+
+            <include path="button.html">
+                <text>Credits</text>
+            </include>
         </include>
 
-        <include path="button.html">
-            <text>Credits</text>
+        <include path="panel.html">
+            <include path="button.html">
+                <text>Credits</text>
+            </include>
+
+            <include path="button.html">
+                <text>Credits</text>
+            </include>
+
+            <include path="button.html">
+                <text>Credits</text>
+            </include>
         </include>
     </include>
-</div>
+</node>

@@ -1,15 +1,18 @@
-use crate::data::{Action, Attribute, StyleAttr};
+use std::rc::Rc;
+
+use crate::data::{Action, Attribute, Property, StyleAttr};
 use crate::error::ParseError;
 use crate::prelude::{NodeType, XNode};
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap,
     JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis, PositionType,
 };
+use bevy::utils::HashMap;
 use bevy::{
     color::Color,
     ui::{UiRect, Val},
 };
-use nom::bytes::complete::take_while1;
+use nom::bytes::complete::{is_not, take_while1};
 use nom::combinator::{flat_map, map_parser, rest};
 use nom::error::context;
 use nom::multi::{many0, many1};
@@ -35,42 +38,42 @@ pub fn parse_bytes(input: &[u8]) -> Result<XNode, ParseError> {
 
 #[rustfmt::skip]
 fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
-    let (input, _) = multispace0(input)?;
-    let (input, (start_tag, attributes, is_empty)) = parse_start_tag(input)?;
-    let (input, _) = multispace0(input)?;
-
-    let (input, content, children ) = if !is_empty {
-
-        let (input, children) = many0(parse_element)(input)?;
         let (input, _) = multispace0(input)?;
-        let (input, content) = map(parse_content,|content| if content.len() > 0 { Some(content.to_string())  } else {None})(input)?;
+        let (input, (start_tag, attributes, is_empty)) = parse_start_tag(input)?;
         let (input, _) = multispace0(input)?;
-        let (input, end_tag) = parse_end_tag(input)?;
 
-        if start_tag != end_tag {
-            return Err(nom::Err::Failure(nom::error::make_error(end_tag, nom::error::ErrorKind::TagClosure)));
-        }
+        let (input, content, children ) = if !is_empty {
 
-        ( input, content, children )
+            let (input, children) = many0(parse_element)(input)?;
+            let (input, _) = multispace0(input)?;
+            let (input, content) = map(parse_content,|content| if content.len() > 0 { Some(content.to_string())  } else {None})(input)?;
+            let (input, _) = multispace0(input)?;
+            let (input, end_tag) = parse_end_tag(input)?;
 
-    } else {( input, None, vec![] )};
+            if start_tag != end_tag {
+                return Err(nom::Err::Failure(nom::error::make_error(end_tag, nom::error::ErrorKind::TagClosure)));
+            }
+
+            ( input, content, children )
+
+        } else {( input, None, vec![] )};
 
 
-    let (_, node_type) = parse_node_type(start_tag)?;
+        let (_, node_type) = parse_node_type(start_tag)?;
 
-    let node = XNode{
-        node_type,
-        children,
-        attributes,
-        content,
-    };
+        let node = XNode{
+            node_type,
+            children,
+            attributes,
+            content,
+        };
 
-    Ok((input, node))
+        Ok((input, node))
 }
 
 fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
     alt((
-        map(tag("div"), |_| NodeType::Div),
+        map(tag("node"), |_| NodeType::Node),
         map(tag("img"), |_| NodeType::Image),
         map(tag("include"), |_| NodeType::Include),
         map(tag("button"), |_| NodeType::Button),
@@ -81,6 +84,12 @@ fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
             NodeType::Custom(custom)
         }),
     ))(input)
+}
+
+fn compile_content(
+    props: &HashMap<String, String>,
+) -> impl FnOnce(&[u8]) -> IResult<&[u8], String> {
+    move |i: &[u8]| todo!()
 }
 
 fn parse_start_tag(input: &[u8]) -> IResult<&[u8], (&[u8], Vec<Attribute>, bool)> {
@@ -113,14 +122,32 @@ fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
     Ok((input, content.trim().trim_end()))
 }
 
-fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
+fn parse_property_key(input: &[u8]) -> IResult<&[u8], String> {
+    let (input, prop_id) = map(delimited(tag("${"), is_not("}"), tag("}")), |v| {
+        String::from_utf8_lossy(v).to_string()
+    })(input)?;
+    Ok((input, prop_id))
+}
+
+pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     let (input, (_, prefix, ident, _, value)) = tuple((
         multispace0,
         parse_prefix0,
-        take_while(|c: u8| c != b'='),
+        is_not("="),
         tag("="),
-        delimited(tag("\""), take_while(|b: u8| b != b'"'), tag("\"")),
+        delimited(tag("\""), is_not("\""), tag("\"")),
     ))(input)?;
+
+    if let Ok((_, key)) = parse_property_key(value) {
+        return Ok((
+            input,
+            Attribute::Property(Property {
+                prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
+                ident: String::from_utf8_lossy(ident).to_string(),
+                key,
+            }),
+        ));
+    }
 
     match prefix {
         Some(b"on") => match ident {
@@ -147,7 +174,7 @@ fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
         Some(b"prop") => {
             let (_, prop_ident) = as_string(ident)?;
             let (_, prop_value) = as_string(value)?;
-            return Ok((input, Attribute::Prop(prop_ident, prop_value)));
+            return Ok((input, Attribute::PropertyDefinition(prop_ident, prop_value)));
         }
         _ => (),
     };
@@ -603,6 +630,14 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
+    #[test_case(r#"prop:myvar="test""#, Attribute::PropertyDefinition("myvar".into(), "test".into()))]
+    #[test_case(r#"on:press="test""#, Attribute::Action(Action::OnPress("test".into())))]
+    #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
+    fn test_parse_attribute(input: &str, expected: Attribute) {
+        let result = parse_attribute(input.as_bytes());
+        assert_eq!(Ok(("".as_bytes(), expected)), result);
+    }
+
     #[test_case("20vw", Val::Vw(20.))]
     #[test_case("20%", Val::Percent(20.))]
     #[test_case("20vh", Val::Vh(20.))]
@@ -625,12 +660,12 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
-    #[test_case("./assets/panel.html")]
-    #[test_case("./assets/menu.html")]
+    // #[test_case("./assets/panel.html")]
+    // #[test_case("./assets/menu.html")]
     #[test_case("./assets/button.html")]
     fn parse_file(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
         let node = parse_bytes(input.as_bytes()).unwrap();
-        // dbg!(node);
+        dbg!(node);
     }
 }

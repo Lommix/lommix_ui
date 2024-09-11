@@ -61,3 +61,7 @@ fn delete_me(entity: In<Entity>, mut cmd: Commands) {
 fn start_game(entity: In<Entity>, mut cmd: Commands) {
     info!("hello world from start game system");
 }
+
+fn add_collapse(entity: In<Entity>, mut cmd: Commands) {
+    info!("hello world from start game system");
+}

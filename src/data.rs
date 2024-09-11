@@ -1,10 +1,11 @@
 use crate::prelude::*;
+use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
 use bevy::text::Text as UiText;
 
 #[derive(Debug)]
 pub enum NodeType {
-    Div,
+    Node,
     Image,
     Text,
     Button,
@@ -24,17 +25,41 @@ pub struct XNode {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
-    Prop(String, String),
+    PropertyDefinition(String, String),
+    Property(Property),
     Action(Action),
     Path(String),
     SpawnFunction(String),
 }
 
-#[derive(Component, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct Property {
+    pub prefix: Option<String>,
+    pub ident: String,
+    pub key: String,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Action {
     OnPress(String),
     OnEnter(String),
     OnExit(String),
+}
+
+impl Action {
+    pub fn apply(self, mut cmd: EntityCommands) {
+        match self {
+            Action::OnPress(fn_id) => {
+                cmd.insert(crate::prelude::OnPress(fn_id));
+            }
+            Action::OnEnter(fn_id) => {
+                cmd.insert(crate::prelude::OnEnter(fn_id));
+            }
+            Action::OnExit(fn_id) => {
+                cmd.insert(crate::prelude::OnExit(fn_id));
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
