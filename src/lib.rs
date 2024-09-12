@@ -9,8 +9,10 @@ mod parse;
 mod properties;
 
 pub mod prelude {
-    pub use crate::bindings::{FunctionBindings, SpawnBindings};
-    pub use crate::build::{StyleAttributes, UiBundle, OnPress, OnExit, OnEnter};
+    pub use crate::bindings::{Callback, ComponenRegistry, FunctionBindings};
+    pub use crate::build::{
+        OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, UiBundle, UiId, UiTarget,
+    };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, XNode};
     pub use crate::error::ParseError;
     pub use crate::LommixUiPlugin;

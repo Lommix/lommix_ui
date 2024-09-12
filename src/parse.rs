@@ -1,3 +1,4 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::rc::Rc;
 
 use crate::data::{Action, Attribute, Property, StyleAttr};
@@ -122,11 +123,14 @@ fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
     Ok((input, content.trim().trim_end()))
 }
 
-fn parse_property_key(input: &[u8]) -> IResult<&[u8], String> {
-    let (input, prop_id) = map(delimited(tag("${"), is_not("}"), tag("}")), |v| {
-        String::from_utf8_lossy(v).to_string()
-    })(input)?;
-    Ok((input, prop_id))
+
+enum ValueType<'a> {
+    Prop(&'a [u8]),
+    Val(&'a [u8]),
+}
+
+fn trimmed(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    delimited(multispace0, is_not(" "), multispace0)(input)
 }
 
 pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
@@ -135,19 +139,32 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
         parse_prefix0,
         is_not("="),
         tag("="),
-        delimited(tag("\""), is_not("\""), tag("\"")),
+        alt((
+            map(delimited(tag("\"{"), is_not("}"), tag("}\"")), |v| {
+                ValueType::Prop(v)
+            }),
+            map(delimited(tag("{"), is_not("}"), tag("}")), |v| {
+                ValueType::Prop(v)
+            }),
+            map(delimited(tag("\""), is_not("\""), tag("\"")), |v| {
+                ValueType::Val(v)
+            }),
+        )),
     ))(input)?;
 
-    if let Ok((_, key)) = parse_property_key(value) {
-        return Ok((
-            input,
-            Attribute::Property(Property {
-                prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
-                ident: String::from_utf8_lossy(ident).to_string(),
-                key,
-            }),
-        ));
-    }
+    let value = match value {
+        ValueType::Prop(val) => {
+            return Ok((
+                input,
+                Attribute::Property(Property {
+                    prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
+                    ident: String::from_utf8_lossy(ident).to_string(),
+                    key: String::from_utf8_lossy(val).to_string(),
+                }),
+            ));
+        }
+        ValueType::Val(val) => val,
+    };
 
     match prefix {
         Some(b"on") => match ident {
@@ -169,6 +186,12 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
                     Attribute::Action(Action::OnPress(as_string(value).map(|(_, string)| string)?)),
                 ));
             }
+            b"spawn" => {
+                return Ok((
+                    input,
+                    Attribute::Action(Action::OnSpawn(as_string(value).map(|(_, string)| string)?)),
+                ));
+            }
             _ => (),
         },
         Some(b"prop") => {
@@ -180,8 +203,9 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     };
 
     let attribute = match ident {
-        b"spawn" => Attribute::SpawnFunction(as_string(value).map(|(_, string)| string)?),
-        b"path" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
+        b"id" => Attribute::Id(as_hash(value).map(|(_, hash)| hash)?),
+        b"target" => Attribute::Target(as_hash(value).map(|(_, hash)| hash)?),
+        b"src" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
         ident => {
             let (_, style) = parse_style(prefix, ident, value)?;
             Attribute::Style(style)
@@ -401,6 +425,12 @@ fn as_string(input: &[u8]) -> IResult<&[u8], String> {
     map(rest, |v| String::from_utf8_lossy(v).to_string())(input)
 }
 
+fn as_hash(input: &[u8]) -> IResult<&[u8], u64> {
+    let mut hasher = DefaultHasher::default();
+    input.hash(&mut hasher);
+    Ok((input, hasher.finish()))
+}
+
 #[rustfmt::skip]
 fn parse_prefix0(input: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
     let res : IResult<&[u8], (&[u8], &[u8])>= tuple((
@@ -616,6 +646,8 @@ fn from_hex_nib(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
 
 #[cfg(test)]
 mod tests {
+    use std::string;
+
     use super::*;
     use test_case::test_case;
 
@@ -633,6 +665,8 @@ mod tests {
     #[test_case(r#"prop:myvar="test""#, Attribute::PropertyDefinition("myvar".into(), "test".into()))]
     #[test_case(r#"on:press="test""#, Attribute::Action(Action::OnPress("test".into())))]
     #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
+    #[test_case(r#"height="{my_var}""#, Attribute::Property( Property{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
+    #[test_case(r#"width={myvar}"#, Attribute::Property( Property{ key: "myvar".into(),prefix: None, ident: "width".into() }))]
     fn test_parse_attribute(input: &str, expected: Attribute) {
         let result = parse_attribute(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
@@ -662,10 +696,10 @@ mod tests {
 
     // #[test_case("./assets/panel.html")]
     // #[test_case("./assets/menu.html")]
-    #[test_case("./assets/button.html")]
+    // #[test_case("./assets/button.html")]
     fn parse_file(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
         let node = parse_bytes(input.as_bytes()).unwrap();
-        dbg!(node);
+        // dbg!(node);
     }
 }

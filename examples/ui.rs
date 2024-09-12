@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, window::WindowResolution};
+use bevy::{ecs::system::EntityCommands, prelude::*, window::WindowResolution};
 use lommix_ui::prelude::*;
 
 fn main() {
@@ -17,7 +17,7 @@ fn main() {
             LommixUiPlugin,
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, update_puls)
+        .add_systems(Update, (update_puls, update_collapse))
         .run();
 }
 
@@ -25,7 +25,7 @@ fn setup(
     mut cmd: Commands,
     server: Res<AssetServer>,
     mut function_bindings: ResMut<FunctionBindings>,
-    mut spawn_bindings: ResMut<SpawnBindings>,
+    mut custom_comps: ResMut<ComponenRegistry>,
 ) {
     cmd.spawn(Camera2dBundle::default());
     cmd.spawn(UiBundle {
@@ -35,10 +35,49 @@ fn setup(
 
     function_bindings.register("delete_me", cmd.register_one_shot_system(delete_me));
     function_bindings.register("start_game", cmd.register_one_shot_system(start_game));
+    function_bindings.register(
+        "add_comp_collapse",
+        cmd.register_one_shot_system(add_comp_collapse),
+    );
 
-    spawn_bindings.register("puls", &|mut entity_cmd| {
-        entity_cmd.insert(Puls(20.));
+    let panel_handle = server.load("panel.html");
+    custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
+        info!("spawning custom node!");
+        entity_cmd.insert((UiBundle {
+            handle: panel_handle.clone(),
+            ..default()
+        },));
     });
+}
+
+fn update_collapse(
+    mut interactions: Query<(&Interaction, &UiTarget, &mut Collapse), Changed<Interaction>>,
+    mut style: Query<&mut Style>,
+) {
+    interactions
+        .iter_mut()
+        .for_each(|(interaction, target, mut collapse)| {
+            let Interaction::Pressed = interaction else {
+                return;
+            };
+
+            info!("collapsing {}", target.0);
+
+            let display = match **collapse {
+                true => {
+                    **collapse = false;
+                    Display::None
+                }
+                false => {
+                    **collapse = true;
+                    Display::Flex
+                }
+            };
+
+            if let Ok(mut style) = style.get_mut(**target) {
+                style.display = display;
+            }
+        });
 }
 
 #[derive(Component)]
@@ -53,15 +92,19 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
     });
 }
 
-fn delete_me(entity: In<Entity>, mut cmd: Commands) {
-    info!("hehe I delete {}", *entity);
-    cmd.entity(*entity).despawn_recursive();
+fn delete_me(callback: In<Callback>, mut cmd: Commands) {
+    info!("hehe I delete {}", callback.entity);
+    cmd.entity(callback.entity).despawn_recursive();
 }
 
-fn start_game(entity: In<Entity>, mut cmd: Commands) {
+fn start_game(_entity: In<Callback>, mut _cmd: Commands) {
     info!("hello world from start game system");
 }
 
-fn add_collapse(entity: In<Entity>, mut cmd: Commands) {
-    info!("hello world from start game system");
+fn add_comp_collapse(callback: In<Callback>, mut cmd: Commands) {
+    info!("added collapse comp");
+    cmd.entity(callback.entity).insert(Collapse::default());
 }
+
+#[derive(Component, Deref, DerefMut, Default)]
+pub struct Collapse(pub bool);

@@ -10,45 +10,44 @@ pub struct BindingPlugin;
 impl Plugin for BindingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FunctionBindings>();
-        app.init_resource::<SpawnBindings>();
-        app.add_systems(Update, observe_interactions);
+        app.init_resource::<ComponenRegistry>();
+        app.add_systems(Update, (observe_interactions, observe_on_spawn));
     }
 }
 
 pub type SpawnFunction = dyn Fn(EntityCommands) + Send + Sync + 'static;
 
-/// # Spawn binding resource
+/// # Register custom node tags
 ///
-/// maps spawn functions on any node identitfied by a string
-/// makes it possible to mark nodes with any custom spawn logic/components
-///
-/// in templates: `comp="slider_tag"`
-///
-/// backend:
-///
+/// then use in your templats `<my_comp></my_comp>`
 /// `
-/// SpawnBindings.register("slider_tag", &|mut cmd: EntityCommands| cmd.insert(SliderTag::default()))
+/// ComponenRegistry.register("my_comp", &|mut cmd: EntityCommands| cmd.insert(MyBundle::default()))
 /// `
 #[derive(Resource, Default, Deref, DerefMut)]
-pub struct SpawnBindings(HashMap<String, &'static SpawnFunction>);
+pub struct ComponenRegistry(HashMap<String, Box<SpawnFunction>>);
 
-impl SpawnBindings {
-    pub fn register<F>(&mut self, key: impl Into<String>, f: &'static F)
+impl ComponenRegistry {
+    pub fn register<F>(&mut self, key: impl Into<String>, f: F)
     where
         F: Fn(EntityCommands) + Send + Sync + 'static,
     {
         let key: String = key.into();
-        self.insert(key, f);
+        self.insert(key, Box::new(f));
     }
 
-    pub fn maybe_run(&self, key: &String, entity: Entity, cmd: &mut Commands) {
+    pub fn try_spawn(&self, key: &String, entity: Entity, cmd: &mut Commands) {
         self.get(key)
             .map(|f| {
                 let cmd = cmd.entity(entity);
                 f(cmd);
             })
-            .unwrap_or_else(|| warn!("function `{key}` is not bound"));
+            .unwrap_or_else(|| warn!("custom tag `{key}` is not bound"));
     }
+}
+
+pub struct Callback {
+    pub entity: Entity,
+    pub args: Vec<String>,
 }
 
 /// # Function binding resource
@@ -65,10 +64,10 @@ impl SpawnBindings {
 /// FunctionBindings.register("start_game", system_id);
 /// `
 #[derive(Resource, Default, Deref, DerefMut)]
-pub struct FunctionBindings(HashMap<String, SystemId<Entity>>);
+pub struct FunctionBindings(HashMap<String, SystemId<Callback>>);
 
 impl FunctionBindings {
-    pub fn register(&mut self, key: impl Into<String>, system_id: SystemId<Entity>) {
+    pub fn register(&mut self, key: impl Into<String>, system_id: SystemId<Callback>) {
         let key: String = key.into();
         self.insert(key, system_id);
     }
@@ -76,10 +75,28 @@ impl FunctionBindings {
     pub fn maybe_run(&self, key: &String, entity: Entity, cmd: &mut Commands) {
         self.get(key)
             .map(|id| {
-                cmd.run_system_with_input(*id, entity);
+                cmd.run_system_with_input(
+                    *id,
+                    Callback {
+                        entity,
+                        args: vec![],
+                    },
+                );
             })
             .unwrap_or_else(|| warn!("function `{key}` is not bound"));
     }
+}
+
+fn observe_on_spawn(
+    mut cmd: Commands,
+    function_bindings: Res<FunctionBindings>,
+    on_spawn: Query<(Entity, &crate::prelude::OnSpawn)>,
+) {
+    on_spawn.iter().for_each(|(entity, on_spawn)| {
+        function_bindings.maybe_run(&on_spawn.0, entity, &mut cmd);
+        info!("running spawn sysytem {}", on_spawn.0);
+        cmd.entity(entity).remove::<crate::prelude::OnSpawn>();
+    });
 }
 
 #[rustfmt::skip]

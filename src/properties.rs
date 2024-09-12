@@ -7,7 +7,7 @@ use crate::{
     build::{StyleAttributes, UnStyled},
     data::{Attribute, Property, StyleAttr},
     parse::parse_attribute,
-    prelude::SpawnBindings,
+    prelude::ComponenRegistry,
 };
 
 pub struct PropertyPlugin;
@@ -20,7 +20,7 @@ impl Plugin for PropertyPlugin {
 
 // virtual tree required
 // includes & slots move and park, bevy tree hirachy might be invalid at times.
-// **leaking memory**
+// @todo: **leaks memory**, may have artefacts, fix later
 #[derive(Default, Resource)]
 pub struct PropTree {
     prop_defs: HashMap<Entity, PropertyDefintions>,
@@ -28,7 +28,7 @@ pub struct PropTree {
 }
 
 impl PropTree {
-    fn find_def_up<'a>(&'a self, entity: Entity, key: &'a str) -> Option<&'a String> {
+    pub fn find_def_up<'a>(&'a self, entity: Entity, key: &'a str) -> Option<&'a String> {
         if let Some(props) = self
             .prop_defs
             .get(&entity)
@@ -61,9 +61,21 @@ impl PropTree {
         }
     }
 
-    // removes a node with children
-    fn clear_node(&mut self, entity: Entity) {
-        // clear dangle refs
+    /// does not overwrite
+    pub fn try_insert(&mut self, entity: Entity, key: String, value: String) {
+
+        info!("try insert! key: {key} val: {value}");
+
+        _ = match self.prop_defs.get_mut(&entity) {
+            Some(props) => {
+                _ = props.try_insert(key, value);
+            }
+            None => {
+                let mut props = PropertyDefintions::default();
+                props.insert(key, value);
+                self.prop_defs.insert(entity, props);
+            }
+        }
     }
 }
 
@@ -80,7 +92,7 @@ fn compile_properties(
     mut cmd: Commands,
     prop_tree: Res<PropTree>,
     mut to_compile: Query<(Entity, &mut StyleAttributes, &mut ToCompile)>,
-    spawn_bindings: Res<SpawnBindings>,
+    spawn_bindings: Res<ComponenRegistry>,
 ) {
     to_compile
         .iter_mut()
@@ -112,8 +124,6 @@ fn compile_properties(
                 info!("success full compiled property {attribute_string}");
 
                 // ---------------------------------------
-                // todo: apply
-                // ---------------------------------------
                 match attr {
                     Attribute::Style(s) => {
                         // upsert style
@@ -122,18 +132,17 @@ fn compile_properties(
                     }
                     Attribute::Action(action) => {
                         // insert action
-                        // @todo: fix actions
                         action.apply(cmd.entity(entity));
                     }
                     Attribute::SpawnFunction(spawn) => {
                         // rerun spawn
-                        spawn_bindings.maybe_run(&spawn, entity, &mut cmd);
+                        spawn_bindings.try_spawn(&spawn, entity, &mut cmd);
                     }
                     Attribute::Path(_) => {
-                        warn!("recursive includes not yet supported");
+                        warn!("recursive includes not supported");
                     }
                     _ => {
-                        warn!("recursive properties not yet supported");
+                        warn!("recursive properties not supported");
                     }
                 }
 
@@ -157,6 +166,5 @@ fn upsert_style(style: StyleAttr, target: &mut StyleAttributes) {
             return;
         }
     }
-
     target.0.push(style);
 }

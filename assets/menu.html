@@ -1,33 +1,29 @@
-<node flex_direction="column" prop:press="start_game">
-    <include path="panel.html">
-        <img align_self="center" width="100px" path="bevy_bird_dark.png" />
+<node flex_direction="column">
+    <include src="panel.html" prop:title="Main">
+        <img align_self="center" width="100px" src="bevy_bird_dark.png" />
 
         <node justify_content="center" flex_direction="row">
             <text font_size="40,0"> Effortless Ui </text>
         </node>
 
-        <include path="panel.html" prop:color="#8F2">
-            <include path="button.html">
-                <text>Play this game</text>
+        <panel prop:color="#000" prop:press="start_game" prop:title="Foo">
+            <include src="button.html" prop:color="#000" prop:press="start_game">
+                <text>Play</text>
             </include>
 
-            <include path="button.html">
-                <text>Credits</text>
+            <include src="button.html" prop:color="#000" prop:press="start_game">
+                <text>Play</text>
             </include>
-        </include>
+        </panel>
 
-        <include path="panel.html">
-            <include path="button.html">
-                <text>Credits</text>
-            </include>
-
-            <include path="button.html">
-                <text>Credits</text>
+        <panel prop:bcolor="#000" prop:press="start_game" prop:title="Bar">
+            <include src="button.html" prop:color="#000" prop:press="start_game">
+                <text>Play</text>
             </include>
 
-            <include path="button.html">
-                <text>Credits</text>
+            <include src="button.html" prop:color="#000" prop:press="start_game">
+                <text>Play</text>
             </include>
-        </include>
+        </panel>
     </include>
 </node>

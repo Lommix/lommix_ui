@@ -1,8 +1,30 @@
 # Style Values
 
-## Elements
+## Function bindings
 
--   `<div>` : `NodeBundle`
+provides basics events for the `Interaction` Component and on `Spawn`.
+
+-   `on_spawn="my_spawn(arg1,arg2 ..)"`
+-   `on_enter="my"`
+-   `on_press:`
+-   `on_exit:`
+
+in bevy your register your function on startup in the
+
+```
+function_bindings.register("my_spawn", move |mut entity_cmd: EntityCommands| {
+    info!("spawning custom node!");
+    entity_cmd.insert((UiBundle {
+        handle: panel_handle.clone(),
+        ..default()
+    },));
+});
+
+```
+
+## Default Elements
+
+-   `<node>` : `NodeBundle`
 -   `<img>` : `ImageBundle`
     -   `path="image_path"`
 -   `<button>` : `ButtonBundle`
@@ -10,7 +32,7 @@
 -   `<text>` : `TexBundle`
 -   `<Include>` : Includes another file
     -   `path="include_path"`
--   `<slot>` : marks a slot if block is included [WIP]
+-   `<slot>` : marks a slot if block is included. There is currently only support for 1 slot.
 
 ## Style tags
 

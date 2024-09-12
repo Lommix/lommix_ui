@@ -29,6 +29,8 @@ pub enum Attribute {
     Property(Property),
     Action(Action),
     Path(String),
+    Target(u64),
+    Id(u64),
     SpawnFunction(String),
 }
 
@@ -44,6 +46,13 @@ pub enum Action {
     OnPress(String),
     OnEnter(String),
     OnExit(String),
+    OnSpawn(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FnBinding {
+    key: String,
+    args: Vec<String>,
 }
 
 impl Action {
@@ -57,6 +66,10 @@ impl Action {
             }
             Action::OnExit(fn_id) => {
                 cmd.insert(crate::prelude::OnExit(fn_id));
+            }
+            Action::OnSpawn(fn_id) => {
+                info!("inserting spawn");
+                cmd.insert(crate::prelude::OnSpawn(fn_id));
             }
         }
     }

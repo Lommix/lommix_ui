@@ -1,9 +1,14 @@
 use crate::{
     data::{Action, Attribute, NodeType, Property, XNode},
-    prelude::{SpawnBindings, StyleAttr},
+    prelude::{ComponenRegistry, StyleAttr},
     properties::{PropTree, PropertyDefintions, ToCompile},
 };
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
+use nom::{
+    bytes::{complete::is_not, streaming::tag},
+    sequence::tuple,
+    IResult,
+};
 
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
@@ -30,7 +35,17 @@ pub struct UnslotedChildren(Entity);
 #[derive(Component, Deref)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
 
-impl StyleAttributes {}
+#[derive(Default, Resource)]
+pub struct IdLookUpTable {
+    ids: HashMap<u64, Entity>,
+    targets: HashMap<Entity, u64>,
+}
+
+#[derive(Component, Default, Hash)]
+pub struct UiId(u64);
+
+#[derive(Component, DerefMut, Deref)]
+pub struct UiTarget(pub Entity);
 
 #[derive(Component, Default)]
 pub struct UnbuildTag;
@@ -42,6 +57,9 @@ pub struct UnStyled;
 pub struct OnPress(pub String);
 
 #[derive(Component)]
+pub struct OnSpawn(pub String);
+
+#[derive(Component)]
 pub struct OnEnter(pub String);
 
 #[derive(Component)]
@@ -50,7 +68,8 @@ pub struct OnExit(pub String);
 #[derive(Bundle, Default)]
 pub struct UiBundle {
     pub handle: Handle<XNode>,
-    pub tag: UnbuildTag,
+    pub _t1: UnbuildTag,
+    pub _t2: UnStyled,
 }
 
 fn update_interaction(
@@ -113,27 +132,24 @@ fn hotreload(
             .iter()
             .filter(|(_, handle)| handle.id() == *id)
             .for_each(|(entity, handle)| {
-                // find slot
                 let slots = find_sloted_children(entity, &children, &sloted_nodes, &templates);
 
                 if slots.len() > 0 {
-                    info!("saved slots {}", slots.len());
+                    // info!("saved slots {}", slots.len());
                     let slot_holder = cmd.spawn_empty().push_children(&slots).id();
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
                 }
 
-                //todo: clean components
-                // there maybe left over added compontens from spawn functions
                 cmd.entity(entity)
                     .despawn_descendants()
-                    .retain::<MinimalComponentList>()
+                    .retain::<KeepComps>()
                     .insert(UnbuildTag);
             });
     });
 }
 
 #[derive(Bundle)]
-struct MinimalComponentList {
+struct KeepComps {
     pub parent: Parent,
     pub children: Children,
     pub node: NodeBundle,
@@ -141,6 +157,7 @@ struct MinimalComponentList {
     pub sloted_nodes: SlotedNode,
     pub slot: SlotTag,
     pub unsloted: UnslotedChildren,
+    pub props: PropertyDefintions,
 }
 
 fn find_sloted_children(
@@ -212,7 +229,7 @@ fn move_children_to_slot(
                 return;
             };
 
-            info!("found slot! {slot}");
+            // info!("found slot! {slot}");
             _ = children.get(*slot_holder).map(|children| {
                 children.iter().for_each(|child| {
                     cmd.entity(slot_parent).add_child(*child);
@@ -252,9 +269,8 @@ fn spawn_ui(
     unbuild: Query<(Entity, &Handle<XNode>), With<UnbuildTag>>,
     assets: Res<Assets<XNode>>,
     server: Res<AssetServer>,
-    spawn_bindings: Res<SpawnBindings>,
+    custom_comps: Res<ComponenRegistry>,
     parents: Query<&Parent>,
-    loaded_props: Query<&PropertyDefintions>,
     mut prop_tree: ResMut<PropTree>,
 ) {
     unbuild.iter().for_each(|(ent, handle)| {
@@ -262,14 +278,16 @@ fn spawn_ui(
             return;
         };
 
-        info!(
-            "spawning ui {}",
-            handle.path().map(|p| p.to_string()).unwrap_or_default()
-        );
+        // info!(
+        //     "spawning ui {}",
+        //     handle.path().map(|p| p.to_string()).unwrap_or_default()
+        // );
 
-        if parents.get(ent).is_ok() {
-            info!("hass prent ",);
-        }
+        // if parents.get(ent).is_ok() {
+        //     info!("hass prent ",);
+        // }
+
+        let mut id_table = IdLookUpTable::default();
 
         build_node(
             ent,
@@ -277,9 +295,20 @@ fn spawn_ui(
             &mut cmd,
             &assets,
             &server,
-            &spawn_bindings,
+            &custom_comps,
             &mut prop_tree,
+            &mut id_table,
         );
+
+        id_table
+            .targets
+            .iter()
+            .for_each(|(entity, target_id)| match id_table.ids.get(target_id) {
+                Some(tar) => {
+                    cmd.entity(*entity).insert(UiTarget(*tar));
+                }
+                None => warn!("target not found for entity {entity}"),
+            });
 
         cmd.entity(ent).remove::<UnbuildTag>();
     });
@@ -293,14 +322,22 @@ fn build_node(
     cmd: &mut Commands,
     assets: &Assets<XNode>,
     server: &AssetServer,
-    spawn_bindings: &SpawnBindings,
+    custom_comps: &ComponenRegistry,
     prop_tree: &mut PropTree,
+    id_table: &mut IdLookUpTable,
 ) {
     let mut attributes = SortedAttributes::from(&node.attributes);
-    // parent later
-    for (key, value) in attributes.definitions.drain(..) {
-        prop_tree.insert(entity, key, value);
-    }
+    _ = match &node.node_type {
+        // preserve already set props for includes
+        NodeType::Include => attributes
+            .definitions
+            .drain(..)
+            .for_each(|(key, val)| prop_tree.insert(entity, key, val)),
+        _ => attributes
+            .definitions
+            .drain(..)
+            .for_each(|(key, val)| prop_tree.try_insert(entity, key, val)),
+    };
 
     if attributes.properties.len() > 0 {
         cmd.entity(entity).insert(ToCompile(
@@ -308,12 +345,15 @@ fn build_node(
         ));
     }
 
-    // todo --> move to seperate system
-    attributes.spawn_functions_keys.iter().for_each(|key| {
-        spawn_bindings.maybe_run(key, entity, cmd);
-    });
+    if let Some(id) = attributes.id {
+        // cmd.entity(entity).insert(UiId(id));
+        id_table.ids.insert(id, entity);
+    }
 
-    // build node
+    if let Some(target) = attributes.target {
+        id_table.targets.insert(entity, target);
+    }
+
     match &node.node_type {
         NodeType::Node => {
             cmd.entity(entity).insert((
@@ -339,10 +379,20 @@ fn build_node(
             }
         }
         NodeType::Text => {
+            // compile text here? may break hotreload
+            let content = node
+                .content
+                .as_ref()
+                .map(|c| match compile_content(entity, c, prop_tree) {
+                    Ok((_, compiled)) => compiled,
+                    Err(_) => c.clone(),
+                })
+                .unwrap_or_default();
+
             cmd.entity(entity).insert((
                 Name::new("Text"),
                 TextBundle::from_section(
-                    node.content.as_ref().cloned().unwrap_or_default(),
+                    content,
                     TextStyle {
                         font_size: 16., // default
                         color: Color::WHITE,
@@ -367,7 +417,7 @@ fn build_node(
         }
         NodeType::Include => {
             let path = attributes.path.unwrap_or_default();
-            info!("loading component {path}");
+            // info!("loading component {path}");
             let handle = server.load::<XNode>(path);
 
             cmd.entity(entity)
@@ -388,13 +438,14 @@ fn build_node(
                         cmd,
                         assets,
                         server,
-                        spawn_bindings,
+                        custom_comps,
                         prop_tree,
+                        id_table,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
 
-                info!("found unsloted children");
+                // info!("found unsloted children");
                 cmd.entity(entity).insert(UnslotedChildren(slot_holder));
             }
 
@@ -405,7 +456,30 @@ fn build_node(
             return;
         }
         NodeType::Custom(custom_tag) => {
-            warn!("your custom tag `{custom_tag}` is not supported yet");
+            custom_comps.try_spawn(custom_tag, entity, cmd);
+            if node.children.len() > 0 {
+                let slot_holder = cmd.spawn_empty().id();
+
+                node.children.iter().for_each(|child_node| {
+                    let child = cmd.spawn(SlotedNode).id();
+                    // save the real parent after slot insert
+                    prop_tree.set_parent(child, entity);
+                    build_node(
+                        child,
+                        child_node,
+                        cmd,
+                        assets,
+                        server,
+                        custom_comps,
+                        prop_tree,
+                        id_table,
+                    );
+                    cmd.entity(slot_holder).add_child(child);
+                });
+                // info!("found unsloted children");
+                cmd.entity(entity).insert(UnslotedChildren(slot_holder));
+            }
+
             return;
         }
     };
@@ -421,8 +495,9 @@ fn build_node(
             cmd,
             assets,
             server,
-            spawn_bindings,
+            custom_comps,
             prop_tree,
+            id_table,
         );
 
         cmd.entity(entity).add_child(child);
@@ -437,6 +512,8 @@ struct SortedAttributes {
     pub spawn_functions_keys: Vec<String>,
     pub definitions: Vec<(String, String)>,
     pub properties: Vec<Property>,
+    pub target: Option<u64>,
+    pub id: Option<u64>,
 }
 
 impl From<&Vec<Attribute>> for SortedAttributes {
@@ -450,8 +527,40 @@ impl From<&Vec<Attribute>> for SortedAttributes {
                 Attribute::SpawnFunction(spawn) => sorted.spawn_functions_keys.push(spawn),
                 Attribute::PropertyDefinition(key, val) => sorted.definitions.push((key, val)),
                 Attribute::Property(prop) => sorted.properties.push(prop),
+                Attribute::Target(target) => sorted.target = Some(target),
+                Attribute::Id(id) => sorted.id = Some(id),
             };
         }
         sorted
     }
+}
+
+fn compile_content<'a, 'b>(
+    entity: Entity,
+    input: &'a str,
+    prop_tree: &'b PropTree,
+) -> IResult<&'a str, String> {
+    let mut out = String::new();
+
+    let (remaining, (text_content, _, prop_key, _)) =
+        tuple((is_not("{"), tag("{"), is_not("}"), tag("}")))(input)?;
+
+    out.push_str(text_content);
+
+    match prop_tree.find_def_up(entity, prop_key) {
+        Some(val) => {
+            out.push_str(val);
+        }
+        None => (),
+    };
+
+    if remaining.len() > 0 {
+        if let Ok((_, str)) = compile_content(entity, remaining, prop_tree) {
+            out.push_str(&str);
+        } else {
+            out.push_str(remaining);
+        }
+    }
+
+    Ok(("", out))
 }
