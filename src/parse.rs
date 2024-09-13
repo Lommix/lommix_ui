@@ -5,8 +5,9 @@ use crate::data::{Action, Attribute, Property, StyleAttr};
 use crate::error::ParseError;
 use crate::prelude::{NodeType, XNode};
 use bevy::ui::{
-    AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap,
-    JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis, PositionType,
+    AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap, GridAutoFlow,
+    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis,
+    PositionType, RepeatedGridTrack,
 };
 use bevy::utils::HashMap;
 use bevy::{
@@ -16,16 +17,14 @@ use bevy::{
 use nom::bytes::complete::{is_not, take_while1};
 use nom::combinator::{flat_map, map_parser, rest};
 use nom::error::context;
-use nom::multi::{many0, many1};
+use nom::multi::{many0, many1, separated_list1};
+use nom::number::Endianness;
 use nom::{
     branch::alt,
-    bytes::{
-        complete::{tag, take_while},
-        streaming::take_while_m_n,
-    },
+    bytes::complete::{tag, take_while, take_while_m_n},
     character::complete::multispace0,
     combinator::{complete, map, map_res},
-    number::streaming::float,
+    number::complete::float,
     sequence::{delimited, preceded, tuple, Tuple},
     IResult, Parser,
 };
@@ -87,12 +86,6 @@ fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
     ))(input)
 }
 
-fn compile_content(
-    props: &HashMap<String, String>,
-) -> impl FnOnce(&[u8]) -> IResult<&[u8], String> {
-    move |i: &[u8]| todo!()
-}
-
 fn parse_start_tag(input: &[u8]) -> IResult<&[u8], (&[u8], Vec<Attribute>, bool)> {
     let (input, (_, element_tag, attributes, _, is_empty)) = tuple((
         tag("<"),
@@ -123,14 +116,9 @@ fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
     Ok((input, content.trim().trim_end()))
 }
 
-
 enum ValueType<'a> {
     Prop(&'a [u8]),
-    Val(&'a [u8]),
-}
-
-fn trimmed(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(multispace0, is_not(" "), multispace0)(input)
+    Literal(&'a [u8]),
 }
 
 pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
@@ -147,7 +135,10 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
                 ValueType::Prop(v)
             }),
             map(delimited(tag("\""), is_not("\""), tag("\"")), |v| {
-                ValueType::Val(v)
+                ValueType::Literal(v)
+            }),
+            map(take_while1(|b: u8| !b.is_ascii_whitespace()), |v| {
+                ValueType::Literal(v)
             }),
         )),
     ))(input)?;
@@ -156,44 +147,22 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
         ValueType::Prop(val) => {
             return Ok((
                 input,
-                Attribute::Property(Property {
+                Attribute::UnCompiledProperty(Property {
                     prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
                     ident: String::from_utf8_lossy(ident).to_string(),
                     key: String::from_utf8_lossy(val).to_string(),
                 }),
             ));
         }
-        ValueType::Val(val) => val,
+        ValueType::Literal(val) => val,
     };
 
     match prefix {
-        Some(b"on") => match ident {
-            b"exit" => {
-                return Ok((
-                    input,
-                    Attribute::Action(Action::OnExit(as_string(value).map(|(_, string)| string)?)),
-                ));
-            }
-            b"enter" => {
-                return Ok((
-                    input,
-                    Attribute::Action(Action::OnEnter(as_string(value).map(|(_, string)| string)?)),
-                ));
-            }
-            b"press" => {
-                return Ok((
-                    input,
-                    Attribute::Action(Action::OnPress(as_string(value).map(|(_, string)| string)?)),
-                ));
-            }
-            b"spawn" => {
-                return Ok((
-                    input,
-                    Attribute::Action(Action::OnSpawn(as_string(value).map(|(_, string)| string)?)),
-                ));
-            }
-            _ => (),
-        },
+        Some(b"tag") => {
+            let (_, prop_ident) = as_string(ident)?;
+            let (_, prop_value) = as_string(value)?;
+            return Ok((input, Attribute::Custom(prop_ident, prop_value)));
+        }
         Some(b"prop") => {
             let (_, prop_ident) = as_string(ident)?;
             let (_, prop_value) = as_string(value)?;
@@ -203,9 +172,21 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     };
 
     let attribute = match ident {
-        b"id" => Attribute::Id(as_hash(value).map(|(_, hash)| hash)?),
-        b"target" => Attribute::Target(as_hash(value).map(|(_, hash)| hash)?),
+        b"id" => Attribute::Id(as_string(value).map(|(_, hash)| hash)?),
+        b"target" => Attribute::Target(as_string(value).map(|(_, hash)| hash)?),
         b"src" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
+        b"onexit" => Attribute::Action(Action::OnExit(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        b"onenter" => Attribute::Action(Action::OnEnter(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        b"onpress" => Attribute::Action(Action::OnPress(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        b"onspawn" => Attribute::Action(Action::OnSpawn(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
         ident => {
             let (_, style) = parse_style(prefix, ident, value)?;
             Attribute::Style(style)
@@ -243,13 +224,13 @@ fn parse_style<'a>(
         b"column_gap" => map(parse_val, |val| StyleAttr::ColumnGap(val))(value)?,
 
         // grid
-        b"grid_auto_flow" => todo!(),
-        b"grid_auto_rows" => todo!(),
-        b"grid_auto_columns" => todo!(),
-        b"grid_template_rows" => todo!(),
-        b"grid_template_columns" => todo!(),
-        b"grid_row" => todo!(),
-        b"grid_column" => todo!(),
+        b"grid_auto_flow" => map(parse_auto_flow,|v| StyleAttr::GridAutoFlow(v))(value)?,
+        b"grid_auto_rows" => map(many0(parse_grid_track), |v| StyleAttr::GridAutoRows(v))(value)?,
+        b"grid_auto_columns" => map(many0(parse_grid_track), |v| StyleAttr::GridAutoColumns(v))(value)?,
+        b"grid_template_rows" => map(many0(parse_grid_track_repeated), |v| StyleAttr::GridTemplateRows(v))(value)?,
+        b"grid_template_columns" => map(many0(parse_grid_track_repeated), |v| StyleAttr::GridTemplateColumns(v))(value)?,
+        b"grid_row" => map(parse_grid_placement, |v| StyleAttr::GridRow(v))(value)?,
+        b"grid_column" => map(parse_grid_placement, |v| StyleAttr::GridColumn(v))(value)?,
 
         // values
         b"font" => map(as_string, |val| StyleAttr::Font(val))(value)?,
@@ -288,7 +269,7 @@ fn parse_style<'a>(
 }
 
 fn parse_float(input: &[u8]) -> IResult<&[u8], f32> {
-    nom::number::streaming::float(input)
+    nom::number::complete::float(input)
 }
 
 fn parse_position_type(input: &[u8]) -> IResult<&[u8], PositionType> {
@@ -425,6 +406,18 @@ fn as_string(input: &[u8]) -> IResult<&[u8], String> {
     map(rest, |v| String::from_utf8_lossy(v).to_string())(input)
 }
 
+fn as_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
+    map(
+        separated_list1(tag(","), take_while1(|b: u8| b != b',' && b != b'"')),
+        |bytes: Vec<&[u8]>| {
+            bytes
+                .iter()
+                .map(|b| String::from_utf8_lossy(b).to_string())
+                .collect::<Vec<_>>()
+        },
+    )(input)
+}
+
 fn as_hash(input: &[u8]) -> IResult<&[u8], u64> {
     let mut hasher = DefaultHasher::default();
     input.hash(&mut hasher);
@@ -478,6 +471,179 @@ fn parse_ui_rect(input: &[u8]) -> IResult<&[u8], UiRect> {
             UiRect::all(all)
         })),
     ))(input)
+}
+
+// grid_template_rows="auto 10% 10%"
+fn parse_grid_track(input: &[u8]) -> IResult<&[u8], GridTrack> {
+    let (input, track) = delimited(
+        multispace0,
+        alt((
+            map(tag("auto"), |_| GridTrack::auto()),
+            map(tag("min"), |_| GridTrack::min_content()),
+            map(tag("max"), |_| GridTrack::max_content()),
+            map(tuple((float, tag("px"))), |(val, _)| GridTrack::px(val)),
+            map(tuple((float, tag("%"))), |(val, _)| GridTrack::percent(val)),
+            map(tuple((float, tag("fr"))), |(val, _)| GridTrack::fr(val)),
+            map(tuple((float, tag("flex"))), |(val, _)| GridTrack::flex(val)),
+            map(tuple((float, tag("vh"))), |(val, _)| GridTrack::vh(val)),
+            map(tuple((float, tag("vw"))), |(val, _)| GridTrack::vw(val)),
+            map(tuple((float, tag("vmin"))), |(val, _)| GridTrack::vmin(val)),
+            map(tuple((float, tag("vmax"))), |(val, _)| GridTrack::vmax(val)),
+        )),
+        multispace0,
+    )(input)?;
+
+    Ok((input, track))
+}
+
+// (5, auto)
+// (2, 150px)
+#[rustfmt::skip]
+fn parse_grid_track_repeated(input: &[u8]) -> IResult<&[u8], RepeatedGridTrack> {
+
+    let (input, (_,repeat,_, value ,_)) = tuple((
+        preceded(multispace0, tag("(")),
+        preceded(multispace0, map_res(integer,|i:i64| u16::try_from(i))),
+        preceded(multispace0, tag(",")),
+        preceded(multispace0, take_while1(|b: u8| b.is_ascii_alphanumeric())),
+        preceded(multispace0, tag(")")),
+    ))(input)?;
+
+    let (_, track) : (&[u8], RepeatedGridTrack) = alt((
+            map(tag("auto"), |_| RepeatedGridTrack::auto::<RepeatedGridTrack>(repeat)),
+            map(tag("min"), |_| RepeatedGridTrack::min_content(repeat)),
+            map(tag("max"), |_| RepeatedGridTrack::max_content(repeat)),
+            map(tuple((float, tag("px"))), |(val, _)| RepeatedGridTrack::px(repeat,val)),
+            map(tuple((float, tag("%"))), |(val, _)| RepeatedGridTrack::percent(repeat,val)),
+            map(tuple((float, tag("fr"))), |(val, _)| RepeatedGridTrack::fr(repeat,val)),
+            map(tuple((float, tag("flex"))), |(val, _)| RepeatedGridTrack::flex(repeat,val)),
+            map(tuple((float, tag("vh"))), |(val, _)| RepeatedGridTrack::vh(repeat,val)),
+            map(tuple((float, tag("vw"))), |(val, _)| RepeatedGridTrack::vw(repeat,val)),
+            map(tuple((float, tag("vmin"))), |(val, _)| RepeatedGridTrack::vmin(repeat,val)),
+            map(tuple((float, tag("vmax"))), |(val, _)| RepeatedGridTrack::vmax(repeat,val)),
+    ))(value)?;
+
+    Ok((input, track))
+}
+
+fn parse_auto_flow(input: &[u8]) -> IResult<&[u8], GridAutoFlow> {
+    delimited(
+        multispace0,
+        alt((
+            map(tag("row"), |_| GridAutoFlow::Row),
+            map(tag("column"), |_| GridAutoFlow::Column),
+            map(tag("row_dense"), |_| GridAutoFlow::RowDense),
+            map(tag("column_dense"), |_| GridAutoFlow::ColumnDense),
+        )),
+        multispace0,
+    )(input)
+}
+
+fn integer(input: &[u8]) -> IResult<&[u8], i64> {
+    let (input, integer) = map_res(
+        map_res(take_while(|u: u8| u.is_ascii_digit() || u == b'-'), |d| {
+            std::str::from_utf8(d)
+        }),
+        |str| str.parse::<i64>(),
+    )(input)?;
+
+    Ok((input, integer))
+}
+
+// auto
+// start_span(5,5)
+// end_span(5,5)
+fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
+    let (input, _) = multispace0(input)?;
+    let (input, ident) = take_while1(|b: u8| b != b'(' && b != b'"')(input)?;
+    match ident {
+        b"auto" => Ok((input, GridPlacement::auto())),
+        // span(5)
+        b"span" => map(
+            delimited(
+                tag("("),
+                delimited(
+                    multispace0,
+                    map(integer, |i| u16::try_from(i).unwrap_or_default()),
+                    multispace0,
+                ),
+                tag(")"),
+            ),
+            |v| GridPlacement::span(v),
+        )(input),
+        // end(5)
+        b"end" => map(
+            delimited(
+                tag("("),
+                delimited(
+                    multispace0,
+                    map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                    multispace0,
+                ),
+                tag(")"),
+            ),
+            |v| GridPlacement::end(v),
+        )(input),
+        // start(5)
+        b"start" => map(
+            delimited(
+                tag("("),
+                delimited(
+                    multispace0,
+                    map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                    multispace0,
+                ),
+                tag(")"),
+            ),
+            |v| GridPlacement::start(v),
+        )(input),
+        // start_span(5,5)
+        b"start_span" => map(
+            delimited(
+                tag("("),
+                tuple((
+                    delimited(
+                        multispace0,
+                        map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                        multispace0,
+                    ),
+                    tag(","),
+                    delimited(
+                        multispace0,
+                        map(integer, |i| u16::try_from(i).unwrap_or_default()),
+                        multispace0,
+                    ),
+                )),
+                tag(")"),
+            ),
+            |(a, _, b)| GridPlacement::start_span(a, b),
+        )(input),
+        // end_span(5,5)
+        b"end_span" => map(
+            delimited(
+                tag("("),
+                tuple((
+                    delimited(
+                        multispace0,
+                        map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                        multispace0,
+                    ),
+                    tag(","),
+                    delimited(
+                        multispace0,
+                        map(integer, |i| u16::try_from(i).unwrap_or_default()),
+                        multispace0,
+                    ),
+                )),
+                tag(")"),
+            ),
+            |(a, _, b)| GridPlacement::end_span(a, b),
+        )(input),
+        _ => Err(nom::Err::Error(nom::error::make_error(
+            input,
+            nom::error::ErrorKind::LengthValue,
+        ))),
+    }
 }
 
 /// 10px 10%
@@ -662,11 +828,14 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
+    #[test_case(r#"font_size="20""#, Attribute::Style(StyleAttr::FontSize(20.)))]
     #[test_case(r#"prop:myvar="test""#, Attribute::PropertyDefinition("myvar".into(), "test".into()))]
-    #[test_case(r#"on:press="test""#, Attribute::Action(Action::OnPress("test".into())))]
+    #[test_case(r#"onenter="test_enter""#, Attribute::Action(Action::OnEnter(vec!["test_enter".to_string()])))]
+    #[test_case(r#"onspawn="init_inventory""#, Attribute::Action(Action::OnSpawn(vec!["init_inventory".to_string()])))]
+    #[test_case(r#"onpress="test,test_50,test o""#, Attribute::Action(Action::OnPress(vec!["test".to_string(),"test_50".to_string(), "test o".to_string()])))]
     #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
-    #[test_case(r#"height="{my_var}""#, Attribute::Property( Property{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
-    #[test_case(r#"width={myvar}"#, Attribute::Property( Property{ key: "myvar".into(),prefix: None, ident: "width".into() }))]
+    #[test_case(r#"height="{my_var}""#, Attribute::UnCompiledProperty( Property{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
+    #[test_case(r#"width={myvar}"#, Attribute::UnCompiledProperty( Property{ key: "myvar".into(),prefix: None, ident: "width".into() }))]
     fn test_parse_attribute(input: &str, expected: Attribute) {
         let result = parse_attribute(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
@@ -683,6 +852,32 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
+    #[test_case("auto", GridPlacement::auto())]
+    #[test_case("end_span(5,50)", GridPlacement::end_span(5, 50))]
+    #[test_case("start_span(-5, 5)", GridPlacement::start_span(-5,5))]
+    #[test_case("span( 55  )", GridPlacement::span(55))]
+    #[test_case("span(5)", GridPlacement::span(5))]
+    fn test_grid_placement(input: &str, expected: GridPlacement) {
+        let result = parse_grid_placement(input.as_bytes());
+        assert_eq!(Ok(("".as_bytes(), expected)), result);
+    }
+
+    #[test_case("min max auto", vec![GridTrack::min_content(), GridTrack::max_content(), GridTrack::auto()])]
+    #[test_case("50% auto   8fr   ", vec![GridTrack::percent(50.), GridTrack::auto(), GridTrack::fr(8.)])]
+    #[test_case("50px       ", vec![GridTrack::px(50.)])]
+    fn test_tracks(input: &str, expected: Vec<GridTrack>) {
+        let result = many0(parse_grid_track)(input.as_bytes());
+        assert_eq!(Ok(("".as_bytes(), expected)), result);
+    }
+
+    #[test_case("(4, 8flex)(1, 50px)", vec![RepeatedGridTrack::flex(4, 8.), RepeatedGridTrack::px(1,50.)])]
+    #[test_case("(1, auto)(5, 50fr)", vec![RepeatedGridTrack::auto(1), RepeatedGridTrack::fr(5,50.)])]
+    #[test_case("(1, auto)", vec![RepeatedGridTrack::auto(1)])]
+    fn test_repeat_tracks(input: &str, expected: Vec<RepeatedGridTrack>) {
+        let result = many0(parse_grid_track_repeated)(input.as_bytes());
+        assert_eq!(Ok(("".as_bytes(), expected)), result);
+    }
+
     #[test_case("20px", UiRect::all(Val::Px(20.)))]
     #[test_case("20px 10px", UiRect::axes(Val::Px(20.), Val::Px(10.)))]
     #[test_case(
@@ -694,9 +889,10 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
-    // #[test_case("./assets/panel.html")]
-    // #[test_case("./assets/menu.html")]
-    // #[test_case("./assets/button.html")]
+    #[test_case("./assets/card.html")]
+    #[test_case("./assets/panel.html")]
+    #[test_case("./assets/menu.html")]
+    #[test_case("./assets/button.html")]
     fn parse_file(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
         let node = parse_bytes(input.as_bytes()).unwrap();

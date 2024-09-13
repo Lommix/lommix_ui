@@ -1,81 +1,16 @@
-use std::sync::Arc;
-
 use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
-    bindings::SpawnFunction,
     build::{StyleAttributes, UnStyled},
     data::{Attribute, Property, StyleAttr},
     parse::parse_attribute,
-    prelude::ComponenRegistry,
+    prelude::ComponentBindings,
 };
 
 pub struct PropertyPlugin;
 impl Plugin for PropertyPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PropTree>();
         app.add_systems(Update, compile_properties);
-    }
-}
-
-// virtual tree required
-// includes & slots move and park, bevy tree hirachy might be invalid at times.
-// @todo: **leaks memory**, may have artefacts, fix later
-#[derive(Default, Resource)]
-pub struct PropTree {
-    prop_defs: HashMap<Entity, PropertyDefintions>,
-    parents: HashMap<Entity, Entity>,
-}
-
-impl PropTree {
-    pub fn find_def_up<'a>(&'a self, entity: Entity, key: &'a str) -> Option<&'a String> {
-        if let Some(props) = self
-            .prop_defs
-            .get(&entity)
-            .map(|defs| defs.get(key))
-            .flatten()
-        {
-            return Some(props);
-        }
-
-        match self.parents.get(&entity) {
-            Some(parent) => self.find_def_up(*parent, key),
-            None => None,
-        }
-    }
-
-    pub fn set_parent(&mut self, child: Entity, parent: Entity) {
-        self.parents.insert(child, parent);
-    }
-
-    pub fn insert(&mut self, entity: Entity, key: String, value: String) {
-        _ = match self.prop_defs.get_mut(&entity) {
-            Some(props) => {
-                props.insert(key, value);
-            }
-            None => {
-                let mut props = PropertyDefintions::default();
-                props.insert(key, value);
-                self.prop_defs.insert(entity, props);
-            }
-        }
-    }
-
-    /// does not overwrite
-    pub fn try_insert(&mut self, entity: Entity, key: String, value: String) {
-
-        info!("try insert! key: {key} val: {value}");
-
-        _ = match self.prop_defs.get_mut(&entity) {
-            Some(props) => {
-                _ = props.try_insert(key, value);
-            }
-            None => {
-                let mut props = PropertyDefintions::default();
-                props.insert(key, value);
-                self.prop_defs.insert(entity, props);
-            }
-        }
     }
 }
 
@@ -88,11 +23,39 @@ pub struct ToCompile(pub Vec<Property>);
 #[derive(Component, Deref, Clone, DerefMut, Default)]
 pub struct PropertyDefintions(HashMap<String, String>);
 
+impl PropertyDefintions {
+    pub fn new() -> Self{
+        Self::default()
+    }
+    pub fn with(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.0.insert(key.into(), value.into());
+        self
+    }
+}
+
+pub fn find_def<'a, 'b>(
+    entity: Entity,
+    key: &'b str,
+    defs: &'a Query<&PropertyDefintions>,
+    parents: &'a Query<&Parent>,
+) -> Option<&'a str> {
+    if let Some(v) = defs.get(entity).ok().map(|def| def.get(key)).flatten() {
+        return Some(v.as_str());
+    }
+
+    let Ok(parent_ent) = parents.get(entity).map(|p| p.get()) else {
+        return None;
+    };
+
+    find_def(parent_ent, key, defs, parents)
+}
+
 fn compile_properties(
     mut cmd: Commands,
-    prop_tree: Res<PropTree>,
+    parents: Query<&Parent>,
+    definitions: Query<&PropertyDefintions>,
     mut to_compile: Query<(Entity, &mut StyleAttributes, &mut ToCompile)>,
-    spawn_bindings: Res<ComponenRegistry>,
+    spawn_bindings: Res<ComponentBindings>,
 ) {
     to_compile
         .iter_mut()
@@ -101,10 +64,9 @@ fn compile_properties(
             // --> success --> remove from stack
             // --> all compiled? --> remove Component
             // --> def unfindable? No Slotholder parent && end reached without propval found
-
             to_compile.retain(|raw_prop| {
                 // try compile
-                let Some(prop_val) = prop_tree.find_def_up(entity, &raw_prop.key) else {
+                let Some(prop_val) = find_def(entity, &raw_prop.key, &definitions, &parents) else {
                     return true;
                 };
 
@@ -132,7 +94,7 @@ fn compile_properties(
                     }
                     Attribute::Action(action) => {
                         // insert action
-                        action.apply(cmd.entity(entity));
+                        action.self_insert(cmd.entity(entity));
                     }
                     Attribute::SpawnFunction(spawn) => {
                         // rerun spawn

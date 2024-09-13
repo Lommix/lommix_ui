@@ -4,13 +4,11 @@ use bevy::{
     utils::HashMap,
 };
 
-use crate::{build::OnPress, data::Action};
-
 pub struct BindingPlugin;
 impl Plugin for BindingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FunctionBindings>();
-        app.init_resource::<ComponenRegistry>();
+        app.init_resource::<ComponentBindings>();
         app.add_systems(Update, (observe_interactions, observe_on_spawn));
     }
 }
@@ -24,9 +22,9 @@ pub type SpawnFunction = dyn Fn(EntityCommands) + Send + Sync + 'static;
 /// ComponenRegistry.register("my_comp", &|mut cmd: EntityCommands| cmd.insert(MyBundle::default()))
 /// `
 #[derive(Resource, Default, Deref, DerefMut)]
-pub struct ComponenRegistry(HashMap<String, Box<SpawnFunction>>);
+pub struct ComponentBindings(HashMap<String, Box<SpawnFunction>>);
 
-impl ComponenRegistry {
+impl ComponentBindings {
     pub fn register<F>(&mut self, key: impl Into<String>, f: F)
     where
         F: Fn(EntityCommands) + Send + Sync + 'static,
@@ -45,11 +43,6 @@ impl ComponenRegistry {
     }
 }
 
-pub struct Callback {
-    pub entity: Entity,
-    pub args: Vec<String>,
-}
-
 /// # Function binding resource
 ///
 /// maps an oneshot system to a callable action, passing the Entity the action is
@@ -64,10 +57,10 @@ pub struct Callback {
 /// FunctionBindings.register("start_game", system_id);
 /// `
 #[derive(Resource, Default, Deref, DerefMut)]
-pub struct FunctionBindings(HashMap<String, SystemId<Callback>>);
+pub struct FunctionBindings(HashMap<String, SystemId<Entity>>);
 
 impl FunctionBindings {
-    pub fn register(&mut self, key: impl Into<String>, system_id: SystemId<Callback>) {
+    pub fn register(&mut self, key: impl Into<String>, system_id: SystemId<Entity>) {
         let key: String = key.into();
         self.insert(key, system_id);
     }
@@ -75,13 +68,7 @@ impl FunctionBindings {
     pub fn maybe_run(&self, key: &String, entity: Entity, cmd: &mut Commands) {
         self.get(key)
             .map(|id| {
-                cmd.run_system_with_input(
-                    *id,
-                    Callback {
-                        entity,
-                        args: vec![],
-                    },
-                );
+                cmd.run_system_with_input(*id, entity);
             })
             .unwrap_or_else(|| warn!("function `{key}` is not bound"));
     }
@@ -93,8 +80,12 @@ fn observe_on_spawn(
     on_spawn: Query<(Entity, &crate::prelude::OnSpawn)>,
 ) {
     on_spawn.iter().for_each(|(entity, on_spawn)| {
-        function_bindings.maybe_run(&on_spawn.0, entity, &mut cmd);
-        info!("running spawn sysytem {}", on_spawn.0);
+        info!("running spawn sysytem on {entity}");
+        for spawn_fn in on_spawn.iter() {
+            info!("running spawn sysytem {spawn_fn}");
+            function_bindings.maybe_run(spawn_fn, entity, &mut cmd);
+        }
+
         cmd.entity(entity).remove::<crate::prelude::OnSpawn>();
     });
 }
@@ -111,18 +102,24 @@ fn observe_interactions(
     interactions.iter().for_each(|(entity, interaction)|{
         match interaction {
             Interaction::Pressed => {
-                if let Ok(crate::prelude::OnPress(fn_str)) = on_pressed.get(entity){
-                    function_bindings.maybe_run(fn_str, entity, &mut cmd);
+                if let Ok(crate::prelude::OnPress(funcs)) = on_pressed.get(entity){
+                    for fn_str in funcs.iter(){
+                        function_bindings.maybe_run(fn_str, entity, &mut cmd);
+                    }
                 }
             }
             Interaction::Hovered => {
-                if let Ok(crate::prelude::OnEnter(fn_str)) = on_enter.get(entity){
-                    function_bindings.maybe_run(fn_str, entity, &mut cmd);
+                if let Ok(crate::prelude::OnEnter(funcs)) = on_enter.get(entity){
+                    for fn_str in funcs.iter(){
+                        function_bindings.maybe_run(fn_str, entity, &mut cmd);
+                    }
                 }
             },
             Interaction::None => {
-                if let Ok(crate::prelude::OnExit(fn_str)) = on_exit.get(entity){
-                    function_bindings.maybe_run(fn_str, entity, &mut cmd);
+                if let Ok(crate::prelude::OnExit(funcs)) = on_exit.get(entity){
+                    for fn_str in funcs.iter(){
+                        function_bindings.maybe_run(fn_str, entity, &mut cmd);
+                    }
                 }
             },
         }

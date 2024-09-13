@@ -4,13 +4,14 @@
     background="{color}"
     height="80px"
     width="100%"
-    on:press="{press}"
+    onpress="{press}"
     border="2px"
     border_color="{color}"
     hover:border_color="#333"
     border_radius="5px"
     justify_content="center"
     align_items="center"
+    onenter="play_beep"
 >
     <slot />
 </button>

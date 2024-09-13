@@ -1,6 +1,8 @@
 use std::f32::consts::PI;
 
-use bevy::{ecs::system::EntityCommands, prelude::*, window::WindowResolution};
+use bevy::{
+    ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*, window::WindowResolution,
+};
 use lommix_ui::prelude::*;
 
 fn main() {
@@ -17,7 +19,7 @@ fn main() {
             LommixUiPlugin,
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_puls, update_collapse))
+        .add_systems(Update, (update_puls, update_collapse, update_scroll))
         .run();
 }
 
@@ -25,7 +27,7 @@ fn setup(
     mut cmd: Commands,
     server: Res<AssetServer>,
     mut function_bindings: ResMut<FunctionBindings>,
-    mut custom_comps: ResMut<ComponenRegistry>,
+    mut custom_comps: ResMut<ComponentBindings>,
 ) {
     cmd.spawn(Camera2dBundle::default());
     cmd.spawn(UiBundle {
@@ -33,21 +35,25 @@ fn setup(
         ..default()
     });
 
-    function_bindings.register("delete_me", cmd.register_one_shot_system(delete_me));
     function_bindings.register("start_game", cmd.register_one_shot_system(start_game));
-    function_bindings.register(
-        "add_comp_collapse",
-        cmd.register_one_shot_system(add_comp_collapse),
-    );
+    function_bindings.register("add_comp", cmd.register_one_shot_system(add_comp));
+    function_bindings.register("inventory", cmd.register_one_shot_system(init_inventory));
+    function_bindings.register("scrollable", cmd.register_one_shot_system(init_scrollable));
 
     let panel_handle = server.load("panel.html");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        info!("spawning custom node!");
         entity_cmd.insert((UiBundle {
             handle: panel_handle.clone(),
             ..default()
         },));
     });
+
+    function_bindings.register(
+        "collapse",
+        cmd.register_one_shot_system(|In(entity), mut cmd: Commands| {
+            cmd.entity(entity).insert(Collapse(false));
+        }),
+    );
 }
 
 fn update_collapse(
@@ -62,7 +68,6 @@ fn update_collapse(
             };
 
             info!("collapsing {}", target.0);
-
             let display = match **collapse {
                 true => {
                     **collapse = false;
@@ -75,9 +80,59 @@ fn update_collapse(
             };
 
             if let Ok(mut style) = style.get_mut(**target) {
+                info!("change style");
                 style.display = display;
             }
         });
+}
+
+#[derive(Component)]
+pub struct Scrollable {
+    offset: f32,
+    speed: f32,
+}
+fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>) {
+    let speed = tags
+        .get(entity)
+        .ok()
+        .map(|tags| {
+            tags.get_tag("scroll_speed")
+                .map(|fstr| fstr.parse::<f32>().ok())
+                .flatten()
+        })
+        .flatten()
+        .unwrap_or(10.);
+
+    cmd.entity(entity).insert(Scrollable { speed, offset: 0. });
+}
+
+fn update_scroll(
+    mut events: EventReader<MouseWheel>,
+    mut scrollables: Query<(&mut Scrollable, &UiTarget, &Interaction)>,
+    mut targets: Query<(&mut Style, &Node)>,
+    time: Res<Time>,
+) {
+    // whatever
+    events.read().for_each(|ev| {
+        scrollables
+            .iter_mut()
+            .for_each(|(mut scroll, target, interaction)| {
+                // match interaction {
+                //     Interaction::Hovered => (),
+                //     _ => return,
+                // };
+
+                let Ok((mut style, node)) = targets.get_mut(**target) else {
+                    return;
+                };
+
+                scroll.offset = (scroll.offset
+                    + ev.y.signum() * scroll.speed * time.delta_seconds())
+                .clamp(-node.size().y, 0.);
+
+                style.top = Val::Px(scroll.offset);
+            });
+    });
 }
 
 #[derive(Component)]
@@ -92,18 +147,40 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
     });
 }
 
-fn delete_me(callback: In<Callback>, mut cmd: Commands) {
-    info!("hehe I delete {}", callback.entity);
-    cmd.entity(callback.entity).despawn_recursive();
+fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
+    info!("spawning items");
+    cmd.entity(entity).with_children(|cmd| {
+        for i in 0..300 {
+            cmd.spawn((
+                UiBundle {
+                    handle: server.load("card.html"),
+                    ..default()
+                },
+                NodeBundle::default(),
+                PropertyDefintions::new()
+                    .with("title", format!("item {i}"))
+                    .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
+            ));
+        }
+    });
 }
 
-fn start_game(_entity: In<Callback>, mut _cmd: Commands) {
+fn start_game(_: In<Entity>, mut _cmd: Commands) {
     info!("hello world from start game system");
 }
 
-fn add_comp_collapse(callback: In<Callback>, mut cmd: Commands) {
-    info!("added collapse comp");
-    cmd.entity(callback.entity).insert(Collapse::default());
+fn add_comp(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>) {
+    let Ok(tags) = tags.get(entity) else {
+        warn!("missing args");
+        return;
+    };
+
+    match tags.get_tag("comp") {
+        Some("collapse") => {
+            cmd.entity(entity).insert(Collapse::default());
+        }
+        _ => warn!("missing `arg`"),
+    }
 }
 
 #[derive(Component, Deref, DerefMut, Default)]

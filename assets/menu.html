@@ -1,5 +1,5 @@
-<node flex_direction="column">
-    <include src="panel.html" prop:title="Main">
+<node flex_direction="column" prop:test="inventory">
+    <include src="panel.html" prop:title="Main" prop:bcolor="#F0F">
         <img align_self="center" width="100px" src="bevy_bird_dark.png" />
 
         <node justify_content="center" flex_direction="row">
@@ -16,14 +16,25 @@
             </include>
         </panel>
 
-        <panel prop:bcolor="#000" prop:press="start_game" prop:title="Bar">
-            <include src="button.html" prop:color="#000" prop:press="start_game">
-                <text>Play</text>
-            </include>
+        <node flex_direction="column">
+            <node justify_content="space_between" margin="0px 5px">
+                <text>Inventory</text>
+                <text>[ scroll ]</text>
+            </node>
 
-            <include src="button.html" prop:color="#000" prop:press="start_game">
-                <text>Play</text>
-            </include>
-        </panel>
+            <button
+                onspawn="scrollable"
+                tag:scroll_speed="1000"
+                target="inventory"
+                width="420px"
+                height="300px"
+                border_radius="8px"
+                overflow="hidden hidden"
+                border="2px"
+                border_color="#FFF"
+            >
+                <node onspawn="inventory" id="inventory" row_gap="0px" column_gap="0px" flex_wrap="wrap" />
+            </button>
+        </node>
     </include>
 </node>

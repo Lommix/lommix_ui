@@ -1,7 +1,7 @@
 use crate::{
     data::{Action, Attribute, NodeType, Property, XNode},
-    prelude::{ComponenRegistry, StyleAttr},
-    properties::{PropTree, PropertyDefintions, ToCompile},
+    prelude::{ComponentBindings, StyleAttr},
+    properties::{find_def, PropertyDefintions, ToCompile},
 };
 use bevy::{prelude::*, utils::HashMap};
 use nom::{
@@ -16,7 +16,14 @@ impl Plugin for BuildPlugin {
         app.add_systems(
             Update,
             (
-                (hotreload, spawn_ui, move_children_to_slot, style_ui).chain(),
+                (
+                    hotreload,
+                    spawn_ui,
+                    move_children_to_slot,
+                    compile_ui,
+                    style_ui,
+                )
+                    .chain(),
                 update_interaction,
             ),
         );
@@ -32,16 +39,34 @@ pub struct SlotTag;
 #[derive(Component)]
 pub struct UnslotedChildren(Entity);
 
+#[derive(Component, Deref, DerefMut)]
+pub struct Tags(Vec<Tag>);
+
+impl Tags {
+    pub fn get_tag(&self, key: &str) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|entry| entry.key.eq(key))
+            .map(|entry| entry.value.as_str())
+    }
+}
+
+#[derive(Component)]
+pub struct Tag {
+    pub key: String,
+    pub value: String,
+}
+
 #[derive(Component, Deref)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
 
 #[derive(Default, Resource)]
 pub struct IdLookUpTable {
-    ids: HashMap<u64, Entity>,
-    targets: HashMap<Entity, u64>,
+    ids: HashMap<String, Entity>,
+    targets: HashMap<Entity, String>,
 }
 
-#[derive(Component, Default, Hash)]
+#[derive(Component, Default, Hash, Deref, DerefMut)]
 pub struct UiId(u64);
 
 #[derive(Component, DerefMut, Deref)]
@@ -54,16 +79,19 @@ pub struct UnbuildTag;
 pub struct UnStyled;
 
 #[derive(Component)]
-pub struct OnPress(pub String);
+pub struct UnCompiled;
 
-#[derive(Component)]
-pub struct OnSpawn(pub String);
+#[derive(Component, Deref, DerefMut)]
+pub struct OnPress(pub Vec<String>);
 
-#[derive(Component)]
-pub struct OnEnter(pub String);
+#[derive(Component, DerefMut, Deref)]
+pub struct OnSpawn(pub Vec<String>);
 
-#[derive(Component)]
-pub struct OnExit(pub String);
+#[derive(Component, DerefMut, Deref)]
+pub struct OnEnter(pub Vec<String>);
+
+#[derive(Component, Deref, DerefMut)]
+pub struct OnExit(pub Vec<String>);
 
 #[derive(Bundle, Default)]
 pub struct UiBundle {
@@ -269,26 +297,16 @@ fn spawn_ui(
     unbuild: Query<(Entity, &Handle<XNode>), With<UnbuildTag>>,
     assets: Res<Assets<XNode>>,
     server: Res<AssetServer>,
-    custom_comps: Res<ComponenRegistry>,
-    parents: Query<&Parent>,
-    mut prop_tree: ResMut<PropTree>,
+    custom_comps: Res<ComponentBindings>,
+    mut defintions: Query<&mut PropertyDefintions>,
 ) {
     unbuild.iter().for_each(|(ent, handle)| {
         let Some(ui_node) = assets.get(handle) else {
             return;
         };
 
-        // info!(
-        //     "spawning ui {}",
-        //     handle.path().map(|p| p.to_string()).unwrap_or_default()
-        // );
-
-        // if parents.get(ent).is_ok() {
-        //     info!("hass prent ",);
-        // }
-
+        let def = defintions.get_mut(ent).ok();
         let mut id_table = IdLookUpTable::default();
-
         build_node(
             ent,
             &ui_node,
@@ -296,8 +314,8 @@ fn spawn_ui(
             &assets,
             &server,
             &custom_comps,
-            &mut prop_tree,
             &mut id_table,
+            def,
         );
 
         id_table
@@ -307,7 +325,7 @@ fn spawn_ui(
                 Some(tar) => {
                     cmd.entity(*entity).insert(UiTarget(*tar));
                 }
-                None => warn!("target not found for entity {entity}"),
+                None => warn!("target `{target_id}` not found for entity {entity}"),
             });
 
         cmd.entity(ent).remove::<UnbuildTag>();
@@ -322,21 +340,29 @@ fn build_node(
     cmd: &mut Commands,
     assets: &Assets<XNode>,
     server: &AssetServer,
-    custom_comps: &ComponenRegistry,
-    prop_tree: &mut PropTree,
+    custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
+    defintions: Option<Mut<PropertyDefintions>>,
+    //slot_stack: &Vec<Entity>, - holds
 ) {
     let mut attributes = SortedAttributes::from(&node.attributes);
-    _ = match &node.node_type {
+    match defintions {
         // preserve already set props for includes
-        NodeType::Include => attributes
-            .definitions
-            .drain(..)
-            .for_each(|(key, val)| prop_tree.insert(entity, key, val)),
-        _ => attributes
-            .definitions
-            .drain(..)
-            .for_each(|(key, val)| prop_tree.try_insert(entity, key, val)),
+        // not on includes, on the first node of the include
+        // only first node can already exist in the tree -> query in sys once
+        Some(mut existing) => attributes.definitions.drain(..).for_each(|(key, val)| {
+            _ = existing.try_insert(key, val);
+        }),
+        None => {
+            let defs = attributes.definitions.drain(..).fold(
+                PropertyDefintions::default(),
+                |mut m, (key, val)| {
+                    m.insert(key, val);
+                    m
+                },
+            );
+            cmd.entity(entity).insert(defs);
+        }
     };
 
     if attributes.properties.len() > 0 {
@@ -345,13 +371,26 @@ fn build_node(
         ));
     }
 
+    attributes.actions.drain(..).for_each(|action| {
+        action.self_insert(cmd.entity(entity));
+    });
+
     if let Some(id) = attributes.id {
-        // cmd.entity(entity).insert(UiId(id));
         id_table.ids.insert(id, entity);
     }
-
     if let Some(target) = attributes.target {
         id_table.targets.insert(entity, target);
+    }
+
+    // ------------------
+    if attributes.custom.len() > 0 {
+        cmd.entity(entity).insert(Tags(
+            attributes
+                .custom
+                .drain(..)
+                .map(|(key, value)| Tag { key, value })
+                .collect::<Vec<_>>(),
+        ));
     }
 
     match &node.node_type {
@@ -379,16 +418,7 @@ fn build_node(
             }
         }
         NodeType::Text => {
-            // compile text here? may break hotreload
-            let content = node
-                .content
-                .as_ref()
-                .map(|c| match compile_content(entity, c, prop_tree) {
-                    Ok((_, compiled)) => compiled,
-                    Err(_) => c.clone(),
-                })
-                .unwrap_or_default();
-
+            let content = node.content.as_ref().cloned().unwrap_or_default();
             cmd.entity(entity).insert((
                 Name::new("Text"),
                 TextBundle::from_section(
@@ -401,6 +431,7 @@ fn build_node(
                 ),
                 StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
                 UnStyled,
+                UnCompiled,
             ));
         }
         NodeType::Button => {
@@ -410,14 +441,9 @@ fn build_node(
                 StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
                 UnStyled,
             ));
-
-            for action in attributes.actions.drain(..) {
-                action.apply(cmd.entity(entity));
-            }
         }
         NodeType::Include => {
             let path = attributes.path.unwrap_or_default();
-            // info!("loading component {path}");
             let handle = server.load::<XNode>(path);
 
             cmd.entity(entity)
@@ -428,10 +454,6 @@ fn build_node(
 
                 node.children.iter().for_each(|child_node| {
                     let child = cmd.spawn(SlotedNode).id();
-
-                    // save the real parent after slot insert
-                    prop_tree.set_parent(child, entity);
-
                     build_node(
                         child,
                         child_node,
@@ -439,13 +461,11 @@ fn build_node(
                         assets,
                         server,
                         custom_comps,
-                        prop_tree,
                         id_table,
+                        None,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
-
-                // info!("found unsloted children");
                 cmd.entity(entity).insert(UnslotedChildren(slot_holder));
             }
 
@@ -462,8 +482,6 @@ fn build_node(
 
                 node.children.iter().for_each(|child_node| {
                     let child = cmd.spawn(SlotedNode).id();
-                    // save the real parent after slot insert
-                    prop_tree.set_parent(child, entity);
                     build_node(
                         child,
                         child_node,
@@ -471,12 +489,11 @@ fn build_node(
                         assets,
                         server,
                         custom_comps,
-                        prop_tree,
                         id_table,
+                        None,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
-                // info!("found unsloted children");
                 cmd.entity(entity).insert(UnslotedChildren(slot_holder));
             }
 
@@ -486,9 +503,6 @@ fn build_node(
 
     for child_node in node.children.iter() {
         let child = cmd.spawn_empty().id();
-        // prop_tree.hirachy.insert(child, entity);
-        prop_tree.set_parent(child, entity);
-
         build_node(
             child,
             child_node,
@@ -496,8 +510,8 @@ fn build_node(
             assets,
             server,
             custom_comps,
-            prop_tree,
             id_table,
+            None,
         );
 
         cmd.entity(entity).add_child(child);
@@ -512,8 +526,9 @@ struct SortedAttributes {
     pub spawn_functions_keys: Vec<String>,
     pub definitions: Vec<(String, String)>,
     pub properties: Vec<Property>,
-    pub target: Option<u64>,
-    pub id: Option<u64>,
+    pub target: Option<String>,
+    pub id: Option<String>,
+    pub custom: Vec<(String, String)>,
 }
 
 impl From<&Vec<Attribute>> for SortedAttributes {
@@ -526,19 +541,43 @@ impl From<&Vec<Attribute>> for SortedAttributes {
                 Attribute::Path(path) => sorted.path = Some(path),
                 Attribute::SpawnFunction(spawn) => sorted.spawn_functions_keys.push(spawn),
                 Attribute::PropertyDefinition(key, val) => sorted.definitions.push((key, val)),
-                Attribute::Property(prop) => sorted.properties.push(prop),
+                Attribute::UnCompiledProperty(prop) => sorted.properties.push(prop),
                 Attribute::Target(target) => sorted.target = Some(target),
                 Attribute::Id(id) => sorted.id = Some(id),
+                Attribute::Custom(key, value) => {
+                    info!("found custom {key} : {value}");
+                    sorted.custom.push((key, value))
+                }
             };
         }
         sorted
     }
 }
 
+fn compile_ui(
+    mut cmd: Commands,
+    mut texts: Query<(Entity, &mut Text), With<UnCompiled>>,
+    parents: Query<&Parent>,
+    definitions: Query<&PropertyDefintions>,
+) {
+    texts.iter_mut().for_each(|(entity, mut text)| {
+        for section in text.sections.iter_mut() {
+            let Ok((_, compiled)) = compile_content(entity, &section.value, |key| {
+                find_def(entity, key, &definitions, &parents)
+            }) else {
+                continue;
+            };
+            section.value = compiled;
+        }
+
+        cmd.entity(entity).remove::<UnCompiled>();
+    });
+}
+
 fn compile_content<'a, 'b>(
     entity: Entity,
     input: &'a str,
-    prop_tree: &'b PropTree,
+    find_val: impl Fn(&'a str) -> Option<&'a str>,
 ) -> IResult<&'a str, String> {
     let mut out = String::new();
 
@@ -547,7 +586,7 @@ fn compile_content<'a, 'b>(
 
     out.push_str(text_content);
 
-    match prop_tree.find_def_up(entity, prop_key) {
+    match find_val(prop_key) {
         Some(val) => {
             out.push_str(val);
         }
@@ -555,7 +594,7 @@ fn compile_content<'a, 'b>(
     };
 
     if remaining.len() > 0 {
-        if let Ok((_, str)) = compile_content(entity, remaining, prop_tree) {
+        if let Ok((_, str)) = compile_content(entity, remaining, find_val) {
             out.push_str(&str);
         } else {
             out.push_str(remaining);

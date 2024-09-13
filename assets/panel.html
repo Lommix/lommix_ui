@@ -5,31 +5,27 @@
         row_gap="20px"
         border="5px"
         width="100%"
-		min_width="300px"
+        min_width="300px"
         height="100%"
         border_color="{bcolor}"
         border_radius="30px"
         justify_content="center"
         background="#334"
-        on:press="start_game"
+        onpress="start_game"
     >
-        <node
-			width="100%"
-			justify_content="space_between"
-			align_items="center"
-		>
-			<text>Title: {title} color: {bcolor}</text>
+        <node width="100%" justify_content="space_between" align_items="center">
+            <text>Title: {title} color: {bcolor}</text>
             <button
-				border_radius="50px"
+                border_radius="50px"
                 padding="10px 5px"
                 background="#000"
                 hover:background="#0C0"
                 justify_content="center"
                 width="auto"
                 target="to_collapse"
-                on:spawn="add_comp_collapse"
+                onspawn="collapse"
             >
-                <text font_size="20,0">+</text>
+                <text font_size="20">+</text>
             </button>
         </node>
 

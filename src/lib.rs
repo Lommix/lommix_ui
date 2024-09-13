@@ -9,12 +9,13 @@ mod parse;
 mod properties;
 
 pub mod prelude {
-    pub use crate::bindings::{Callback, ComponenRegistry, FunctionBindings};
+    pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, UiBundle, UiId, UiTarget,
+        OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, Tag, Tags, UiBundle, UiId, UiTarget,
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, XNode};
     pub use crate::error::ParseError;
+    pub use crate::properties::PropertyDefintions;
     pub use crate::LommixUiPlugin;
 }
 

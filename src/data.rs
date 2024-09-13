@@ -26,12 +26,13 @@ pub struct XNode {
 pub enum Attribute {
     Style(StyleAttr),
     PropertyDefinition(String, String),
-    Property(Property),
+    UnCompiledProperty(Property),
     Action(Action),
     Path(String),
-    Target(u64),
-    Id(u64),
+    Target(String),
+    Id(String),
     SpawnFunction(String),
+    Custom(String, String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -43,20 +44,14 @@ pub struct Property {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Action {
-    OnPress(String),
-    OnEnter(String),
-    OnExit(String),
-    OnSpawn(String),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct FnBinding {
-    key: String,
-    args: Vec<String>,
+    OnPress(Vec<String>),
+    OnEnter(Vec<String>),
+    OnExit(Vec<String>),
+    OnSpawn(Vec<String>),
 }
 
 impl Action {
-    pub fn apply(self, mut cmd: EntityCommands) {
+    pub fn self_insert(self, mut cmd: EntityCommands) {
         match self {
             Action::OnPress(fn_id) => {
                 cmd.insert(crate::prelude::OnPress(fn_id));
@@ -68,7 +63,6 @@ impl Action {
                 cmd.insert(crate::prelude::OnExit(fn_id));
             }
             Action::OnSpawn(fn_id) => {
-                info!("inserting spawn");
                 cmd.insert(crate::prelude::OnSpawn(fn_id));
             }
         }
