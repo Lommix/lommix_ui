@@ -1,3 +1,4 @@
+use crate::parse::parse_attribute;
 use crate::prelude::*;
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
@@ -42,6 +43,37 @@ pub struct Property {
     pub key: String,
 }
 
+impl Property {
+    pub fn compile(&self, props: &PropertyDefintions) -> Option<Attribute> {
+        let Some(prop_val) = props.get(&self.key) else {
+            warn!("failed to parse property, key not found `{}`", self.key);
+            return None;
+        };
+
+        let prefix = self
+            .prefix
+            .as_ref()
+            .map(|p| format!("{}:", p))
+            .unwrap_or_default();
+
+        let attribute_string = format!(r#"{}{}="{}""#, prefix, self.ident, prop_val);
+        let Ok((_, attr)) = parse_attribute(attribute_string.as_bytes()) else {
+            warn!(
+                "failed to parse property key: `{}` val:`{}`",
+                self.key, prop_val
+            );
+            return None;
+        };
+
+        // recurive compile, why not
+        if let Attribute::UnCompiledProperty(prop) = attr {
+            return prop.compile(props);
+        };
+
+        Some(attr)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Action {
     OnPress(Vec<String>),
@@ -69,6 +101,8 @@ impl Action {
     }
 }
 
+//@todo: - adding adding cascades
+#[derive(Debug)]
 pub enum Value<T> {
     Value(T),
     Inherit,
@@ -139,6 +173,7 @@ pub enum StyleAttr {
     // -----
     Hover(Box<StyleAttr>),
     Pressed(Box<StyleAttr>),
+
     // -----
     // animations
     Duration(f32),
@@ -158,6 +193,8 @@ impl StyleAttr {
         style: &mut Style,
         text: &mut Option<Mut<UiText>>,
         server: &AssetServer,
+        // parents: &Query<&Parents>,
+        // styles: &Qurty<&Attributes>,
     ) {
         match self {
             StyleAttr::Display(display) => style.display = *display,

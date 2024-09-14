@@ -80,9 +80,7 @@ fn observe_on_spawn(
     on_spawn: Query<(Entity, &crate::prelude::OnSpawn)>,
 ) {
     on_spawn.iter().for_each(|(entity, on_spawn)| {
-        info!("running spawn sysytem on {entity}");
         for spawn_fn in on_spawn.iter() {
-            info!("running spawn sysytem {spawn_fn}");
             function_bindings.maybe_run(spawn_fn, entity, &mut cmd);
         }
 

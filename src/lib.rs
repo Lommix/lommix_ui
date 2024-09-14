@@ -6,17 +6,16 @@ mod data;
 mod error;
 mod load;
 mod parse;
-mod properties;
 // mod lexer;
 
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, Tag, Tags, HtmlBundle, UiId, UiTarget,
+        HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, PropertyDefintions, StyleAttributes, Tag,
+        Tags, UiId, UiTarget,
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, XNode};
     pub use crate::error::ParseError;
-    pub use crate::properties::PropertyDefintions;
     pub use crate::LommixUiPlugin;
 }
 
@@ -27,7 +26,6 @@ impl Plugin for LommixUiPlugin {
             load::LoaderPlugin,
             build::BuildPlugin,
             bindings::BindingPlugin,
-            properties::PropertyPlugin,
         ));
     }
 }

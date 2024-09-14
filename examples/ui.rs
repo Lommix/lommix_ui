@@ -55,7 +55,7 @@ fn setup(
     function_bindings.register(
         "collapse",
         cmd.register_one_shot_system(|In(entity), mut cmd: Commands| {
-            cmd.entity(entity).insert(Collapse(false));
+            cmd.entity(entity).insert(Collapse(true));
         }),
     );
 }
@@ -146,15 +146,13 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
 fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..100 {
-            cmd.spawn((
-                HtmlBundle {
-                    handle: server.load("card.html"),
-                    ..default()
-                },
-                PropertyDefintions::new()
+            cmd.spawn(HtmlBundle {
+                handle: server.load("card.html"),
+                properties: PropertyDefintions::new()
                     .with("title", format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
-            ));
+                ..default()
+            });
         }
     });
 }

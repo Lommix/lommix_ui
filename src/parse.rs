@@ -22,7 +22,7 @@ use nom::{
     combinator::{complete, map, map_res},
     number::complete::float,
     sequence::{delimited, preceded, tuple, Tuple},
-    IResult, Parser,
+    IResult,
 };
 use std::hash::{DefaultHasher, Hash, Hasher};
 
