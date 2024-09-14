@@ -1,6 +1,3 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::rc::Rc;
-
 use crate::data::{Action, Attribute, Property, StyleAttr};
 use crate::error::ParseError;
 use crate::prelude::{NodeType, XNode};
@@ -9,16 +6,15 @@ use bevy::ui::{
     GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis,
     PositionType, RepeatedGridTrack,
 };
-use bevy::utils::HashMap;
 use bevy::{
     color::Color,
     ui::{UiRect, Val},
 };
-use nom::bytes::complete::{is_not, take_while1};
+use nom::bytes::complete::{is_not, take_until, take_while1};
 use nom::combinator::{flat_map, map_parser, rest};
 use nom::error::context;
 use nom::multi::{many0, many1, separated_list1};
-use nom::number::Endianness;
+use nom::sequence::terminated;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
@@ -28,6 +24,7 @@ use nom::{
     sequence::{delimited, preceded, tuple, Tuple},
     IResult, Parser,
 };
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// --------------------------------------------------
 /// try parsing a ui xml bytes
@@ -38,16 +35,16 @@ pub fn parse_bytes(input: &[u8]) -> Result<XNode, ParseError> {
 
 #[rustfmt::skip]
 fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
-        let (input, _) = multispace0(input)?;
+        let (input, _) = trim_comments(input)?;
         let (input, (start_tag, attributes, is_empty)) = parse_start_tag(input)?;
         let (input, _) = multispace0(input)?;
 
         let (input, content, children ) = if !is_empty {
-
+            let (input, _) = trim_comments(input)?;
             let (input, children) = many0(parse_element)(input)?;
-            let (input, _) = multispace0(input)?;
+            let (input, _) = trim_comments(input)?;
             let (input, content) = map(parse_content,|content| if content.len() > 0 { Some(content.to_string())  } else {None})(input)?;
-            let (input, _) = multispace0(input)?;
+            let (input, _) = trim_comments(input)?;
             let (input, end_tag) = parse_end_tag(input)?;
 
             if start_tag != end_tag {
@@ -71,6 +68,17 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
         Ok((input, node))
 }
 
+fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    let (input, trimmed) = nom::character::complete::multispace0(input)?;
+    let o: Result<(&[u8], Vec<&[u8]>), nom::Err<nom::error::Error<&[u8]>>> = many0(terminated(
+        delimited(tag("<!--"), take_until("-->"), tag("-->")),
+        multispace0,
+    ))(input);
+
+    o.map(|(r, _)| (r, "".as_bytes()))
+        .or_else(|_| Ok((input, trimmed)))
+}
+
 fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
     alt((
         map(tag("node"), |_| NodeType::Node),
@@ -86,6 +94,7 @@ fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
     ))(input)
 }
 
+// true: empty tag
 fn parse_start_tag(input: &[u8]) -> IResult<&[u8], (&[u8], Vec<Attribute>, bool)> {
     let (input, (_, element_tag, attributes, _, is_empty)) = tuple((
         tag("<"),
@@ -109,6 +118,8 @@ fn parse_end_tag(input: &[u8]) -> IResult<&[u8], &[u8]> {
 }
 
 fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
+    // -------------
+    // trim comments -> to string
     let (input, content) = map_res(take_while(|c: u8| c != b'>' && c != b'<'), |c| {
         std::str::from_utf8(c)
     })(input)?;
@@ -123,7 +134,7 @@ enum ValueType<'a> {
 
 pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     let (input, (_, prefix, ident, _, value)) = tuple((
-        multispace0,
+        trim_comments,
         parse_prefix0,
         is_not("="),
         tag("="),
@@ -835,7 +846,7 @@ mod tests {
     #[test_case(r#"onpress="test,test_50,test o""#, Attribute::Action(Action::OnPress(vec!["test".to_string(),"test_50".to_string(), "test o".to_string()])))]
     #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
     #[test_case(r#"height="{my_var}""#, Attribute::UnCompiledProperty( Property{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
-    #[test_case(r#"width={myvar}"#, Attribute::UnCompiledProperty( Property{ key: "myvar".into(),prefix: None, ident: "width".into() }))]
+    #[test_case(r#"font_size="{test_that}""#, Attribute::UnCompiledProperty( Property{ key: "test_that".into(),prefix: None, ident: "font_size".into() }))]
     fn test_parse_attribute(input: &str, expected: Attribute) {
         let result = parse_attribute(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
@@ -887,6 +898,17 @@ mod tests {
     fn test_rect(input: &str, expected: UiRect) {
         let result = parse_ui_rect(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
+    }
+
+    #[test_case(
+        "   \n<!-- hello world <button> test thah </button> fdsfsd-->\nok",
+        "ok"
+    )]
+    #[test_case(r#"  <!-- hello <tag/> <""/>world -->    ok"#, "ok")]
+    #[test_case("   <!-- hello world -->    ok", "ok")]
+    fn test_comments(input: &str, expected: &str) {
+        let (remaining, trimmed) = trim_comments(&input.as_bytes()).unwrap();
+        assert_eq!(std::str::from_utf8(remaining).unwrap(), expected);
     }
 
     #[test_case("./assets/card.html")]

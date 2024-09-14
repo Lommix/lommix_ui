@@ -1,18 +1,21 @@
-<node flex_direction="column" prop:test="inventory">
+<node flex_direction="column" prop:test="#008">
     <include src="panel.html" prop:title="Main" prop:bcolor="#F0F">
         <img align_self="center" width="100px" src="bevy_bird_dark.png" />
+
+
 
         <node justify_content="center" flex_direction="row">
             <text font_size="40,0"> Effortless Ui </text>
         </node>
 
+        <!-- this is a user defined node `panel` that maps to include a another template -->
         <panel prop:color="#000" prop:press="start_game" prop:title="Foo">
             <include src="button.html" prop:color="#000" prop:press="start_game">
                 <text>Play</text>
             </include>
-
+            <!-- this is a normal include with passing properties -->
             <include src="button.html" prop:color="#000" prop:press="start_game">
-                <text>Play</text>
+                <text>Credits</text>
             </include>
         </panel>
 
@@ -32,8 +35,19 @@
                 overflow="hidden hidden"
                 border="2px"
                 border_color="#FFF"
+                align_content="center"
+                justify_content="center"
             >
-                <node onspawn="inventory" id="inventory" row_gap="0px" column_gap="0px" flex_wrap="wrap" />
+                <node
+                    onspawn="inventory"
+                    id="inventory"
+                    display="grid"
+                    grid_template_columns="(5, auto)"
+                    grid_auto_flow="row"
+                    padding="20px"
+                    column_gap="5px"
+                    row_gap="5px"
+                />
             </button>
         </node>
     </include>

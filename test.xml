@@ -1,7 +1,0 @@
-<div width="20px" height="50px">
-	<button click="start_game" background="#300044" hover:background="#995511">
-		<img width="64px" height="64px" path="test.png" />
-		<text padding="10px 10px"> hello world </text>
-	</button>
-	<include path="button.xml"/>
-</div>

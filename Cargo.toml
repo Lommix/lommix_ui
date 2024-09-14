@@ -1,5 +1,6 @@
 [package]
 name = "lommix_ui"
+authors = ["Lorenz Mielke"]
 version = "0.1.0"
 edition = "2021"
 

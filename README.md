@@ -1,17 +1,19 @@
-# Effortless Bevy ui
+# lommix' effortless bevy ui
 
-Opionionated `html/Xml`-like bevy ui parser. First class support for hotreloading.
+`html/Xml`-like bevy ui parser. First class support for hotreloading, custom nodes
+and Templating.
+
+This is a [MVP]. Expect alot of change.
 
 ## Featuring
 
 -   Hotreload, iteratate fast.
 -   Conditional styling with prefix like `hover:..` & `pressed:..`
 -   Component Templates with `<include>`
--   Function- and Spawnbindings like `on:pess="fn_id"` or `spawn="add_my_component"`
-    -   `fn_id` maps a string to a one shot system, passing the entity.
-    -   `add_my_component` maps a string to a function with access to `EntityCommands`.
--   Template `props`. expose values in components for reuseablity.
--   Very little dependecies. Minimal designed. No Widgets. Just the tools to make your own fast.
+-   Event Hooks that bind to your `OneShotSystems`: `onpress="fn_id"` or `onspawn="init_item_preview"`
+-   Add Custom tags for custom logic `tag:scroll_speed="20"` .. `Query<&Tags>`
+-   `Properties`. Expose and inject your Values. `<item_card prop:bg="{item_rarity_color}" ..`
+-   Very little dependecies. Minimal designed. No Widgets. Just the tools to make your own.
 
 ## Example
 
@@ -37,7 +39,7 @@ you write html, you get bevy ui. hotreload, happy dev noises.
 
 ## Syntax
 
-There is only one truth: `snake_case`. Take any Bevy naming, make it `snake_case`, you found your value.
+`snake_case` all the way. Take any BeVy naming, make it `snake_case`, you found your value.
 
 [checkout the full syntax here](docs/syntax.md)
 
@@ -46,7 +48,9 @@ There is only one truth: `snake_case`. Take any Bevy naming, make it `snake_case
 Add your own conmponent templates. `UiTarget` and `UiId` Components are resolved on build to contain the
 Entities of the corresponding element. With this, you can shape any custom logic and make it reuseable.
 
-`id` and `target` are always local to the file and do not propagate on includes.
+Any `tag:my_tag` gets added as `Tags` Component to the node entity.
+
+`id` and `target` are always local to the file and do not propagate to other templates (slots work).
 
 ```html
 <!-- menu.html -->
@@ -57,12 +61,12 @@ Entities of the corresponding element. With this, you can shape any custom logic
 
 ```html
 <!-- panel.html -->
-<node background_color={color} >
-    <button on_spawn="add_collapse_comp" target="collapse_me">
+<node background_color="{color}" >
+    <button on_spawn="init_collapse" target="preview" tag:collapse_speed="20">
         <text>{close_button_text}</text>
     </button>
 
-    <node id="collapse_me">
+    <node id="preview">
         <slot />
     </node>
 </nonde>
@@ -75,7 +79,7 @@ fn setup(
 ) {
     let panel_handle = server.load("panel.html");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert((UiBundle {
+        entity_cmd.insert((HtmlBundle {
             handle: panel_handle.clone(),
             ..default()
         },));
@@ -87,5 +91,15 @@ fn setup(
 
 The goal is to provide a very thin layer of ui syntax abstraction for seamless and fast iteration on your design.
 
-This crate will not provide any ui components/widgets like sliders and so on. Rather it will provide all the tooling neccessary to build your own
-on top.
+## Why Html (-like)
+
+To make us of existing tooling like syntax highlights, auto format and basic linting. T
+
+## Animations & Transitions
+
+Animations and transitions, just like in bevy, are application level. There will probably be
+some defaults behind features at some point.
+
+## Errors
+
+They are messy, parser rewrite soon.

@@ -1,7 +1,7 @@
 use crate::{
     data::{Action, Attribute, NodeType, Property, XNode},
     prelude::{ComponentBindings, StyleAttr},
-    properties::{find_def, PropertyDefintions, ToCompile},
+    properties::{find_def, NeedsPropCompile, Properties, PropertyDefintions},
 };
 use bevy::{prelude::*, utils::HashMap};
 use nom::{
@@ -60,44 +60,50 @@ pub struct Tag {
 #[derive(Component, Deref)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
 
-#[derive(Default, Resource)]
-pub struct IdLookUpTable {
-    ids: HashMap<String, Entity>,
-    targets: HashMap<Entity, String>,
-}
-
+/// the entities owned uid `id="my_id"`
 #[derive(Component, Default, Hash, Deref, DerefMut)]
 pub struct UiId(u64);
 
+/// the entity behind `id` in `target="id"`
 #[derive(Component, DerefMut, Deref)]
 pub struct UiTarget(pub Entity);
 
 #[derive(Component, Default)]
 pub struct UnbuildTag;
 
+/// tag fro reapplying styles
 #[derive(Component, Default)]
 pub struct UnStyled;
 
+/// tag for recompiles text content
 #[derive(Component)]
 pub struct UnCompiled;
 
+/// Eventlistener interaction transitions to Hover
 #[derive(Component, Deref, DerefMut)]
 pub struct OnPress(pub Vec<String>);
 
+/// Eventlistener on spawning node
 #[derive(Component, DerefMut, Deref)]
 pub struct OnSpawn(pub Vec<String>);
 
+/// Eventlistener for interaction transitions to Hover
 #[derive(Component, DerefMut, Deref)]
 pub struct OnEnter(pub Vec<String>);
 
+/// Eventlistener for interaction transitions to None
 #[derive(Component, Deref, DerefMut)]
 pub struct OnExit(pub Vec<String>);
 
+///
+/// Spawns a ui template behind an asset.
+///
 #[derive(Bundle, Default)]
-pub struct UiBundle {
+pub struct HtmlBundle {
     pub handle: Handle<XNode>,
-    pub _t1: UnbuildTag,
-    pub _t2: UnStyled,
+    pub node: NodeBundle,
+    pub unbuild: UnbuildTag,
+    pub unstyled: UnStyled,
 }
 
 fn update_interaction(
@@ -180,12 +186,12 @@ fn hotreload(
 struct KeepComps {
     pub parent: Parent,
     pub children: Children,
-    pub node: NodeBundle,
-    pub ui: UiBundle,
+    pub ui: HtmlBundle,
     pub sloted_nodes: SlotedNode,
     pub slot: SlotTag,
     pub unsloted: UnslotedChildren,
     pub props: PropertyDefintions,
+    pub uncompiled: NeedsPropCompile,
 }
 
 fn find_sloted_children(
@@ -292,6 +298,12 @@ fn find_slot(
     None
 }
 
+#[derive(Default)]
+struct IdLookUpTable {
+    ids: HashMap<String, Entity>,
+    targets: HashMap<Entity, String>,
+}
+
 fn spawn_ui(
     mut cmd: Commands,
     unbuild: Query<(Entity, &Handle<XNode>), With<UnbuildTag>>,
@@ -299,6 +311,7 @@ fn spawn_ui(
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
     mut defintions: Query<&mut PropertyDefintions>,
+    mut properties: Query<&mut Properties>,
 ) {
     unbuild.iter().for_each(|(ent, handle)| {
         let Some(ui_node) = assets.get(handle) else {
@@ -306,6 +319,8 @@ fn spawn_ui(
         };
 
         let def = defintions.get_mut(ent).ok();
+        let props = properties.get_mut(ent).ok();
+
         let mut id_table = IdLookUpTable::default();
         build_node(
             ent,
@@ -316,6 +331,7 @@ fn spawn_ui(
             &custom_comps,
             &mut id_table,
             def,
+            props,
         );
 
         id_table
@@ -343,7 +359,7 @@ fn build_node(
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
     defintions: Option<Mut<PropertyDefintions>>,
-    //slot_stack: &Vec<Entity>, - holds
+    properties: Option<Mut<Properties>>,
 ) {
     let mut attributes = SortedAttributes::from(&node.attributes);
     match defintions {
@@ -366,9 +382,23 @@ fn build_node(
     };
 
     if attributes.properties.len() > 0 {
-        cmd.entity(entity).insert(ToCompile(
-            attributes.properties.drain(..).collect::<Vec<_>>(),
-        ));
+        let mut props: Vec<Property> = attributes.properties.drain(..).collect();
+        // check if already has some
+        match properties {
+            Some(mut parent_properties) => {
+                for prop in props.drain(..) {
+                    if parent_properties.has(&prop) {
+                        continue;
+                    }
+                    parent_properties.push(prop);
+                }
+                cmd.entity(entity).insert(NeedsPropCompile);
+            }
+            None => {
+                cmd.entity(entity)
+                    .insert((Properties::new(props), NeedsPropCompile));
+            }
+        }
     }
 
     attributes.actions.drain(..).for_each(|action| {
@@ -463,6 +493,7 @@ fn build_node(
                         custom_comps,
                         id_table,
                         None,
+                        None,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
@@ -491,6 +522,7 @@ fn build_node(
                         custom_comps,
                         id_table,
                         None,
+                        None,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
@@ -511,6 +543,7 @@ fn build_node(
             server,
             custom_comps,
             id_table,
+            None,
             None,
         );
 
@@ -558,7 +591,7 @@ fn compile_ui(
     mut cmd: Commands,
     mut texts: Query<(Entity, &mut Text), With<UnCompiled>>,
     parents: Query<&Parent>,
-    definitions: Query<&PropertyDefintions>,
+    definitions: Query<&mut PropertyDefintions>,
 ) {
     texts.iter_mut().for_each(|(entity, mut text)| {
         for section in text.sections.iter_mut() {

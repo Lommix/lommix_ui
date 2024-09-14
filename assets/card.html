@@ -7,9 +7,11 @@
 	border_color="{bordercolor}"
     border_radius="8px"
     padding="5px"
-    width="20%"
     onpress="change_text"
-    target="preview_box"
+	onenter="play_beep"
+	tag:source="pop.ogg"
+	height="64px"
+	width="64px"
 >
     <img align_self="center" justify_self="center" width="100%" height="auto" src="bevy_bird_dark.png" />
     <text align_self="end" font_size="10px" justify_self="center" position="absolute">I: {title}</text>

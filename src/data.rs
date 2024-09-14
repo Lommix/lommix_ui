@@ -69,6 +69,11 @@ impl Action {
     }
 }
 
+pub enum Value<T> {
+    Value(T),
+    Inherit,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum StyleAttr {
     Display(Display),

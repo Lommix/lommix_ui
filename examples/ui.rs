@@ -1,7 +1,8 @@
 use std::f32::consts::PI;
 
 use bevy::{
-    ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*, window::WindowResolution,
+    ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*, ui::FocusPolicy,
+    window::WindowResolution,
 };
 use lommix_ui::prelude::*;
 
@@ -19,7 +20,10 @@ fn main() {
             LommixUiPlugin,
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_puls, update_collapse, update_scroll))
+        .add_systems(
+            Update,
+            (update_puls, update_collapse, update_scroll, cleaner),
+        )
         .run();
 }
 
@@ -30,19 +34,19 @@ fn setup(
     mut custom_comps: ResMut<ComponentBindings>,
 ) {
     cmd.spawn(Camera2dBundle::default());
-    cmd.spawn(UiBundle {
+    cmd.spawn(HtmlBundle {
         handle: server.load("menu.html"),
         ..default()
     });
 
-    function_bindings.register("start_game", cmd.register_one_shot_system(start_game));
-    function_bindings.register("add_comp", cmd.register_one_shot_system(add_comp));
+    function_bindings.register("greet", cmd.register_one_shot_system(greet));
     function_bindings.register("inventory", cmd.register_one_shot_system(init_inventory));
     function_bindings.register("scrollable", cmd.register_one_shot_system(init_scrollable));
+    function_bindings.register("play_beep", cmd.register_one_shot_system(play_beep));
 
     let panel_handle = server.load("panel.html");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert((UiBundle {
+        entity_cmd.insert((HtmlBundle {
             handle: panel_handle.clone(),
             ..default()
         },));
@@ -114,24 +118,16 @@ fn update_scroll(
 ) {
     // whatever
     events.read().for_each(|ev| {
-        scrollables
-            .iter_mut()
-            .for_each(|(mut scroll, target, interaction)| {
-                // match interaction {
-                //     Interaction::Hovered => (),
-                //     _ => return,
-                // };
+        scrollables.iter_mut().for_each(|(mut scroll, target, _)| {
+            let Ok((mut style, node)) = targets.get_mut(**target) else {
+                return;
+            };
 
-                let Ok((mut style, node)) = targets.get_mut(**target) else {
-                    return;
-                };
+            scroll.offset = (scroll.offset + ev.y.signum() * scroll.speed * time.delta_seconds())
+                .clamp(-node.unrounded_size().y, 0.);
 
-                scroll.offset = (scroll.offset
-                    + ev.y.signum() * scroll.speed * time.delta_seconds())
-                .clamp(-node.size().y, 0.);
-
-                style.top = Val::Px(scroll.offset);
-            });
+            style.top = Val::Px(scroll.offset);
+        });
     });
 }
 
@@ -148,15 +144,13 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
 }
 
 fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
-    info!("spawning items");
     cmd.entity(entity).with_children(|cmd| {
-        for i in 0..300 {
+        for i in 0..100 {
             cmd.spawn((
-                UiBundle {
+                HtmlBundle {
                     handle: server.load("card.html"),
                     ..default()
                 },
-                NodeBundle::default(),
                 PropertyDefintions::new()
                     .with("title", format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
@@ -165,22 +159,52 @@ fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetSe
     });
 }
 
-fn start_game(_: In<Entity>, mut _cmd: Commands) {
-    info!("hello world from start game system");
-}
-
-fn add_comp(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>) {
-    let Ok(tags) = tags.get(entity) else {
-        warn!("missing args");
+fn play_beep(
+    In(entity): In<Entity>,
+    tags: Query<&Tags>,
+    mut cmd: Commands,
+    server: Res<AssetServer>,
+) {
+    let Some(path) = tags
+        .get(entity)
+        .ok()
+        .map(|t| t.get_tag("source").map(|s| s.to_string()))
+        .flatten()
+    else {
         return;
     };
 
-    match tags.get_tag("comp") {
-        Some("collapse") => {
-            cmd.entity(entity).insert(Collapse::default());
-        }
-        _ => warn!("missing `arg`"),
+    cmd.spawn((
+        AudioBundle {
+            source: server.load(path.clone()),
+            settings: PlaybackSettings::ONCE,
+            ..default()
+        },
+        LifeTime::new(0.5),
+    ));
+}
+
+#[derive(Component, Deref, DerefMut)]
+struct LifeTime(Timer);
+impl LifeTime {
+    pub fn new(s: f32) -> Self {
+        LifeTime(Timer::new(
+            std::time::Duration::from_secs_f32(s),
+            TimerMode::Once,
+        ))
     }
+}
+
+fn cleaner(mut expired: Query<(Entity, &mut LifeTime)>, mut cmd: Commands, time: Res<Time>) {
+    expired.iter_mut().for_each(|(entity, mut lifetime)| {
+        if lifetime.tick(time.delta()).finished() {
+            cmd.entity(entity).despawn_recursive();
+        }
+    });
+}
+
+fn greet(In(entity): In<Entity>, mut _cmd: Commands) {
+    info!("greetings from `{entity}`");
 }
 
 #[derive(Component, Deref, DerefMut, Default)]

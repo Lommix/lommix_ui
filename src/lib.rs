@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::app::{App, Plugin};
 
 mod bindings;
 mod build;
@@ -7,11 +7,12 @@ mod error;
 mod load;
 mod parse;
 mod properties;
+// mod lexer;
 
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, Tag, Tags, UiBundle, UiId, UiTarget,
+        OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, Tag, Tags, HtmlBundle, UiId, UiTarget,
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, XNode};
     pub use crate::error::ParseError;
