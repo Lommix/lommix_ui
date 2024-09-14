@@ -30,7 +30,7 @@ impl Plugin for BuildPlugin {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct SlotedNode;
 
 #[derive(Component)]
@@ -153,6 +153,7 @@ fn hotreload(
     templates: Query<(Entity, &Handle<XNode>)>,
     children: Query<&Children>,
     sloted_nodes: Query<Entity, With<SlotedNode>>,
+    parent: Query<&Parent>,
 ) {
     events.read().for_each(|ev| {
         let id = match ev {
@@ -174,12 +175,34 @@ fn hotreload(
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
                 }
 
+                // clear property definitionns on reload
+
                 cmd.entity(entity)
                     .despawn_descendants()
                     .retain::<KeepComps>()
                     .insert(UnbuildTag);
+
+                if !has_template_parent(entity, &parent, &templates) {
+                    cmd.entity(entity).remove::<PropertyDefintions>();
+                }
             });
     });
+}
+
+fn has_template_parent(
+    entity: Entity,
+    parent: &Query<&Parent>,
+    templates: &Query<(Entity, &Handle<XNode>)>,
+) -> bool {
+    let Ok(parent_ent) = parent.get(entity).map(|p| p.get()) else {
+        return false;
+    };
+
+    if templates.get(parent_ent).is_ok() {
+        return true;
+    }
+
+    has_template_parent(parent_ent, parent, templates)
 }
 
 #[derive(Bundle)]
@@ -187,8 +210,6 @@ struct KeepComps {
     pub parent: Parent,
     pub children: Children,
     pub ui: HtmlBundle,
-    pub sloted_nodes: SlotedNode,
-    pub slot: SlotTag,
     pub unsloted: UnslotedChildren,
     pub props: PropertyDefintions,
     pub uncompiled: NeedsPropCompile,
@@ -258,6 +279,7 @@ fn move_children_to_slot(
             };
 
             // slot is a empty entity
+            // this
             let Ok(slot_parent) = parent.get(slot).map(|p| p.get()) else {
                 warn!("parentless slot, impossible");
                 return;
@@ -266,7 +288,9 @@ fn move_children_to_slot(
             // info!("found slot! {slot}");
             _ = children.get(*slot_holder).map(|children| {
                 children.iter().for_each(|child| {
-                    cmd.entity(slot_parent).add_child(*child);
+                    if *child != slot_parent {
+                        cmd.entity(slot_parent).add_child(*child);
+                    }
                 })
             });
 
@@ -480,10 +504,9 @@ fn build_node(
                 .insert((handle, UnbuildTag, NodeBundle::default(), UnStyled));
 
             if node.children.len() > 0 {
-                let slot_holder = cmd.spawn_empty().id();
-
+                let slot_holder = cmd.spawn((NodeBundle::default(), SlotedNode)).id();
                 node.children.iter().for_each(|child_node| {
-                    let child = cmd.spawn(SlotedNode).id();
+                    let child = cmd.spawn_empty().id();
                     build_node(
                         child,
                         child_node,
@@ -509,10 +532,9 @@ fn build_node(
         NodeType::Custom(custom_tag) => {
             custom_comps.try_spawn(custom_tag, entity, cmd);
             if node.children.len() > 0 {
-                let slot_holder = cmd.spawn_empty().id();
-
+                let slot_holder = cmd.spawn((NodeBundle::default(), SlotedNode)).id();
                 node.children.iter().for_each(|child_node| {
-                    let child = cmd.spawn(SlotedNode).id();
+                    let child = cmd.spawn_empty().id();
                     build_node(
                         child,
                         child_node,
@@ -587,13 +609,34 @@ impl From<&Vec<Attribute>> for SortedAttributes {
     }
 }
 
+fn is_waiting_for_slot(
+    entity: Entity,
+    slot_holder: &Query<&SlotedNode>,
+    parents: &Query<&Parent>,
+) -> bool {
+    let Ok(parent_ent) = parents.get(entity).map(|p| p.get()) else {
+        return false;
+    };
+
+    if slot_holder.get(parent_ent).is_ok() {
+        return true;
+    }
+
+    is_waiting_for_slot(parent_ent, slot_holder, parents)
+}
+
 fn compile_ui(
     mut cmd: Commands,
     mut texts: Query<(Entity, &mut Text), With<UnCompiled>>,
+    slot_holder: Query<&SlotedNode>,
     parents: Query<&Parent>,
     definitions: Query<&mut PropertyDefintions>,
 ) {
     texts.iter_mut().for_each(|(entity, mut text)| {
+        if is_waiting_for_slot(entity, &slot_holder, &parents) {
+            return;
+        }
+
         for section in text.sections.iter_mut() {
             let Ok((_, compiled)) = compile_content(entity, &section.value, |key| {
                 find_def(entity, key, &definitions, &parents)

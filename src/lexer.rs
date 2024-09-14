@@ -1,7 +1,3 @@
-// The parser and lexer are currently
-// merged. This makes certain things really
-// hard and costly like finding comments.
-//
 // lex -> syntaxtree -> lint -> compile
 // use thiserror::Error;
 //

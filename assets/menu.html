@@ -1,21 +1,23 @@
-<node flex_direction="column" prop:test="#008">
-    <include src="panel.html" prop:title="Main" prop:bcolor="#F0F">
+<node flex_direction="column" prop:test="#080">
+    <!-- this is a user defined node `panel` that maps to include a another template -->
+    <panel prop:title="Effortless UI" prop:bcolor="#F0F">
+        <!-- images -->
         <img align_self="center" width="100px" src="bevy_bird_dark.png" />
 
-
-
         <node justify_content="center" flex_direction="row">
-            <text font_size="40,0"> Effortless Ui </text>
+            <text font_size="40"> - {title} - </text>
         </node>
 
-        <!-- this is a user defined node `panel` that maps to include a another template -->
-        <panel prop:color="#000" prop:press="start_game" prop:title="Foo">
-            <include src="button.html" prop:color="#000" prop:press="start_game">
-                <text>Play</text>
+        <panel tag:lol="20px" prop:bcolor="{test}" prop:title="Foo">
+            <include src="button.html" prop:color="{test}" prop:press="start_game">
+                <!-- BUG this should be `Effortless UI` not `Foo` -->
+                <text> Play "{title}" </text>
             </include>
+
             <!-- this is a normal include with passing properties -->
             <include src="button.html" prop:color="#000" prop:press="start_game">
-                <text>Credits</text>
+                <!-- BUG this should compile -->
+                <text> {title} </text>
             </include>
         </panel>
 
@@ -50,5 +52,5 @@
                 />
             </button>
         </node>
-    </include>
+    </panel>
 </node>
