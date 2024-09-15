@@ -1,8 +1,8 @@
+<!-- the root node of each template can define default property values -->
 <node flex_direction="column" prop:test="#080" prop:title="Effortless UI">
     <!-- this is a user defined node `panel` that maps to include a another template -->
     <panel prop:bcolor="#F0F">
-        <!-- images -->
-        <img align_self="center" width="100px" src="bevy_bird_dark.png" />
+        <img align_self="center" height="200px" src="bevy_bird_dark.png" />
 
         <node justify_content="center" flex_direction="row">
             <text font_size="40"> - {title} - </text>
@@ -15,39 +15,40 @@
 
             <!-- this is a normal include with passing properties -->
             <include src="button.html" prop:color="#000" prop:press="start_game">
-                <text> {title} </text>
+                <text> Hello {title} </text>
             </include>
         </panel>
 
-        <node flex_direction="column">
-            <node justify_content="space_between" margin="0px 5px">
-                <text>Inventory</text>
-                <text>[ scroll ]</text>
+        <panel tag:lol="20px" prop:bcolor="#15a" prop:title="Foo">
+            <node flex_direction="column">
+                <node justify_content="space_between" margin="0px 5px">
+                    <text>Inventory</text>
+                    <text>[ scroll ]</text>
+                </node>
+                <button
+                    onspawn="scrollable"
+                    tag:scroll_speed="1000"
+                    target="inventory"
+                    width="420px"
+                    height="300px"
+                    border_radius="8px"
+                    overflow="hidden hidden"
+                    border="2px"
+                    border_color="#FFF"
+                    align_content="center"
+                    justify_content="center"
+                >
+                    <node
+                        onspawn="inventory"
+                        id="inventory"
+                        display="grid"
+                        grid_template_columns="(6, auto)"
+                        padding="20px"
+                        column_gap="5px"
+                        row_gap="5px"
+                    />
+                </button>
             </node>
-
-            <button
-                onspawn="scrollable"
-                tag:scroll_speed="1000"
-                target="inventory"
-                width="420px"
-                height="300px"
-                border_radius="8px"
-                overflow="hidden hidden"
-                border="2px"
-                border_color="#FFF"
-                align_content="center"
-                justify_content="center"
-            >
-                <node
-                    onspawn="inventory"
-                    id="inventory"
-                    display="grid"
-                    grid_template_columns="(5, auto)"
-                    padding="20px"
-                    column_gap="5px"
-                    row_gap="5px"
-                />
-            </button>
-        </node>
+        </panel>
     </panel>
 </node>

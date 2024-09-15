@@ -15,6 +15,7 @@ use nom::combinator::{flat_map, map_parser, rest};
 use nom::error::context;
 use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::terminated;
+use nom::Parser;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
@@ -206,6 +207,12 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
 
     Ok((input, attribute))
 }
+
+// fn parse_style_attr<I,E>() -> impl Parser<I, StyleAttr, E>
+// where I: &[u8];
+// {
+//     todo!()
+// }
 
 #[rustfmt::skip]
 fn parse_style<'a>(

@@ -62,8 +62,31 @@ impl PropertyDefintions {
     }
 }
 
-#[derive(Component, Deref)]
+#[derive(Component, DerefMut, Deref, Clone)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
+
+impl StyleAttributes {
+    pub fn replace_or_insert(&mut self, attr: StyleAttr) {
+        if let Some(i) = self
+            .iter()
+            .position(|at| std::mem::discriminant(at) == std::mem::discriminant(&attr))
+        {
+            self[i] = attr;
+        } else {
+            self.push(attr);
+        }
+    }
+
+    pub fn try_insert(&mut self, attr: StyleAttr) {
+        if self
+            .iter()
+            .find(|at| std::mem::discriminant(*at) == std::mem::discriminant(&attr))
+            .is_none()
+        {
+            self.push(attr);
+        }
+    }
+}
 
 /// the entities owned uid `id="my_id"`
 #[derive(Component, Default, Hash, Deref, DerefMut)]
@@ -309,6 +332,7 @@ fn spawn_ui(
     assets: Res<Assets<XNode>>,
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
+    styles: Query<&StyleAttributes>,
 ) {
     unbuild.iter_mut().for_each(|(ent, handle, mut defs)| {
         let Some(ui_node) = assets.get(handle) else {
@@ -328,6 +352,7 @@ fn spawn_ui(
             &custom_comps,
             &mut id_table,
             &mut defs,
+            &styles,
         );
 
         id_table
@@ -344,6 +369,7 @@ fn spawn_ui(
     });
 }
 
+/// @todo: currently overwriting styles from includes!
 /// big recursive boy
 #[allow(clippy::too_many_arguments)]
 fn build_node(
@@ -356,6 +382,7 @@ fn build_node(
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
     defintions: &mut PropertyDefintions,
+    styles: &Query<&StyleAttributes>,
 ) {
     // add any default properties on first node here
     if depth == 0 {
@@ -369,6 +396,15 @@ fn build_node(
 
     // compile properties
     let mut attributes = SortedAttributes::new(&node.attributes, &defintions);
+    let mut style_attributes = StyleAttributes(attributes.styles.drain(..).collect());
+    // transfer inherited styles
+    if depth == 0 {
+        if let Ok(include_styles) = styles.get(entity) {
+            for style in include_styles.iter() {
+                style_attributes.replace_or_insert(style.clone());
+            }
+        }
+    }
 
     // any defintion not on inlucde/custom gets discarded
     let include_definitions = attributes.definitions.drain(..).fold(
@@ -406,7 +442,7 @@ fn build_node(
             cmd.entity(entity).insert((
                 Name::new("Div"),
                 NodeBundle::default(),
-                StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
+                style_attributes,
                 UnStyled,
             ));
         }
@@ -418,7 +454,7 @@ fn build_node(
                         image: UiImage::new(server.load(path)),
                         ..default()
                     },
-                    StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
+                    style_attributes,
                     UnStyled,
                 ));
             } else {
@@ -442,7 +478,7 @@ fn build_node(
                         ..default()
                     },
                 ),
-                StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
+                style_attributes,
                 UnStyled,
             ));
         }
@@ -450,7 +486,7 @@ fn build_node(
             cmd.entity(entity).insert((
                 Name::new("Button"),
                 ButtonBundle::default(),
-                StyleAttributes(attributes.styles.drain(..).collect::<Vec<_>>()),
+                style_attributes,
                 UnStyled,
             ));
         }
@@ -463,7 +499,7 @@ fn build_node(
                 include_definitions,
                 UnbuildTag,
                 NodeBundle::default(),
-                UnStyled,
+                style_attributes,
             ));
 
             if node.children.len() > 0 {
@@ -480,6 +516,7 @@ fn build_node(
                         custom_comps,
                         id_table,
                         defintions,
+                        styles,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
@@ -509,11 +546,16 @@ fn build_node(
                         custom_comps,
                         id_table,
                         defintions,
+                        styles,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
-                cmd.entity(entity)
-                    .insert((UnslotedChildren(slot_holder), include_definitions));
+                cmd.entity(entity).insert((
+                    UnslotedChildren(slot_holder),
+                    include_definitions,
+                    style_attributes,
+                    UnbuildTag,
+                ));
             }
 
             return;
@@ -532,6 +574,7 @@ fn build_node(
             custom_comps,
             id_table,
             defintions,
+            styles,
         );
 
         cmd.entity(entity).add_child(child);
