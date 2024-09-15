@@ -208,11 +208,12 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     Ok((input, attribute))
 }
 
-// fn parse_style_attr<I,E>() -> impl Parser<I, StyleAttr, E>
-// where I: &[u8];
-// {
-//     todo!()
-// }
+pub fn parse_style_attr<E>() -> impl FnMut(&[u8]) -> IResult<&[u8], StyleAttr, E> {
+    move |i: &[u8]| {
+        // ---
+        todo!()
+    }
+}
 
 #[rustfmt::skip]
 fn parse_style<'a>(
