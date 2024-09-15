@@ -1,4 +1,4 @@
-# lommix' effortless bevy ui
+# Bevy Html Ui
 
 `html/Xml`-like bevy ui parser. First class support for hotreloading, custom nodes
 and Templating.
