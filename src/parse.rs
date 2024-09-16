@@ -1,4 +1,4 @@
-use crate::data::{Action, Attribute, Property, StyleAttr};
+use crate::data::{Action, Attribute, AttrTokens, StyleAttr};
 use crate::error::ParseError;
 use crate::prelude::{NodeType, XNode};
 use bevy::ui::{
@@ -168,7 +168,7 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
         ValueType::Prop(val) => {
             return Ok((
                 input,
-                Attribute::UnCompiledProperty(Property {
+                Attribute::Uncompiled(AttrTokens {
                     prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
                     ident: String::from_utf8_lossy(ident).to_string(),
                     key: String::from_utf8_lossy(val).to_string(),
@@ -855,8 +855,8 @@ mod tests {
     #[test_case(r#"onspawn="init_inventory""#, Attribute::Action(Action::OnSpawn(vec!["init_inventory".to_string()])))]
     #[test_case(r#"onpress="test,test_50,test o""#, Attribute::Action(Action::OnPress(vec!["test".to_string(),"test_50".to_string(), "test o".to_string()])))]
     #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
-    #[test_case(r#"height="{my_var}""#, Attribute::UnCompiledProperty( Property{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
-    #[test_case(r#"font_size="{test_that}""#, Attribute::UnCompiledProperty( Property{ key: "test_that".into(),prefix: None, ident: "font_size".into() }))]
+    #[test_case(r#"height="{my_var}""#, Attribute::Uncompiled( AttrTokens{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
+    #[test_case(r#"font_size="{test_that}""#, Attribute::Uncompiled( AttrTokens{ key: "test_that".into(),prefix: None, ident: "font_size".into() }))]
     fn test_parse_attribute(input: &str, expected: Attribute) {
         let result = parse_attribute(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);

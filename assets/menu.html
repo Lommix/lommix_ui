@@ -1,25 +1,26 @@
 <!-- the root node of each template can define default property values -->
 <node flex_direction="column" prop:test="#080" prop:title="Effortless UI">
     <!-- this is a user defined node `panel` that maps to include a another template -->
-    <panel prop:bcolor="#F0F">
+    <panel prop:secondary="#049" prop:primary="#023" prop:title="Popup">
         <img align_self="center" height="200px" src="bevy_bird_dark.png" />
 
         <node justify_content="center" flex_direction="row">
             <text font_size="40"> - {title} - </text>
         </node>
 
-        <panel tag:lol="20px" prop:bcolor="{test}" prop:title="Foo">
+        <panel tag:lol="20px" prop:primary="#515" prop:secondary="#315" prop:title="Foo">
+
             <include src="button.html" prop:color="#000" prop:press="start_game">
                 <text> Play "{title}" </text>
             </include>
 
-            <!-- this is a normal include with passing properties -->
             <include src="button.html" prop:color="#000" prop:press="start_game">
                 <text> Hello {title} </text>
             </include>
+
         </panel>
 
-        <panel tag:lol="20px" prop:bcolor="#15a" prop:title="Foo">
+        <panel tag:lol="20px" prop:secondary="#a02" prop:primary="#401" prop:title="Foo">
             <node flex_direction="column">
                 <node justify_content="space_between" margin="0px 5px">
                     <text>Inventory</text>

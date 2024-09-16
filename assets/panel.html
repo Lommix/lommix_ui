@@ -1,31 +1,31 @@
-<node justify_content="center" align_items="center" padding="20px" prop:bcolor="#038">
+<node justify_content="center" align_items="center" padding="20px" prop:secondary="#038" prop:primary="#238">
     <node
-        padding="20px 30px"
         flex_direction="column"
-        row_gap="20px"
-        border="5px"
         width="100%"
-        min_width="300px"
+        min_width="400px"
         height="100%"
-        border_color="{bcolor}"
-        border_radius="30px"
         justify_content="center"
-        background="#334"
         onpress="start_game"
     >
-        <node width="100%" justify_content="space_between" align_items="center">
-            <text>Title: {title} color: {bcolor}</text>
+        <node
+            width="100%"
+            padding="20px auto"
+            justify_content="space_between"
+            background="{secondary}"
+            align_items="center"
+        >
+            <text>{title} color: {secondary}</text>
             <button
                 border_radius="50px"
-                padding="10px 5px"
-                background="#000"
+                padding="auto 5px"
+                background="{secondary}"
                 hover:background="#0C0"
                 justify_content="center"
                 width="auto"
                 target="to_collapse"
                 onspawn="collapse"
             >
-                <text font_size="20">+</text>
+                <text font_size="25">+</text>
             </button>
         </node>
 
@@ -33,9 +33,14 @@
             flex_direction="column"
             row_gap="20px"
             width="100%"
+            margin="-2px auto auto auto"
             height="100%"
-            border_radius="30px"
+            padding="10px 10px"
             justify_content="center"
+            border_color="{secondary}"
+            border="5px"
+            background="{primary}"
+            border_radius="auto auto 15px 15px"
             id="to_collapse"
         >
             <slot />

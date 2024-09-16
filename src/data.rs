@@ -37,7 +37,7 @@ pub struct Template {
 pub enum Attribute {
     Style(StyleAttr),
     PropertyDefinition(String, String),
-    UnCompiledProperty(Property),
+    Uncompiled(AttrTokens),
     Action(Action),
     Path(String),
     Target(String),
@@ -47,13 +47,13 @@ pub enum Attribute {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Property {
+pub struct AttrTokens {
     pub prefix: Option<String>,
     pub ident: String,
     pub key: String,
 }
 
-impl Property {
+impl AttrTokens {
     pub fn compile(&self, props: &PropertyDefintions) -> Option<Attribute> {
         let Some(prop_val) = props.get(&self.key) else {
             warn!("failed to parse property, key not found `{}`", self.key);
@@ -76,7 +76,7 @@ impl Property {
         };
 
         // recurive compile, why not
-        if let Attribute::UnCompiledProperty(prop) = attr {
+        if let Attribute::Uncompiled(prop) = attr {
             return prop.compile(props);
         };
 

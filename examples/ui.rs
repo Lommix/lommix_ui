@@ -17,7 +17,7 @@ fn main() {
         }))
         .add_plugins((
             bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
-            LommixUiPlugin,
+            LommixUiPlugin::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(

@@ -1,5 +1,5 @@
 use crate::{
-    data::{Action, Attribute, NodeType, XNode},
+    data::{Action, AttrTokens, Attribute, NodeType, XNode},
     prelude::{ComponentBindings, StyleAttr},
 };
 use bevy::{prelude::*, utils::HashMap};
@@ -23,72 +23,52 @@ impl Plugin for BuildPlugin {
     }
 }
 
-#[derive(Component, Clone)]
-pub struct Scope {
-    pub vars: Vars,
-    root: Entity,
-}
-
-#[derive(Component, Clone)]
-enum TemplateScope {
-    Root(Scope),
-    Include {
-        root_scope: Scope,
-        slot_scope: Scope,
-    },
-}
-
-impl Default for Scope {
-    fn default() -> Self {
-        Self {
-            root: Entity::PLACEHOLDER,
-            vars: Vars::default(),
-        }
+#[derive(Component, Clone, Deref, DerefMut, Copy)]
+pub struct ScopeEntity(Entity);
+impl ScopeEntity {
+    pub fn get(&self) -> Entity {
+        return **self;
     }
 }
 
-#[derive(Clone, Default)]
-pub struct Vars {
-    inner: Arc<RwLock<HashMap<String, String>>>,
+#[derive(Component, Clone, Default)]
+pub struct TemplateState {
+    pub vars: HashMap<String, String>,
+    pub props: HashMap<String, String>,
 }
 
-impl Vars {
-    pub fn set(&mut self, key: &str, value: String) {
-        if let Ok(mut inner) = self.inner.write() {
-            inner.insert(key.into(), value);
-        };
+#[derive(Component, Clone, Default)]
+pub struct StateSubscriber(Vec<Entity>);
+
+impl TemplateState {
+    pub fn try_set_prop(&mut self, key: &str, value: String) {
+        _ = self.props.try_insert(key.to_string(), value);
     }
-
-    pub fn get(&self, key: &str) -> Option<String> {
-        if let Ok(inner) = self.inner.read() {
-            return inner.get(key).cloned();
-        };
-
-        return None;
+    pub fn try_set_val(&mut self, key: &str, value: String) {
+        _ = self.vars.try_insert(key.to_string(), value);
     }
-
-    pub fn clear(&mut self) {
-        if let Ok(mut inner) = self.inner.write() {
-            inner.clear();
-        };
+    pub fn set_prop(&mut self, key: &str, value: String) {
+        self.props.insert(key.to_string(), value);
+    }
+    pub fn set_val(&mut self, key: &str, value: String) {
+        self.vars.insert(key.to_string(), value);
+    }
+    pub fn get_prop(&self, key: &str) -> Option<&String> {
+        self.props.get(key)
+    }
+    pub fn get_val(&self, key: &str) -> Option<&String> {
+        self.vars.get(key)
     }
 }
 
 #[derive(Component)]
 pub struct InsideSlot {
-    include_root: Entity,
-}
-
-// this marks a slot
-#[derive(Component)]
-pub struct SlotTag {
-    root: Entity,
+    owner: Entity,
 }
 
 #[derive(Component)]
-pub struct Slots {
-    target: Entity,
-    children: Vec<Entity>,
+pub struct SlotPlaceholder {
+    owner: Entity,
 }
 
 #[derive(Component)]
@@ -164,7 +144,7 @@ pub struct UnbuildTag;
 
 /// tag fro reapplying styles
 #[derive(Component, Default)]
-pub struct UnStyled;
+pub struct UnstyledTag;
 
 /// Eventlistener interaction transitions to Hover
 #[derive(Component, Deref, DerefMut)]
@@ -190,8 +170,9 @@ pub struct HtmlBundle {
     pub handle: Handle<XNode>,
     pub node: NodeBundle,
     pub unbuild: UnbuildTag,
-    pub unstyled: UnStyled,
+    pub unstyled: UnstyledTag,
     pub properties: PropertyDefintions,
+    pub state: TemplateState,
 }
 
 fn update_interaction(
@@ -261,9 +242,7 @@ fn hotreload(
                 // same include children are also replaced!!!
                 let slots = sloted_nodes
                     .iter()
-                    .flat_map(|(slot_entity, slot)| {
-                        (slot.include_root == entity).then_some(slot_entity)
-                    })
+                    .flat_map(|(slot_entity, slot)| (slot.owner == entity).then_some(slot_entity))
                     .collect::<Vec<_>>();
 
                 // check if there are already children in queue!
@@ -290,14 +269,17 @@ struct KeepComps {
     pub children: Children,
     pub ui: HtmlBundle,
     pub unsloed: UnslotedChildren,
-    pub slot: SlotTag,
+    pub slot: SlotPlaceholder,
     pub inside: InsideSlot,
-    pub scope: Scope,
+    pub scope: ScopeEntity,
 }
 
 fn style_ui(
     mut cmd: Commands,
-    mut unstyled: Query<(Entity, &mut Style, &StyleAttributes, Option<&mut Text>), With<UnStyled>>,
+    mut unstyled: Query<
+        (Entity, &mut Style, &StyleAttributes, Option<&mut Text>),
+        With<UnstyledTag>,
+    >,
     server: Res<AssetServer>,
 ) {
     unstyled
@@ -307,7 +289,7 @@ fn style_ui(
                 StyleAttr::Hover(_) | StyleAttr::Pressed(_) => (),
                 any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
             });
-            cmd.entity(entity).remove::<UnStyled>();
+            cmd.entity(entity).remove::<UnstyledTag>();
         });
 }
 
@@ -315,22 +297,22 @@ fn move_children_to_slot(
     mut cmd: Commands,
     unsloted_includes: Query<(Entity, &UnslotedChildren)>,
     children: Query<&Children>,
-    slots: Query<(Entity, &SlotTag)>,
+    slots: Query<(Entity, &SlotPlaceholder)>,
     parent: Query<&Parent>,
 ) {
     unsloted_includes
         .iter()
         .for_each(|(entity, UnslotedChildren(slot_holder))| {
-            let Some(slot) = slots
+            let Some(placeholder_entity) = slots
                 .iter()
-                .find_map(|(slot_ent, slot)| (slot.root == entity).then_some(slot_ent))
+                .find_map(|(slot_ent, slot)| (slot.owner == entity).then_some(slot_ent))
             else {
                 warn!("this node does not have a slot {entity}");
                 return;
             };
 
             // slot is a empty entity
-            let Ok(slot_parent) = parent.get(slot).map(|p| p.get()) else {
+            let Ok(slot_parent) = parent.get(placeholder_entity).map(|p| p.get()) else {
                 warn!("parentless slot, impossible");
                 return;
             };
@@ -339,9 +321,7 @@ fn move_children_to_slot(
             _ = children.get(*slot_holder).map(|children| {
                 children.iter().for_each(|child| {
                     if *child != slot_parent {
-                        cmd.entity(*child).insert(InsideSlot {
-                            include_root: entity,
-                        });
+                        cmd.entity(*child).insert(InsideSlot { owner: entity });
                         cmd.entity(slot_parent).add_child(*child);
                     }
                 })
@@ -350,7 +330,7 @@ fn move_children_to_slot(
             info!("filled slot of {entity} successfull");
 
             cmd.entity(entity).remove::<UnslotedChildren>();
-            cmd.entity(slot).despawn_recursive();
+            cmd.entity(placeholder_entity).despawn_recursive();
             cmd.entity(*slot_holder).despawn();
         });
 }
@@ -363,57 +343,62 @@ struct IdLookUpTable {
 
 fn spawn_ui(
     mut cmd: Commands,
-    mut unbuild: Query<(Entity, &Handle<XNode>, &mut PropertyDefintions), With<UnbuildTag>>,
+    mut unbuild: Query<
+        (
+            Entity,
+            &Handle<XNode>,
+            &mut PropertyDefintions,
+            &mut TemplateState,
+        ),
+        With<UnbuildTag>,
+    >,
     assets: Res<Assets<XNode>>,
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
 ) {
-    unbuild.iter_mut().for_each(|(ent, handle, mut defs)| {
-        let Some(ui_node) = assets.get(handle) else {
-            return;
-        };
+    unbuild
+        .iter_mut()
+        .for_each(|(root_entity, handle, mut defs, mut state)| {
 
-        let mut id_table = IdLookUpTable::default();
+            let Some(root_node) = assets.get(handle) else {
+                return;
+            };
 
-        let scope = Scope {
-            root: ent,
-            ..default()
-        };
+            let mut subscriber = StateSubscriber::default();
+            let mut id_table = IdLookUpTable::default();
+            let scope = ScopeEntity(root_entity);
 
-        // dont touch include scopes
-        match ui_node.node_type {
-            NodeType::Include | NodeType::Template | NodeType::Custom(_) => (),
-            _ => {
-                cmd.entity(ent).insert(scope.clone());
-            }
-        };
+            // append build template vars & props here
 
-        // add defaults on first call
-        build_node(
-            0,
-            ent,
-            scope,
-            &ui_node,
-            &mut cmd,
-            &assets,
-            &server,
-            &custom_comps,
-            &mut id_table,
-            &mut defs,
-        );
+            // add defaults on first call
+            build_node(
+                0,
+                root_entity,
+                scope,
+                &root_node,
+                &mut cmd,
+                &assets,
+                &server,
+                &custom_comps,
+                &mut id_table,
+                &mut defs,
+                &mut state,
+                &mut subscriber,
+            );
 
-        id_table
-            .targets
-            .iter()
-            .for_each(|(entity, target_id)| match id_table.ids.get(target_id) {
-                Some(tar) => {
-                    cmd.entity(*entity).insert(UiTarget(*tar));
+            id_table.targets.iter().for_each(|(entity, target_id)| {
+                match id_table.ids.get(target_id) {
+                    Some(tar) => {
+                        cmd.entity(*entity).insert(UiTarget(*tar));
+                    }
+                    None => warn!("target `{target_id}` not found for entity {entity}"),
                 }
-                None => warn!("target `{target_id}` not found for entity {entity}"),
             });
 
-        cmd.entity(ent).remove::<UnbuildTag>();
-    });
+            cmd.entity(root_entity)
+                .insert(subscriber)
+                .remove::<UnbuildTag>();
+        });
 }
 
 /// big recursive boy
@@ -421,7 +406,7 @@ fn spawn_ui(
 fn build_node(
     depth: u32,
     entity: Entity,
-    scope: Scope,
+    scope: ScopeEntity,
     node: &XNode,
     cmd: &mut Commands,
     assets: &Assets<XNode>,
@@ -429,6 +414,8 @@ fn build_node(
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
     defintions: &mut PropertyDefintions,
+    state: &mut TemplateState,
+    subscriber: &mut StateSubscriber,
 ) {
     // add any default properties on first node here
     if depth == 0 {
@@ -438,6 +425,21 @@ fn build_node(
             }
             _ => (),
         });
+
+        match &node.node_type {
+            NodeType::Include | NodeType::Template | NodeType::Custom(_) => (),
+            _ => {
+                cmd.entity(entity).insert(scope.clone());
+            }
+        };
+    } else {
+        // dont touch include scopes
+        // match ui_node.node_type {
+        //     NodeType::Include | NodeType::Template | NodeType::Custom(_) => (),
+        //     _ => {
+        cmd.entity(entity).insert(scope.clone());
+        // }
+        // };
     }
 
     // compile properties
@@ -482,7 +484,7 @@ fn build_node(
                 Name::new("Div"),
                 NodeBundle::default(),
                 style_attributes,
-                UnStyled,
+                UnstyledTag,
             ));
         }
         NodeType::Image => {
@@ -493,7 +495,7 @@ fn build_node(
                     ..default()
                 },
                 style_attributes,
-                UnStyled,
+                UnstyledTag,
             ));
         }
         NodeType::Text => {
@@ -514,7 +516,7 @@ fn build_node(
                     },
                 ),
                 style_attributes,
-                UnStyled,
+                UnstyledTag,
             ));
         }
         NodeType::Button => {
@@ -522,19 +524,12 @@ fn build_node(
                 Name::new("Button"),
                 ButtonBundle::default(),
                 style_attributes,
-                UnStyled,
+                UnstyledTag,
             ));
         }
         NodeType::Include => {
             let path = attributes.path.unwrap_or_default();
             let handle = server.load::<XNode>(path);
-
-            cmd.entity(entity).insert((
-                handle,
-                include_definitions,
-                UnbuildTag,
-                NodeBundle::default(),
-            ));
 
             if node.children.len() > 0 {
                 let slot_holder = cmd.spawn(NodeBundle::default()).id();
@@ -543,7 +538,7 @@ fn build_node(
                     build_node(
                         depth + 1,
                         child,
-                        scope.clone(),
+                        scope,
                         child_node,
                         cmd,
                         assets,
@@ -551,17 +546,29 @@ fn build_node(
                         custom_comps,
                         id_table,
                         defintions,
+                        state,
+                        subscriber,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
-                cmd.entity(entity).insert(UnslotedChildren(slot_holder));
+
+                cmd.entity(entity).insert((
+                    UnslotedChildren(slot_holder),
+                    handle,
+                    include_definitions,
+                    UnbuildTag,
+                    NodeBundle::default(),
+                    TemplateState::default(),
+                ));
             }
 
             return;
         }
         NodeType::Slot => {
-            cmd.entity(entity)
-                .insert((SlotTag { root: scope.root }, NodeBundle::default()));
+            cmd.entity(entity).insert((
+                SlotPlaceholder { owner: scope.get() },
+                NodeBundle::default(),
+            ));
             return;
         }
         NodeType::Custom(custom_tag) => {
@@ -574,7 +581,7 @@ fn build_node(
                     build_node(
                         depth + 1,
                         child,
-                        scope.clone(),
+                        scope,
                         child_node,
                         cmd,
                         assets,
@@ -582,9 +589,12 @@ fn build_node(
                         custom_comps,
                         id_table,
                         defintions,
+                        state,
+                        subscriber,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
+
                 cmd.entity(entity).insert((
                     UnslotedChildren(slot_holder),
                     include_definitions,
@@ -601,7 +611,7 @@ fn build_node(
         build_node(
             depth + 1,
             child,
-            scope.clone(),
+            scope,
             child_node,
             cmd,
             assets,
@@ -609,6 +619,8 @@ fn build_node(
             custom_comps,
             id_table,
             defintions,
+            state,
+            subscriber,
         );
 
         cmd.entity(entity).add_child(child);
@@ -625,6 +637,7 @@ struct SortedAttributes {
     pub target: Option<String>,
     pub id: Option<String>,
     pub custom: Vec<(String, String)>,
+    pub code: Vec<AttrTokens>,
 }
 
 impl SortedAttributes {
@@ -644,8 +657,10 @@ impl SortedAttributes {
             Attribute::Path(path) => self.path = Some(path),
             Attribute::SpawnFunction(spawn) => self.spawn_functions_keys.push(spawn),
             Attribute::PropertyDefinition(key, val) => self.definitions.push((key, val)),
-            Attribute::UnCompiledProperty(prop) => {
-                if let Some(attr) = prop.compile(defs) {
+            Attribute::Uncompiled(tokens) => {
+                self.code.push(tokens.clone());
+                // should no longer happen here, remove later
+                if let Some(attr) = tokens.compile(defs) {
                     self.add_attr(attr, defs);
                 };
             }
