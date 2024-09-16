@@ -1,4 +1,4 @@
-use crate::data::{Action, Attribute, AttrTokens, StyleAttr};
+use crate::data::{Action, AttrTokens, Attribute, StyleAttr};
 use crate::error::ParseError;
 use crate::prelude::{NodeType, XNode};
 use bevy::ui::{
@@ -10,9 +10,8 @@ use bevy::{
     color::Color,
     ui::{UiRect, Val},
 };
-use nom::bytes::complete::{is_not, take_until, take_while1};
-use nom::combinator::{flat_map, map_parser, rest};
-use nom::error::context;
+use nom::bytes::complete::{is_a, is_not, take_until, take_while1};
+use nom::combinator::{flat_map, map_parser, not, peek, rest};
 use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::terminated;
 use nom::Parser;
@@ -25,7 +24,6 @@ use nom::{
     sequence::{delimited, preceded, tuple, Tuple},
     IResult,
 };
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// --------------------------------------------------
 /// try parsing a ui xml bytes
@@ -36,6 +34,138 @@ pub fn parse_bytes(input: &[u8]) -> Result<XNode, ParseError> {
 
     let (_, node) = parse_element(input)?;
     Ok(node)
+}
+
+pub fn parse_bytes_xml(input: &[u8]) -> Result<Xml, ParseError> {
+    let (input, _) = trim_comments(input)?;
+    let (input, _xml_header) = alt((
+        delimited(tag("<?"), take_until("?>"), tag("?>")).map(Some),
+        |i| Ok((i, None)),
+    ))(input)?;
+
+    let (_, node) = parse_xml_node(input)?;
+    Ok(node)
+}
+
+struct XmlAttr<'a> {
+    prefix: Option<&'a [u8]>,
+    key: &'a [u8],
+    value: &'a [u8],
+}
+
+impl std::fmt::Debug for XmlAttr<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "(prefix:{} key:{} value:{})",
+            std::str::from_utf8(self.prefix.unwrap_or_default()).unwrap_or_default(),
+            std::str::from_utf8(self.key).unwrap_or_default(),
+            std::str::from_utf8(self.value).unwrap_or_default(),
+        )
+    }
+}
+
+struct Xml<'a> {
+    prefix: Option<&'a [u8]>,
+    name: &'a [u8],
+    value: Option<&'a [u8]>,
+    attributes: Vec<XmlAttr<'a>>,
+    children: Vec<Xml<'a>>,
+}
+
+impl std::fmt::Debug for Xml<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "\n prefix:{} \n name:{} \n value:{} \n attributes:{:?} \n children:{:?}",
+            std::str::from_utf8(self.prefix.unwrap_or_default()).unwrap_or_default(),
+            std::str::from_utf8(self.name).unwrap_or_default(),
+            std::str::from_utf8(self.value.unwrap_or_default()).unwrap_or_default(),
+            self.attributes,
+            self.children,
+        )
+    }
+}
+
+fn parse_xml_node(input: &[u8]) -> IResult<&[u8], Xml> {
+    let (input, _) = trim_comments(input)?;
+
+    not(tag("</"))(input)?;
+
+    let (input, (prefix, start_name)) =
+        preceded(tag("<"), tuple((parse_prefix0, take_snake)))(input)?;
+
+    let (input, attributes) = parse_xml_attr(input)?;
+
+    let (input, is_empty) = alt((
+        preceded(multispace0, tag("/>")).map(|_| true),
+        preceded(multispace0, tag(">")).map(|_| false),
+    ))(input)?;
+
+    if is_empty {
+        return Ok((
+            input,
+            Xml {
+                prefix,
+                name: start_name,
+                attributes,
+                value: None,
+                children: vec![],
+            },
+        ));
+    }
+
+    let (input, children) = many0(parse_xml_node)(input)?;
+    let (input, _) = trim_comments(input)?;
+    let (input, value) = map(take_while(|b: u8| b != b'<'), |c: &[u8]| {
+        (c.len() > 0).then_some(c)
+    })(input)?;
+    let (input, (end_prefix, end_name)) = parse_xml_end(input)?;
+
+    if start_name != end_name {
+        dbg!(
+            std::str::from_utf8(end_prefix.unwrap_or_default()).unwrap_or_default(),
+            std::str::from_utf8(start_name).unwrap_or_default(),
+            std::str::from_utf8(end_name).unwrap_or_default(),
+            attributes
+        );
+        return Err(nom::Err::Failure(nom::error::make_error(
+            end_name,
+            nom::error::ErrorKind::TagClosure,
+        )));
+    }
+    Ok((
+        input,
+        Xml {
+            prefix,
+            name: start_name,
+            attributes,
+            value,
+            children,
+        },
+    ))
+}
+
+fn parse_xml_end(input: &[u8]) -> IResult<&[u8], (Option<&[u8]>, &[u8])> {
+    let (input, (_, prefix, end_tag, _)) = tuple((
+        tag("</"),
+        parse_prefix0,
+        take_while1(|c: u8| c.is_ascii_alphabetic()),
+        tag(">"),
+    ))(input)?;
+
+    Ok((input, (prefix, end_tag)))
+}
+
+fn parse_xml_attr(input: &[u8]) -> IResult<&[u8], Vec<XmlAttr>> {
+    many0(map(
+        tuple((
+            preceded(trim_comments, parse_prefix0),
+            terminated(take_snake, tag("=")),
+            delimited(tag("\""), is_not("\""), tag("\"")),
+        )),
+        |(prefix, key, value)| XmlAttr { prefix, key, value },
+    ))(input)
 }
 
 #[rustfmt::skip]
@@ -68,6 +198,7 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
         let (_, node_type) = parse_node_type(start_tag)?;
 
         let node = XNode{
+            include_attrs : vec![],
             node_type,
             children,
             attributes,
@@ -75,6 +206,12 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
         };
 
         Ok((input, node))
+}
+
+fn parse_start(input: &[u8]) -> IResult<&[u8], NodeType> {
+    let (input, _) = trim_comments(input)?;
+    let (input, tag) = preceded(tag("<"), map_parser(is_not(" "), parse_node_type))(input)?;
+    Ok((input, tag))
 }
 
 fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -182,7 +319,7 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
         Some(b"tag") => {
             let (_, prop_ident) = as_string(ident)?;
             let (_, prop_value) = as_string(value)?;
-            return Ok((input, Attribute::Custom(prop_ident, prop_value)));
+            return Ok((input, Attribute::Tag(prop_ident, prop_value)));
         }
         Some(b"prop") => {
             let (_, prop_ident) = as_string(ident)?;
@@ -439,23 +576,16 @@ fn as_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
     )(input)
 }
 
-fn as_hash(input: &[u8]) -> IResult<&[u8], u64> {
-    let mut hasher = DefaultHasher::default();
-    input.hash(&mut hasher);
-    Ok((input, hasher.finish()))
-}
-
 #[rustfmt::skip]
 fn parse_prefix0(input: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
-    let res : IResult<&[u8], (&[u8], &[u8])>= tuple((
-        take_while1(|b: u8| b.is_ascii_alphabetic()),
-        tag(":"),
-    ))(input);
+    alt((
+        terminated(take_snake,tag(":")).map(Some),
+        |i| Ok((i, None)),
+    ))(input)
+}
 
-    match res {
-        Ok((input, (prefix,_))) => Ok((input, Some(prefix))),
-        Err(_) => Ok((input, None)),
-    }
+fn take_snake(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    take_while(|b: u8| b.is_ascii_alphabetic() || b == b'_')(input)
 }
 
 /// convert string values to uirect
@@ -927,7 +1057,28 @@ mod tests {
     #[test_case("./assets/button.html")]
     fn parse_file(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
-        let node = parse_bytes(input.as_bytes()).unwrap();
+        let node = parse_bytes_xml(input.as_bytes()).unwrap();
         // dbg!(node);
+        // let = parse_xml_node
+    }
+    #[test_case(r#"    pressed:background="fsdfsf"  pressed:background="fsdfsf"  <!-- test -->    pressed:background="fsdfsf" \n"#)]
+    #[test_case(r#"pressed:background="fsdfsf"#)]
+    fn test_parse_xml_attr(input: &str) {
+        let (_, attr) = parse_xml_attr(input.as_bytes())
+            .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
+            .unwrap();
+
+        // dbg!(&attr);
+    }
+
+    #[test_case(r#"<node pressed:background="fsdfsf" active="hello"><text p:hello="sdf">hello</text></node>"#)]
+    #[test_case(r#"<slot/>"#)]
+    #[test_case(r#"<node pressed:background="fsdfsf" active="hello" />"#)]
+    fn test_parse_xml_node(input: &str) {
+        let (_, xml) = parse_xml_node(input.as_bytes())
+            .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
+            .unwrap();
+
+        // dbg!(&xml);
     }
 }

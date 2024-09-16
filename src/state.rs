@@ -9,6 +9,7 @@ impl Plugin for StatePlugin {
     }
 }
 
+
 #[derive(Event)]
 pub struct CompileVars;
 

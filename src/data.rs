@@ -19,6 +19,7 @@ pub enum NodeType {
 
 #[derive(Debug, Asset, TypePath)]
 pub struct XNode {
+    pub include_attrs: Vec<IncludeAttributes>,
     pub attributes: Vec<Attribute>,
     pub content: Option<String>,
     pub children: Vec<XNode>,
@@ -34,16 +35,28 @@ pub struct Template {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum TemplateAttributes {
+    ComponentName(String),
+    PropertyDefinition(String, String),
+    VarDefintion(String, String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum IncludeAttributes {
+    Path(String),
+    PropertyDefinition(String, String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
-    PropertyDefinition(String, String),
+    PropertyDefinition(String, String), // to remove
     Uncompiled(AttrTokens),
     Action(Action),
     Path(String),
     Target(String),
     Id(String),
-    SpawnFunction(String),
-    Custom(String, String),
+    Tag(String, String),
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -139,6 +139,10 @@ pub struct UiId(u64);
 #[derive(Component, DerefMut, Deref)]
 pub struct UiTarget(pub Entity);
 
+/// watch interaction of another entity
+#[derive(Component, DerefMut, Deref)]
+pub struct UiWatch(pub Entity);
+
 #[derive(Component, Default)]
 pub struct UnbuildTag;
 
@@ -359,7 +363,6 @@ fn spawn_ui(
     unbuild
         .iter_mut()
         .for_each(|(root_entity, handle, mut defs, mut state)| {
-
             let Some(root_node) = assets.get(handle) else {
                 return;
             };
@@ -632,7 +635,6 @@ struct SortedAttributes {
     pub styles: Vec<StyleAttr>,
     pub actions: Vec<Action>,
     pub path: Option<String>,
-    pub spawn_functions_keys: Vec<String>,
     pub definitions: Vec<(String, String)>,
     pub target: Option<String>,
     pub id: Option<String>,
@@ -655,7 +657,6 @@ impl SortedAttributes {
             Attribute::Style(style) => self.styles.push(style),
             Attribute::Action(action) => self.actions.push(action),
             Attribute::Path(path) => self.path = Some(path),
-            Attribute::SpawnFunction(spawn) => self.spawn_functions_keys.push(spawn),
             Attribute::PropertyDefinition(key, val) => self.definitions.push((key, val)),
             Attribute::Uncompiled(tokens) => {
                 self.code.push(tokens.clone());
@@ -666,7 +667,7 @@ impl SortedAttributes {
             }
             Attribute::Target(target) => self.target = Some(target),
             Attribute::Id(id) => self.id = Some(id),
-            Attribute::Custom(key, value) => self.custom.push((key, value)),
+            Attribute::Tag(key, value) => self.custom.push((key, value)),
         };
     }
 }

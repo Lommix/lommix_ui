@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template name="test"
+		  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:pressed="http://example.com/pressed"
+          xmlns:hover="http://example.com/hover"
+		  xsi:noNamespaceSchemaLocation="/home/lommix/Projects/rust/lommix_ui/assets/template.xsd">
+
+	<node hover:width="test" pressed:height=""> </node>
+
+</template>

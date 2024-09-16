@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:hover="http://example.com/hover"
+		   xmlns:pressed="http://example.com/pressed"
+		   xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+	<!-- definition of simple elements -->
+	<xs:element name="node">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+			<xs:attributeGroup ref="styles">
+				<xs:annotation>
+					<xs:documentation>Styles</xs:documentation>
+					<xs:appinfo>
+						<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+						<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+					</xs:appinfo>
+				</xs:annotation>
+			</xs:attributeGroup>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:element name="img">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+			<xs:attribute name="src"
+						  type="xs:string"/>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:element name="button">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:attributeGroup name="includes">
+		<xs:attribute name="src"
+					  type="xs:string">
+			<xs:annotation>
+				<xs:documentation>Bevy asset path</xs:documentation>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:anyAttribute/>
+	</xs:attributeGroup>
+
+	<!-- style attributes -->
+	<xs:attributeGroup name="styles">
+		<xs:attribute name="width">
+			<xs:annotation>
+				<xs:documentation>Width is a Val</xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="height">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="margin">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="padding">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="display">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+	</xs:attributeGroup>
+
+	<xs:element name="slot"
+				type="xs:token"/>
+
+	<!-- definition of complex elements -->
+	<xs:element name="template">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+			<xs:attribute name="name"
+						  type="xs:string"
+						  use="required">
+				<xs:annotation>
+					<xs:documentation>The name attribute with optional hover and pressed namespaces.</xs:documentation>
+					<xs:appinfo>
+						<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+						<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+					</xs:appinfo>
+				</xs:annotation>
+			</xs:attribute>
+		</xs:complexType>
+	</xs:element>
+
+</xs:schema>
