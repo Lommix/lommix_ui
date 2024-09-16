@@ -3,6 +3,7 @@ use crate::prelude::*;
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
 use bevy::text::Text as UiText;
+use bevy::utils::HashMap;
 
 #[derive(Debug)]
 pub enum NodeType {
@@ -12,6 +13,7 @@ pub enum NodeType {
     Button,
     Include,
     Slot,
+    Template,
     Custom(String),
 }
 
@@ -21,6 +23,14 @@ pub struct XNode {
     pub content: Option<String>,
     pub children: Vec<XNode>,
     pub node_type: NodeType,
+}
+
+#[derive(Debug, Asset, TypePath)]
+pub struct Template {
+    pub name: Option<String>,
+    pub props: HashMap<String, String>,
+    pub vars: HashMap<String, String>,
+    pub nodes: Vec<XNode>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

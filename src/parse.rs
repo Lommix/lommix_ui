@@ -30,6 +30,10 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 /// --------------------------------------------------
 /// try parsing a ui xml bytes
 pub fn parse_bytes(input: &[u8]) -> Result<XNode, ParseError> {
+    let (input, _) = trim_comments(input)?;
+
+    // is template?
+
     let (_, node) = parse_element(input)?;
     Ok(node)
 }
@@ -37,10 +41,14 @@ pub fn parse_bytes(input: &[u8]) -> Result<XNode, ParseError> {
 #[rustfmt::skip]
 fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
         let (input, _) = trim_comments(input)?;
+
+        // attributes & styles
         let (input, (start_tag, attributes, is_empty)) = parse_start_tag(input)?;
         let (input, _) = multispace0(input)?;
 
+
         let (input, content, children ) = if !is_empty {
+
             let (input, _) = trim_comments(input)?;
             let (input, children) = many0(parse_element)(input)?;
             let (input, _) = trim_comments(input)?;
@@ -88,6 +96,7 @@ fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
         map(tag("button"), |_| NodeType::Button),
         map(tag("text"), |_| NodeType::Text),
         map(tag("slot"), |_| NodeType::Slot),
+        map(tag("template"), |_| NodeType::Template),
         map(take_while1(|u: u8| u.is_ascii_alphabetic()), |val| {
             let custom = String::from_utf8_lossy(val).to_string();
             NodeType::Custom(custom)
@@ -208,13 +217,6 @@ pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     Ok((input, attribute))
 }
 
-pub fn parse_style_attr<E>() -> impl FnMut(&[u8]) -> IResult<&[u8], StyleAttr, E> {
-    move |i: &[u8]| {
-        // ---
-        todo!()
-    }
-}
-
 #[rustfmt::skip]
 fn parse_style<'a>(
     prefix: Option<&'a [u8]>,
@@ -222,28 +224,28 @@ fn parse_style<'a>(
     value: &'a [u8],
 ) -> IResult<&'a [u8], StyleAttr> {
     let (input, style) = match ident {
-        b"position" => map(parse_position_type, |val| StyleAttr::Position(val))(value)?,
-        b"display" => map(parse_display, |val| StyleAttr::Display(val))(value)?,
-        b"overflow" => map(parse_overflow, |val| StyleAttr::Overflow(val))(value)?,
-        b"direction" => map(parse_direction, |val| StyleAttr::Direction(val))(value)?,
+        b"position" => map(parse_position_type, StyleAttr::Position)(value)?,
+        b"display" => map(parse_display, StyleAttr::Display)(value)?,
+        b"overflow" => map(parse_overflow, StyleAttr::Overflow)(value)?,
+        b"direction" => map(parse_direction, StyleAttr::Direction)(value)?,
         // align & justify
-        b"align_self" => map(parse_align_self, |val| StyleAttr::AlignSelf(val))(value)?,
-        b"align_items" => map(parse_align_items, |val| StyleAttr::AlignItems(val))(value)?,
-        b"align_content" => map(parse_align_content, |val| StyleAttr::AlignContent(val))(value)?,
-        b"justify_self" => map(parse_justify_self, |val| StyleAttr::JustifySelf(val))(value)?,
-        b"justify_items" => map(parse_justify_items, |val| StyleAttr::JustifyItems(val))(value)?,
-        b"justify_content" => map(parse_justify_content, |val| StyleAttr::JustifyContent(val))(value)?,
+        b"align_self" => map(parse_align_self, StyleAttr::AlignSelf)(value)?,
+        b"align_items" => map(parse_align_items, StyleAttr::AlignItems)(value)?,
+        b"align_content" => map(parse_align_content, StyleAttr::AlignContent)(value)?,
+        b"justify_self" => map(parse_justify_self, StyleAttr::JustifySelf)(value)?,
+        b"justify_items" => map(parse_justify_items, StyleAttr::JustifyItems)(value)?,
+        b"justify_content" => map(parse_justify_content, StyleAttr::JustifyContent)(value)?,
         // flex
-        b"flex_direction" => map(parse_flex_direction, |val| StyleAttr::FlexDirection(val))(value)?,
-        b"flex_wrap" => map(parse_flex_wrap, |val| StyleAttr::FlexWrap(val))(value)?,
-        b"flex_grow" => map(float, |val| StyleAttr::FlexGrow(val))(value)?,
-        b"flex_shrink" => map(float, |val| StyleAttr::FlexShrink(val))(value)?,
-        b"flex_basis" => map(parse_val, |val| StyleAttr::FlexBasis(val))(value)?,
-        b"row_gap" => map(parse_val, |val| StyleAttr::RowGap(val))(value)?,
-        b"column_gap" => map(parse_val, |val| StyleAttr::ColumnGap(val))(value)?,
+        b"flex_direction" => map(parse_flex_direction, StyleAttr::FlexDirection)(value)?,
+        b"flex_wrap" => map(parse_flex_wrap, StyleAttr::FlexWrap)(value)?,
+        b"flex_grow" => map(float, StyleAttr::FlexGrow)(value)?,
+        b"flex_shrink" => map(float, StyleAttr::FlexShrink)(value)?,
+        b"flex_basis" => map(parse_val, StyleAttr::FlexBasis)(value)?,
+        b"row_gap" => map(parse_val, StyleAttr::RowGap)(value)?,
+        b"column_gap" => map(parse_val, StyleAttr::ColumnGap)(value)?,
 
         // grid
-        b"grid_auto_flow" => map(parse_auto_flow,|v| StyleAttr::GridAutoFlow(v))(value)?,
+        b"grid_auto_flow" => map(parse_auto_flow, |v| StyleAttr::GridAutoFlow(v))(value)?,
         b"grid_auto_rows" => map(many0(parse_grid_track), |v| StyleAttr::GridAutoRows(v))(value)?,
         b"grid_auto_columns" => map(many0(parse_grid_track), |v| StyleAttr::GridAutoColumns(v))(value)?,
         b"grid_template_rows" => map(many0(parse_grid_track_repeated), |v| StyleAttr::GridTemplateRows(v))(value)?,
@@ -252,26 +254,26 @@ fn parse_style<'a>(
         b"grid_column" => map(parse_grid_placement, |v| StyleAttr::GridColumn(v))(value)?,
 
         // values
-        b"font" => map(as_string, |val| StyleAttr::Font(val))(value)?,
-        b"font_color" => map(parse_color, |val| StyleAttr::FontColor(val))(value)?,
-        b"font_size" => map(parse_float, |val| StyleAttr::FontSize(val))(value)?,
-        b"duration" => map(parse_float, |val| StyleAttr::Duration(val))(value)?,
-        b"max_height" => map(parse_val, |val| StyleAttr::MaxHeight(val))(value)?,
-        b"max_width" => map(parse_val, |val| StyleAttr::MaxWidth(val))(value)?,
-        b"min_height" => map(parse_val, |val| StyleAttr::MinHeight(val))(value)?,
-        b"min_width" => map(parse_val, |val| StyleAttr::MinWidth(val))(value)?,
-        b"bottom" => map(parse_val, |val| StyleAttr::Bottom(val))(value)?,
-        b"top" => map(parse_val, |val| StyleAttr::Top(val))(value)?,
-        b"right" => map(parse_val, |val| StyleAttr::Right(val))(value)?,
-        b"left" => map(parse_val, |val| StyleAttr::Left(val))(value)?,
-        b"height" => map(parse_val, |val| StyleAttr::Height(val))(value)?,
-        b"width" => map(parse_val, |val| StyleAttr::Width(val))(value)?,
-        b"padding" => map(parse_ui_rect, |val| StyleAttr::Padding(val))(value)?,
-        b"margin" => map(parse_ui_rect, |val| StyleAttr::Margin(val))(value)?,
-        b"border" => map(parse_ui_rect, |val| StyleAttr::Border(val))(value)?,
-        b"border_radius" => map(parse_ui_rect, |val| StyleAttr::BorderRadius(val))(value)?,
-        b"background" => map(parse_color, |val| StyleAttr::Background(val))(value)?,
-        b"border_color" => map(parse_color, |val| StyleAttr::BorderColor(val))(value)?,
+        b"font" => map(as_string, StyleAttr::Font)(value)?,
+        b"font_color" => map(parse_color, StyleAttr::FontColor)(value)?,
+        b"font_size" => map(parse_float, StyleAttr::FontSize)(value)?,
+        b"duration" => map(parse_float, StyleAttr::Duration)(value)?,
+        b"max_height" => map(parse_val, StyleAttr::MaxHeight)(value)?,
+        b"max_width" => map(parse_val, StyleAttr::MaxWidth)(value)?,
+        b"min_height" => map(parse_val, StyleAttr::MinHeight)(value)?,
+        b"min_width" => map(parse_val, StyleAttr::MinWidth)(value)?,
+        b"bottom" => map(parse_val, StyleAttr::Bottom)(value)?,
+        b"top" => map(parse_val, StyleAttr::Top)(value)?,
+        b"right" => map(parse_val, StyleAttr::Right)(value)?,
+        b"left" => map(parse_val, StyleAttr::Left)(value)?,
+        b"height" => map(parse_val, StyleAttr::Height)(value)?,
+        b"width" => map(parse_val, StyleAttr::Width)(value)?,
+        b"padding" => map(parse_ui_rect, StyleAttr::Padding)(value)?,
+        b"margin" => map(parse_ui_rect, StyleAttr::Margin)(value)?,
+        b"border" => map(parse_ui_rect, StyleAttr::Border)(value)?,
+        b"border_radius" => map(parse_ui_rect, StyleAttr::BorderRadius)(value)?,
+        b"background" => map(parse_color, StyleAttr::Background)(value)?,
+        b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
         _ => {
             return Err(nom::Err::Error(nom::error::make_error(
                 ident,
