@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:hover="http://example.com/hover"
+		   xmlns:pressed="http://example.com/pressed"
+		   xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+	<!-- definition of simple elements -->
+	<xs:element name="node">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+			<xs:attributeGroup ref="attributes"/>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:element name="img">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+			<xs:attributeGroup ref="attributes"/>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:element name="property">
+		<xs:complexType>
+			<xs:simpleContent>
+				<xs:extension base="xs:string">
+					<xs:attribute name="name"
+								  type="xs:string"
+								  use="required"/>
+				</xs:extension>
+			</xs:simpleContent>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:element name="button">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+			<xs:attributeGroup ref="attributes"/>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:attributeGroup name="attributes">
+		<xs:attribute name="pressed">
+			<xs:annotation>
+				<xs:documentation>Width is a Val</xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="hover">
+			<xs:annotation>
+				<xs:documentation>Width is a Val</xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="width">
+			<xs:annotation>
+				<xs:documentation>Width is a Val</xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="height">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="margin">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="padding">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="display">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+
+		<xs:attribute name="watch">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="id">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="target">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="src">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="onexit">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="onenter">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="onpress">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="onspawn">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="position">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+
+		<xs:attribute name="overflow">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="direction">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="align_self">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="align_items">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="align_content">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="justify_self">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="justify_items">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="justify_content">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="flex_direction">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="flex_wrap">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="flex_grow">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="flex_shrink">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="flex_basis">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="row_gap">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="column_gap">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="grid_auto_flow">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="grid_auto_rows">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="grid_auto_columns">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="grid_template_rows">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+
+		<xs:attribute name="grid_template_columns">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="grid_row">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="grid_column">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="font">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="font_color">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="font_size">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="duration">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="max_height">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="max_width">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="min_height">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="min_width">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="bottom">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="top">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="right">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="left">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+
+		<xs:attribute name="border">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="border_radius">
+
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="background">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+		<xs:attribute name="border_color">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
+	</xs:attributeGroup>
+
+	<xs:element name="slot"
+				type="xs:token"/>
+
+	<xs:group name="nodes">
+		<xs:sequence>
+			<xs:element ref="node"/>
+			<xs:element ref="img"/>
+			<xs:element ref="button"/>
+			<xs:element ref="slot"/>
+		</xs:sequence>
+	</xs:group>
+
+	<!-- definition of complex elements -->
+	<xs:element name="template">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="name"
+					minOccurs="0"
+							type="xs:string"/>
+				<xs:element ref="property"
+							minOccurs="0" maxOccurs="unbounded"/>
+				<!-- <xs:group ref="nodes" minOccurs="0" /> -->
+				<xs:any minOccurs="0"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

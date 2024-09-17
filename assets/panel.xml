@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		  xsi:noNamespaceSchemaLocation="../schema.xsd">
+
+	<property name="title">Default Title</property>
+	<property name="primary">#000</property>
+	<property name="secondary">#FFF</property>
+
+	<node justify_content="center"
+		  align_items="center"
+		  padding="20px">
+		<node flex_direction="column"
+			  width="100%"
+			  min_width="400px"
+			  height="100%"
+			  justify_content="center">
+			<button id="header"
+					width="100%"
+					padding="20px 5px"
+					justify_content="space_between"
+					background="#FFF"
+					hover:background="#008"
+					align_items="center"
+					onspawn="collapse"
+					target="to_collapse">
+				<text font_color="#055"
+					  watch="header"
+					  hover:font_color="#FFF"
+					  font_size="20">{title} color: {secondary}</text>
+			</button>
+			<node flex_direction="column"
+				  row_gap="20px"
+				  width="100%"
+				  watch="header"
+				  margin="-2px auto auto auto"
+				  height="100%"
+				  padding="10px 10px"
+				  justify_content="center"
+				  border_color="#FFF"
+				  hover:border_color="#008"
+				  border="2px"
+				  background="{primary}"
+				  border_radius="auto auto 5px 5px"
+				  id="to_collapse">
+				<slot/>
+			</node>
+		</node>
+	</node>
+</template>

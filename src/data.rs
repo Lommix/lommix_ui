@@ -17,34 +17,27 @@ pub enum NodeType {
     Custom(String),
 }
 
-#[derive(Debug, Asset, TypePath)]
+#[derive(Debug)]
 pub struct XNode {
-    pub include_attrs: Vec<IncludeAttributes>,
-    pub attributes: Vec<Attribute>,
+    pub src: Option<String>,
+    pub styles: Vec<StyleAttr>,
+    pub target: Option<String>,
+    pub watch: Option<String>,
+    pub id: Option<String>,
+    pub uncompiled: Vec<AttrTokens>,
+    pub tags: Vec<(String, String)>,
+    pub defs: Vec<(String, String)>,
+    pub event_listener: Vec<Action>,
     pub content: Option<String>,
-    pub children: Vec<XNode>,
     pub node_type: NodeType,
+    pub children: Vec<XNode>,
 }
 
 #[derive(Debug, Asset, TypePath)]
 pub struct Template {
     pub name: Option<String>,
-    pub props: HashMap<String, String>,
-    pub vars: HashMap<String, String>,
-    pub nodes: Vec<XNode>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum TemplateAttributes {
-    ComponentName(String),
-    PropertyDefinition(String, String),
-    VarDefintion(String, String),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum IncludeAttributes {
-    Path(String),
-    PropertyDefinition(String, String),
+    pub properties: HashMap<String, String>,
+    pub root: Vec<XNode>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -56,6 +49,7 @@ pub enum Attribute {
     Path(String),
     Target(String),
     Id(String),
+    Watch(String),
     Tag(String, String),
 }
 
@@ -67,8 +61,8 @@ pub struct AttrTokens {
 }
 
 impl AttrTokens {
-    pub fn compile(&self, props: &PropertyDefintions) -> Option<Attribute> {
-        let Some(prop_val) = props.get(&self.key) else {
+    pub fn compile(&self, props: &TemplateState) -> Option<Attribute> {
+        let Some(prop_val) = props.get_prop(&self.key) else {
             warn!("failed to parse property, key not found `{}`", self.key);
             return None;
         };

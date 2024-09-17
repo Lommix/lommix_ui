@@ -1,11 +1,12 @@
-use crate::data::{Action, AttrTokens, Attribute, StyleAttr};
+use crate::data::{Action, AttrTokens, Attribute, StyleAttr, Template, XNode};
 use crate::error::ParseError;
-use crate::prelude::{NodeType, XNode};
+use crate::prelude::NodeType;
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap, GridAutoFlow,
     GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis,
     PositionType, RepeatedGridTrack,
 };
+use bevy::utils::HashMap;
 use bevy::{
     color::Color,
     ui::{UiRect, Val},
@@ -25,24 +26,8 @@ use nom::{
     IResult,
 };
 
-/// --------------------------------------------------
-/// try parsing a ui xml bytes
-pub fn parse_bytes(input: &[u8]) -> Result<XNode, ParseError> {
-    let (input, _) = trim_comments(input)?;
-
-    // is template?
-
-    let (_, node) = parse_element(input)?;
-    Ok(node)
-}
 
 pub fn parse_bytes_xml(input: &[u8]) -> Result<Xml, ParseError> {
-    let (input, _) = trim_comments(input)?;
-    let (input, _xml_header) = alt((
-        delimited(tag("<?"), take_until("?>"), tag("?>")).map(Some),
-        |i| Ok((i, None)),
-    ))(input)?;
-
     let (_, node) = parse_xml_node(input)?;
     Ok(node)
 }
@@ -62,6 +47,110 @@ impl std::fmt::Debug for XmlAttr<'_> {
             std::str::from_utf8(self.key).unwrap_or_default(),
             std::str::from_utf8(self.value).unwrap_or_default(),
         )
+    }
+}
+
+pub(crate) fn parse_template(input: &[u8]) -> Result<Template, ParseError> {
+    let (input, h) = trim_comments(input)?;
+    let (input, _xml_header) = alt((
+        delimited(tag("<?"), take_until("?>"), tag("?>")).map(Some),
+        |i| Ok((i, None)),
+    ))(input)?;
+    let (_, xml) = parse_xml_node(input)?;
+
+    let mut name = None;
+    let mut properties = HashMap::default();
+    let mut root = vec![];
+
+    for child in xml.children.iter() {
+        match child.name {
+            b"property" => {
+                if let (Some(key), Some(value)) = (
+                    child
+                        .attributes
+                        .iter()
+                        .find_map(|attr| (attr.key == b"name").then_some(attr.value)),
+                    child.value,
+                ) {
+                    let str_key = String::from_utf8_lossy(key).to_string();
+                    let str_val = String::from_utf8_lossy(value).to_string();
+                    properties.insert(str_key, str_val);
+                };
+            }
+            b"name" => {
+                if let Some(content) = child.value {
+                    let str_name = String::from_utf8_lossy(content).to_string();
+                    name = Some(str_name);
+                };
+            }
+            _ => root.push(XNode::try_from(child)?),
+        }
+    }
+
+    Ok(Template {
+        name,
+        properties,
+        root,
+    })
+}
+
+// try from
+impl TryFrom<&Xml<'_>> for XNode {
+    type Error = ParseError;
+
+    fn try_from(xml: &Xml<'_>) -> Result<Self, Self::Error> {
+        let (_, node_type) = parse_node_type(xml.name)?;
+
+        let content = xml
+            .value
+            .map(|bytes| String::from_utf8_lossy(bytes).to_string());
+
+        let mut styles = vec![];
+        let mut defs = vec![];
+        let mut event_listener = vec![];
+        let mut uncompiled = vec![];
+        let mut tags = vec![];
+        let mut src = None;
+        let mut id = None;
+        let mut target = None;
+        let mut watch = None;
+
+        for attr in xml.attributes.iter() {
+            match attribute_from_parts(attr.prefix, attr.key, attr.value).map(|(_, a)| a)? {
+                Attribute::Style(style_attr) => styles.push(style_attr),
+                Attribute::PropertyDefinition(key, val) => defs.push((key, val)),
+                Attribute::Uncompiled(attr_tokens) => uncompiled.push(attr_tokens),
+                Attribute::Action(action) => event_listener.push(action),
+                Attribute::Path(path) => src = Some(path),
+                Attribute::Target(tar) => target = Some(tar),
+                Attribute::Id(i) => id = Some(i),
+                Attribute::Tag(key, val) => tags.push((key, val)),
+                Attribute::Watch(watch_id) => watch = Some(watch_id),
+            }
+        }
+
+        // dbg!(&src);
+
+        let mut children = vec![];
+        for child in xml.children.iter() {
+            let node: XNode = child.try_into()?;
+            children.push(node);
+        }
+
+        Ok(Self {
+            src,
+            styles,
+            target,
+            watch,
+            uncompiled,
+            id,
+            tags,
+            defs,
+            event_listener,
+            content,
+            node_type,
+            children,
+        })
     }
 }
 
@@ -121,14 +210,7 @@ fn parse_xml_node(input: &[u8]) -> IResult<&[u8], Xml> {
         (c.len() > 0).then_some(c)
     })(input)?;
     let (input, (end_prefix, end_name)) = parse_xml_end(input)?;
-
-    if start_name != end_name {
-        dbg!(
-            std::str::from_utf8(end_prefix.unwrap_or_default()).unwrap_or_default(),
-            std::str::from_utf8(start_name).unwrap_or_default(),
-            std::str::from_utf8(end_name).unwrap_or_default(),
-            attributes
-        );
+    if start_name != end_name || prefix != end_prefix {
         return Err(nom::Err::Failure(nom::error::make_error(
             end_name,
             nom::error::ErrorKind::TagClosure,
@@ -168,51 +250,6 @@ fn parse_xml_attr(input: &[u8]) -> IResult<&[u8], Vec<XmlAttr>> {
     ))(input)
 }
 
-#[rustfmt::skip]
-fn parse_element(input: &[u8]) -> IResult<&[u8], XNode> {
-        let (input, _) = trim_comments(input)?;
-
-        // attributes & styles
-        let (input, (start_tag, attributes, is_empty)) = parse_start_tag(input)?;
-        let (input, _) = multispace0(input)?;
-
-
-        let (input, content, children ) = if !is_empty {
-
-            let (input, _) = trim_comments(input)?;
-            let (input, children) = many0(parse_element)(input)?;
-            let (input, _) = trim_comments(input)?;
-            let (input, content) = map(parse_content,|content| if content.len() > 0 { Some(content.to_string())  } else {None})(input)?;
-            let (input, _) = trim_comments(input)?;
-            let (input, end_tag) = parse_end_tag(input)?;
-
-            if start_tag != end_tag {
-                return Err(nom::Err::Failure(nom::error::make_error(end_tag, nom::error::ErrorKind::TagClosure)));
-            }
-
-            ( input, content, children )
-
-        } else {( input, None, vec![] )};
-
-
-        let (_, node_type) = parse_node_type(start_tag)?;
-
-        let node = XNode{
-            include_attrs : vec![],
-            node_type,
-            children,
-            attributes,
-            content,
-        };
-
-        Ok((input, node))
-}
-
-fn parse_start(input: &[u8]) -> IResult<&[u8], NodeType> {
-    let (input, _) = trim_comments(input)?;
-    let (input, tag) = preceded(tag("<"), map_parser(is_not(" "), parse_node_type))(input)?;
-    Ok((input, tag))
-}
 
 fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (input, trimmed) = nom::character::complete::multispace0(input)?;
@@ -279,6 +316,79 @@ enum ValueType<'a> {
     Literal(&'a [u8]),
 }
 
+fn parse_prop_var<'a>(
+    prefix: Option<&'a [u8]>,
+    key: &'a [u8],
+    value: &'a [u8],
+) -> Option<Attribute> {
+    let result: IResult<&[u8], &[u8]> = delimited(tag("{"), is_not("}"), tag("}"))(value);
+    match result {
+        Ok((_, prop)) => {
+            return Some(Attribute::Uncompiled(AttrTokens {
+                prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
+                ident: String::from_utf8_lossy(key).to_string(),
+                key: String::from_utf8_lossy(prop).to_string(),
+            }));
+        }
+        Err(_) => None,
+    }
+}
+
+pub(crate) fn attribute_from_parts<'a>(
+    prefix: Option<&'a [u8]>,
+    key: &'a [u8],
+    value: &'a [u8],
+) -> IResult<&'a [u8], Attribute> {
+    if let Some(attr) = parse_prop_var(prefix, key, value) {
+        return Ok((b"", attr));
+    }
+
+    match prefix {
+        Some(b"tag") => {
+            let (_, prop_ident) = as_string(key)?;
+            let (_, prop_value) = as_string(value)?;
+            return Ok((b"", Attribute::Tag(prop_ident, prop_value)));
+        }
+        Some(b"prop") => {
+            let (_, prop_ident) = as_string(key)?;
+            let (_, prop_value) = as_string(value)?;
+            return Ok((b"", Attribute::PropertyDefinition(prop_ident, prop_value)));
+        }
+        _ => (),
+    };
+
+    let attribute = match key {
+        b"watch" => Attribute::Watch(as_string(value).map(|(_, hash)| hash)?),
+        b"id" => Attribute::Id(as_string(value).map(|(_, hash)| hash)?),
+        b"target" => Attribute::Target(as_string(value).map(|(_, hash)| hash)?),
+        b"src" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
+        b"onexit" => Attribute::Action(Action::OnExit(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        b"onenter" => Attribute::Action(Action::OnEnter(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        b"onpress" => Attribute::Action(Action::OnPress(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        b"onspawn" => Attribute::Action(Action::OnSpawn(
+            as_string_list(value).map(|(_, string)| string)?,
+        )),
+        any => match parse_style(prefix, any, value) {
+            Ok((_, style)) => Attribute::Style(style),
+            Err(_) => {
+                let (_, value) = as_string(value)?;
+                let (_, key) = as_string(any)?;
+                Attribute::PropertyDefinition(key, value)
+            }
+        },
+    };
+
+    Ok((b"", attribute))
+}
+
+//----------------------
+//depricated
 pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
     let (input, (_, prefix, ident, _, value)) = tuple((
         trim_comments,
@@ -411,7 +521,9 @@ fn parse_style<'a>(
         b"border_radius" => map(parse_ui_rect, StyleAttr::BorderRadius)(value)?,
         b"background" => map(parse_color, StyleAttr::Background)(value)?,
         b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
-        _ => {
+        rest => {
+
+            dbg!(String::from_utf8_lossy(rest));
             return Err(nom::Err::Error(nom::error::make_error(
                 ident,
                 nom::error::ErrorKind::NoneOf,
@@ -951,13 +1063,13 @@ fn is_hex_digit(c: u8) -> bool {
 
 /// FF -> u8
 fn from_hex_byte(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
-    let str = std::str::from_utf8(input).expect("fuck");
+    let str = std::str::from_utf8(input).expect("fix later");
     u8::from_str_radix(format!("{}", str).as_str(), 16)
 }
 
 /// F -> u8
 fn from_hex_nib(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
-    let str = std::str::from_utf8(input).expect("fuck");
+    let str = std::str::from_utf8(input).expect("fix later");
     u8::from_str_radix(format!("{}{}", str, str).as_str(), 16)
 }
 
@@ -1074,11 +1186,40 @@ mod tests {
     #[test_case(r#"<node pressed:background="fsdfsf" active="hello"><text p:hello="sdf">hello</text></node>"#)]
     #[test_case(r#"<slot/>"#)]
     #[test_case(r#"<node pressed:background="fsdfsf" active="hello" />"#)]
+    #[test_case(r#"<property name="press"><property name="press"></property></property>"#)]
+    #[test_case(
+        r#"
+    <template>
+        <name>test</name>
+        <property this="press">test</property>
+        <property this="press">test</property>
+        <node></node>
+    </template>
+    "#
+    )]
     fn test_parse_xml_node(input: &str) {
         let (_, xml) = parse_xml_node(input.as_bytes())
             .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
             .unwrap();
 
         // dbg!(&xml);
+    }
+
+    #[test_case("./assets/menu.xml")]
+    #[test_case("./assets/panel.xml")]
+    #[test_case("./assets/button.xml")]
+    #[test_case("./assets/card.xml")]
+    fn test_parse_template_full(file_path: &str) {
+        let input = std::fs::read_to_string(file_path).unwrap();
+        let template = parse_template(input.as_bytes()).unwrap();
+        // dbg!(&template);
+    }
+
+    #[test_case(r#"hover:background="{color}""#)]
+    fn parse_attribute_parts(input: &str) {
+        let (_, attr) = parse_xml_attr(input.as_bytes()).unwrap();
+        let first = &attr[0];
+        let (_, attribute) = attribute_from_parts(first.prefix, first.key, first.value).unwrap();
+        dbg!(attribute);
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    data::{Action, AttrTokens, Attribute, NodeType, XNode},
+    data::{Action, AttrTokens, Attribute, NodeType, Template, XNode},
     prelude::{ComponentBindings, StyleAttr},
 };
 use bevy::{prelude::*, utils::HashMap};
@@ -8,20 +8,27 @@ use nom::{
     character::complete::multispace0,
     sequence::{delimited, preceded, tuple},
 };
-use std::sync::{Arc, RwLock};
 
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<TemplateState>();
+
+        app.add_event::<CompileNodeEvent>();
         app.add_systems(
             Update,
             (
                 (hotreload, spawn_ui, move_children_to_slot, style_ui).chain(),
                 update_interaction,
+                on_state_change,
             ),
         );
+        app.observe(compile_node);
     }
 }
+
+#[derive(Event)]
+pub struct CompileNodeEvent;
 
 #[derive(Component, Clone, Deref, DerefMut, Copy)]
 pub struct ScopeEntity(Entity);
@@ -31,33 +38,31 @@ impl ScopeEntity {
     }
 }
 
-#[derive(Component, Clone, Default)]
+#[derive(Component, Clone, Default, Reflect)]
+#[reflect]
 pub struct TemplateState {
-    pub vars: HashMap<String, String>,
     pub props: HashMap<String, String>,
 }
 
-#[derive(Component, Clone, Default)]
+#[derive(Component, Clone, Default, Deref, DerefMut)]
 pub struct StateSubscriber(Vec<Entity>);
 
 impl TemplateState {
     pub fn try_set_prop(&mut self, key: &str, value: String) {
         _ = self.props.try_insert(key.to_string(), value);
     }
-    pub fn try_set_val(&mut self, key: &str, value: String) {
-        _ = self.vars.try_insert(key.to_string(), value);
-    }
     pub fn set_prop(&mut self, key: &str, value: String) {
         self.props.insert(key.to_string(), value);
-    }
-    pub fn set_val(&mut self, key: &str, value: String) {
-        self.vars.insert(key.to_string(), value);
     }
     pub fn get_prop(&self, key: &str) -> Option<&String> {
         self.props.get(key)
     }
-    pub fn get_val(&self, key: &str) -> Option<&String> {
-        self.vars.get(key)
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn with(mut self, key: &str, value: &str) -> Self {
+        self.props.insert(key.to_string(), value.to_string());
+        self
     }
 }
 
@@ -73,6 +78,13 @@ pub struct SlotPlaceholder {
 
 #[derive(Component)]
 pub struct UnslotedChildren(Entity);
+
+#[derive(Component, DerefMut, Deref)]
+pub struct InteractionObverser(Vec<Entity>);
+
+// map to vtable one day
+#[derive(Component)]
+pub struct TemplateExpresions(Vec<AttrTokens>);
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Tags(Vec<Tag>);
@@ -90,19 +102,6 @@ impl Tags {
 pub struct Tag {
     pub key: String,
     pub value: String,
-}
-
-#[derive(Component, Deref, DerefMut, Default)]
-pub struct PropertyDefintions(HashMap<String, String>);
-
-impl PropertyDefintions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn with(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.0.insert(key.into(), value.into());
-        self
-    }
 }
 
 #[derive(Component, DerefMut, Deref, Clone)]
@@ -171,60 +170,91 @@ pub struct OnExit(pub Vec<String>);
 ///
 #[derive(Bundle, Default)]
 pub struct HtmlBundle {
-    pub handle: Handle<XNode>,
+    pub handle: Handle<Template>,
     pub node: NodeBundle,
     pub unbuild: UnbuildTag,
     pub unstyled: UnstyledTag,
-    pub properties: PropertyDefintions,
     pub state: TemplateState,
 }
 
 fn update_interaction(
     mut cmd: Commands,
-    mut nodes: Query<
-        (
-            Entity,
-            &mut Style,
-            &StyleAttributes,
-            &Interaction,
-            Option<&mut Text>,
-        ),
-        Changed<Interaction>,
-    >,
+    interactions: Query<(Entity, &Interaction, Option<&InteractionObverser>), Changed<Interaction>>,
+    mut targets: Query<(&mut Style, &StyleAttributes, Option<&mut Text>)>,
     server: Res<AssetServer>,
 ) {
-    nodes.iter_mut().for_each(
-        |(entity, mut style, style_attr, interaction, mut maybe_text)| match interaction {
-            Interaction::Pressed => {
-                style_attr.iter().for_each(|attr| {
-                    if let StyleAttr::Pressed(val) = attr {
-                        val.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server);
-                    }
-                });
-            }
-            Interaction::Hovered => {
-                style_attr.iter().for_each(|attr| {
-                    if let StyleAttr::Hover(val) = attr {
-                        val.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server);
-                    }
-                });
-            }
-            Interaction::None => {
-                *style = Style::default();
-                style_attr.iter().for_each(|attr| match attr {
-                    StyleAttr::Hover(_) | StyleAttr::Pressed(_) => (),
-                    any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
-                });
-            }
-        },
-    );
+    interactions
+        .iter()
+        .for_each(|(entity, interaction, maybe_oberser)| {
+            if let Ok((mut style, style_attr, mut maybe_text)) = targets.get_mut(entity) {
+                apply_interaction(
+                    entity,
+                    &interaction,
+                    style_attr,
+                    &mut style,
+                    &mut maybe_text,
+                    &server,
+                    &mut cmd,
+                );
+            };
+
+            if let Some(observer) = maybe_oberser {
+                for obs in observer.iter() {
+                    if let Ok((mut style, style_attr, mut maybe_text)) = targets.get_mut(*obs) {
+                        apply_interaction(
+                            *obs,
+                            &interaction,
+                            style_attr,
+                            &mut style,
+                            &mut maybe_text,
+                            &server,
+                            &mut cmd,
+                        );
+                    };
+                }
+            };
+        });
+}
+
+fn apply_interaction(
+    entity: Entity,
+    interaction: &Interaction,
+    style_attr: &StyleAttributes,
+    style: &mut Style,
+    maybe_text: &mut Option<Mut<Text>>,
+    server: &AssetServer,
+    cmd: &mut Commands,
+) {
+    match interaction {
+        Interaction::Pressed => {
+            style_attr.iter().for_each(|attr| {
+                if let StyleAttr::Pressed(val) = attr {
+                    val.apply(entity, cmd, style, maybe_text, &server);
+                }
+            });
+        }
+        Interaction::Hovered => {
+            style_attr.iter().for_each(|attr| {
+                if let StyleAttr::Hover(val) = attr {
+                    val.apply(entity, cmd, style, maybe_text, &server);
+                }
+            });
+        }
+        Interaction::None => {
+            *style = Style::default();
+            style_attr.iter().for_each(|attr| match attr {
+                StyleAttr::Hover(_) | StyleAttr::Pressed(_) => (),
+                any => any.apply(entity, cmd, style, maybe_text, &server),
+            });
+        }
+    };
 }
 
 // what if a slot uses another include?
 fn hotreload(
     mut cmd: Commands,
-    mut events: EventReader<AssetEvent<XNode>>,
-    templates: Query<(Entity, &Handle<XNode>)>,
+    mut events: EventReader<AssetEvent<Template>>,
+    templates: Query<(Entity, &Handle<Template>)>,
     sloted_nodes: Query<(Entity, &InsideSlot)>,
 ) {
     events.read().for_each(|ev| {
@@ -294,7 +324,58 @@ fn style_ui(
                 any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
             });
             cmd.entity(entity).remove::<UnstyledTag>();
+            cmd.trigger_targets(CompileNodeEvent, entity);
         });
+}
+
+fn on_state_change(
+    mut cmd: Commands,
+    state_changes: Query<&StateSubscriber, Changed<TemplateState>>,
+) {
+    state_changes.iter().for_each(|subs| {
+        subs.iter().for_each(|e| {
+            cmd.trigger_targets(CompileNodeEvent, *e);
+        })
+    });
+}
+
+fn compile_node(
+    trigger: Trigger<CompileNodeEvent>,
+    state: Query<&TemplateState>,
+    server: Res<AssetServer>,
+    mut cmd: Commands,
+    mut vars: Query<(
+        &TemplateExpresions,
+        &ScopeEntity,
+        &mut Style,
+        Option<&mut Text>,
+    )>,
+) {
+    let entity = trigger.entity();
+    let Ok((expressions, scope, mut style, mut txt)) = vars.get_mut(entity) else {
+        // warn!("uncompile node, missing scope, style & expressions");
+        return;
+    };
+
+    let Ok(state) = state.get(**scope) else {
+        return;
+    };
+    for attr_tokens in expressions.0.iter() {
+        if let Some(attr) = attr_tokens.compile(state) {
+            match attr {
+                Attribute::Style(style_attr) => {
+                    style_attr.apply(entity, &mut cmd, &mut style, &mut txt, &server);
+                }
+                Attribute::Action(action) => {
+                    action.self_insert(cmd.entity(entity));
+                }
+                any => {
+                    warn!("unimplemented attribute expression {:?}", any);
+                    continue;
+                }
+            }
+        }
+    }
 }
 
 fn move_children_to_slot(
@@ -343,27 +424,33 @@ fn move_children_to_slot(
 struct IdLookUpTable {
     ids: HashMap<String, Entity>,
     targets: HashMap<Entity, String>,
+    watch: HashMap<String, Vec<Entity>>,
+}
+
+impl IdLookUpTable {
+    pub fn subscribe(&mut self, target: String, entity: Entity) {
+        match self.watch.get_mut(&target) {
+            Some(list) => {
+                list.push(entity);
+            }
+            None => {
+                self.watch.insert(target, vec![entity]);
+            }
+        }
+    }
 }
 
 fn spawn_ui(
     mut cmd: Commands,
-    mut unbuild: Query<
-        (
-            Entity,
-            &Handle<XNode>,
-            &mut PropertyDefintions,
-            &mut TemplateState,
-        ),
-        With<UnbuildTag>,
-    >,
-    assets: Res<Assets<XNode>>,
+    mut unbuild: Query<(Entity, &Handle<Template>, &mut TemplateState), With<UnbuildTag>>,
+    assets: Res<Assets<Template>>,
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
 ) {
     unbuild
         .iter_mut()
-        .for_each(|(root_entity, handle, mut defs, mut state)| {
-            let Some(root_node) = assets.get(handle) else {
+        .for_each(|(root_entity, handle, mut state)| {
+            let Some(template) = assets.get(handle) else {
                 return;
             };
 
@@ -371,20 +458,20 @@ fn spawn_ui(
             let mut id_table = IdLookUpTable::default();
             let scope = ScopeEntity(root_entity);
 
-            // append build template vars & props here
+            template.properties.iter().for_each(|(key, val)| {
+                _ = state.try_set_prop(key, val.clone());
+            });
 
-            // add defaults on first call
             build_node(
                 0,
                 root_entity,
                 scope,
-                &root_node,
+                &template.root[0],
                 &mut cmd,
                 &assets,
                 &server,
                 &custom_comps,
                 &mut id_table,
-                &mut defs,
                 &mut state,
                 &mut subscriber,
             );
@@ -395,6 +482,16 @@ fn spawn_ui(
                         cmd.entity(*entity).insert(UiTarget(*tar));
                     }
                     None => warn!("target `{target_id}` not found for entity {entity}"),
+                }
+            });
+
+            id_table.watch.iter().for_each(|(target_str, obs_list)| {
+                match id_table.ids.get(target_str) {
+                    Some(to_observe) => {
+                        cmd.entity(*to_observe)
+                            .insert(InteractionObverser(obs_list.clone()));
+                    }
+                    None => warn!("undefined watch target `{target_str}`"),
                 }
             });
 
@@ -412,69 +509,59 @@ fn build_node(
     scope: ScopeEntity,
     node: &XNode,
     cmd: &mut Commands,
-    assets: &Assets<XNode>,
+    assets: &Assets<Template>,
     server: &AssetServer,
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
-    defintions: &mut PropertyDefintions,
     state: &mut TemplateState,
-    subscriber: &mut StateSubscriber,
+    state_subscriber: &mut StateSubscriber,
 ) {
-    // add any default properties on first node here
-    if depth == 0 {
-        node.attributes.iter().for_each(|attr| match attr {
-            Attribute::PropertyDefinition(key, value) => {
-                _ = defintions.try_insert(key.clone(), value.clone());
-            }
-            _ => (),
-        });
-
+    if depth > 0 {
         match &node.node_type {
-            NodeType::Include | NodeType::Template | NodeType::Custom(_) => (),
+            NodeType::Include | NodeType::Custom(_) => (),
             _ => {
                 cmd.entity(entity).insert(scope.clone());
             }
-        };
-    } else {
-        // dont touch include scopes
-        // match ui_node.node_type {
-        //     NodeType::Include | NodeType::Template | NodeType::Custom(_) => (),
-        //     _ => {
-        cmd.entity(entity).insert(scope.clone());
-        // }
-        // };
+        }
     }
 
-    // compile properties
-    let mut attributes = SortedAttributes::new(&node.attributes, &defintions);
-    let style_attributes = StyleAttributes(attributes.styles.drain(..).collect());
+    if node.uncompiled.len() > 0 {
+        cmd.entity(entity).insert(TemplateExpresions(
+            node.uncompiled.iter().cloned().collect(),
+        ));
+        state_subscriber.push(entity);
+    }
 
-    // any defintion not on inlucde/custom gets discarded
-    let include_definitions = attributes.definitions.drain(..).fold(
-        PropertyDefintions::default(),
-        |mut m, (key, value)| {
-            m.insert(key, value);
-            m
-        },
-    );
+    let style_attributes = StyleAttributes(node.styles.clone());
+    let passed_state =
+        node.defs
+            .iter()
+            .cloned()
+            .fold(TemplateState::default(), |mut m, (key, value)| {
+                m.props.insert(key, value);
+                m
+            });
 
-    attributes.actions.drain(..).for_each(|action| {
-        action.self_insert(cmd.entity(entity));
+    node.event_listener.iter().for_each(|listener| {
+        listener.clone().self_insert(cmd.entity(entity));
     });
 
-    if let Some(id) = attributes.id {
-        id_table.ids.insert(id, entity);
+    if let Some(id) = &node.id {
+        id_table.ids.insert(id.clone(), entity);
     }
-    if let Some(target) = attributes.target {
-        id_table.targets.insert(entity, target);
+    if let Some(target) = &node.target {
+        id_table.targets.insert(entity, target.clone());
     }
 
+    if let Some(watch) = &node.watch {
+        id_table.subscribe(watch.clone(), entity);
+    }
     // ------------------
-    if attributes.custom.len() > 0 {
+    if node.tags.len() > 0 {
         cmd.entity(entity).insert(Tags(
-            attributes
-                .custom
-                .drain(..)
+            node.tags
+                .iter()
+                .cloned()
                 .map(|(key, value)| Tag { key, value })
                 .collect::<Vec<_>>(),
         ));
@@ -491,10 +578,13 @@ fn build_node(
             ));
         }
         NodeType::Image => {
+            let path = node.src.clone().unwrap_or_default();
+            let handle = server.load::<Image>(path);
+
             cmd.entity(entity).insert((
                 Name::new("Image"),
                 ImageBundle {
-                    image: UiImage::new(server.load(attributes.path.unwrap_or_default())),
+                    image: UiImage::new(handle),
                     ..default()
                 },
                 style_attributes,
@@ -505,7 +595,7 @@ fn build_node(
             let content = node
                 .content
                 .as_ref()
-                .map(|str| compile_content(str, defintions))
+                .map(|str| compile_content(str, state))
                 .unwrap_or_default();
 
             cmd.entity(entity).insert((
@@ -531,9 +621,8 @@ fn build_node(
             ));
         }
         NodeType::Include => {
-            let path = attributes.path.unwrap_or_default();
-            let handle = server.load::<XNode>(path);
-
+            let path = node.src.clone().unwrap_or_default();
+            let handle = server.load::<Template>(path);
             if node.children.len() > 0 {
                 let slot_holder = cmd.spawn(NodeBundle::default()).id();
                 node.children.iter().for_each(|child_node| {
@@ -548,9 +637,8 @@ fn build_node(
                         server,
                         custom_comps,
                         id_table,
-                        defintions,
                         state,
-                        subscriber,
+                        state_subscriber,
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
@@ -558,10 +646,40 @@ fn build_node(
                 cmd.entity(entity).insert((
                     UnslotedChildren(slot_holder),
                     handle,
-                    include_definitions,
                     UnbuildTag,
                     NodeBundle::default(),
-                    TemplateState::default(),
+                    passed_state,
+                ));
+            }
+
+            return;
+        }
+        NodeType::Custom(custom_tag) => {
+            custom_comps.try_spawn(custom_tag, entity, cmd);
+            if node.children.len() > 0 {
+                let slot_holder = cmd.spawn(NodeBundle::default()).id();
+                node.children.iter().for_each(|child_node| {
+                    let child = cmd.spawn_empty().id();
+                    build_node(
+                        depth + 1,
+                        child,
+                        scope,
+                        child_node,
+                        cmd,
+                        assets,
+                        server,
+                        custom_comps,
+                        id_table,
+                        state,
+                        state_subscriber,
+                    );
+                    cmd.entity(slot_holder).add_child(child);
+                });
+
+                cmd.entity(entity).insert((
+                    UnslotedChildren(slot_holder),
+                    passed_state,
+                    UnbuildTag,
                 ));
             }
 
@@ -572,39 +690,6 @@ fn build_node(
                 SlotPlaceholder { owner: scope.get() },
                 NodeBundle::default(),
             ));
-            return;
-        }
-        NodeType::Custom(custom_tag) => {
-            custom_comps.try_spawn(custom_tag, entity, cmd);
-
-            if node.children.len() > 0 {
-                let slot_holder = cmd.spawn(NodeBundle::default()).id();
-                node.children.iter().for_each(|child_node| {
-                    let child = cmd.spawn_empty().id();
-                    build_node(
-                        depth + 1,
-                        child,
-                        scope,
-                        child_node,
-                        cmd,
-                        assets,
-                        server,
-                        custom_comps,
-                        id_table,
-                        defintions,
-                        state,
-                        subscriber,
-                    );
-                    cmd.entity(slot_holder).add_child(child);
-                });
-
-                cmd.entity(entity).insert((
-                    UnslotedChildren(slot_holder),
-                    include_definitions,
-                    UnbuildTag,
-                ));
-            }
-
             return;
         }
     };
@@ -621,58 +706,15 @@ fn build_node(
             server,
             custom_comps,
             id_table,
-            defintions,
             state,
-            subscriber,
+            state_subscriber,
         );
 
         cmd.entity(entity).add_child(child);
     }
 }
 
-#[derive(Default)]
-struct SortedAttributes {
-    pub styles: Vec<StyleAttr>,
-    pub actions: Vec<Action>,
-    pub path: Option<String>,
-    pub definitions: Vec<(String, String)>,
-    pub target: Option<String>,
-    pub id: Option<String>,
-    pub custom: Vec<(String, String)>,
-    pub code: Vec<AttrTokens>,
-}
-
-impl SortedAttributes {
-    pub fn new(unsorted: &Vec<Attribute>, props: &PropertyDefintions) -> Self {
-        let mut sorted = SortedAttributes::default();
-        unsorted
-            .iter()
-            .cloned()
-            .for_each(|attr| sorted.add_attr(attr, props));
-        sorted
-    }
-
-    pub fn add_attr(&mut self, attr: Attribute, defs: &PropertyDefintions) {
-        match attr {
-            Attribute::Style(style) => self.styles.push(style),
-            Attribute::Action(action) => self.actions.push(action),
-            Attribute::Path(path) => self.path = Some(path),
-            Attribute::PropertyDefinition(key, val) => self.definitions.push((key, val)),
-            Attribute::Uncompiled(tokens) => {
-                self.code.push(tokens.clone());
-                // should no longer happen here, remove later
-                if let Some(attr) = tokens.compile(defs) {
-                    self.add_attr(attr, defs);
-                };
-            }
-            Attribute::Target(target) => self.target = Some(target),
-            Attribute::Id(id) => self.id = Some(id),
-            Attribute::Tag(key, value) => self.custom.push((key, value)),
-        };
-    }
-}
-
-fn compile_content(input: &str, defs: &PropertyDefintions) -> String {
+pub(crate) fn compile_content(input: &str, defs: &TemplateState) -> String {
     let mut compiled = String::new();
 
     let parts: Result<(&str, (&str, &str)), nom::Err<nom::error::Error<&str>>> = tuple((
@@ -687,7 +729,7 @@ fn compile_content(input: &str, defs: &PropertyDefintions) -> String {
 
     compiled.push_str(literal);
 
-    if let Some(value) = defs.get(key.trim_end()) {
+    if let Some(value) = defs.get_prop(key.trim_end()) {
         compiled.push_str(value);
     }
 

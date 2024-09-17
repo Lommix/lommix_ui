@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		  xsi:noNamespaceSchemaLocation="../schema.xsd">
+
+	<property name="press">greet</property>
+	<property name="primary">#000</property>
+	<property name="secondary">#FFF</property>
+
+	<button border_color="#1FF"
+			hover:border_color="#000"
+			hover:background="#022"
+			background="#0000"
+			prop:title="Default Title"
+			border="2px"
+			border_color="{primary}"
+			border_radius="2px"
+			onpress="greet"
+			onenter="play_beep"
+			tag:source="pop.ogg"
+			height="64px"
+			width="64px">
+		<img align_self="center"
+			 justify_self="center"
+			 width="64px"
+			 height="64px"
+			 height="auto"
+			 src="bevy_bird_dark.png"/>
+		<text align_self="end"
+			  font_size="10px"
+			  justify_self="center"
+			  position="absolute">{title}</text>
+	</button>
+
+</template>

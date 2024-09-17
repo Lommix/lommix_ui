@@ -35,7 +35,7 @@ fn setup(
 ) {
     cmd.spawn(Camera2dBundle::default());
     cmd.spawn(HtmlBundle {
-        handle: server.load("menu.html"),
+        handle: server.load("menu.xml"),
         ..default()
     });
 
@@ -44,7 +44,7 @@ fn setup(
     function_bindings.register("scrollable", cmd.register_one_shot_system(init_scrollable));
     function_bindings.register("play_beep", cmd.register_one_shot_system(play_beep));
 
-    let panel_handle = server.load("panel.html");
+    let panel_handle = server.load("panel.xml");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
         entity_cmd.insert((HtmlBundle {
             handle: panel_handle.clone(),
@@ -147,9 +147,9 @@ fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetSe
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..100 {
             cmd.spawn(HtmlBundle {
-                handle: server.load("card.html"),
-                properties: PropertyDefintions::new()
-                    .with("title", format!("item {i}"))
+                handle: server.load("card.xml"),
+                state: TemplateState::new()
+                    .with("title", &format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
                 ..default()
             });

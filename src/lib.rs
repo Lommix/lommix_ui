@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use build::HtmlBundle;
-use data::XNode;
+use data::Template;
 use prelude::ComponentBindings;
 
 mod bindings;
@@ -15,10 +15,10 @@ mod state;
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, PropertyDefintions, StyleAttributes, Tag,
-        Tags, UiId, UiTarget,
+        HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, Tag, Tags, TemplateState,
+        UiId, UiTarget,
     };
-    pub use crate::data::{Action, Attribute, NodeType, StyleAttr, XNode};
+    pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
     pub use crate::LommixUiPlugin;
 }
@@ -40,36 +40,36 @@ impl Plugin for LommixUiPlugin {
         // ------------------
         // auto load dirs
         // move to system
-        let mut to_load = self
-            .auto_load_dirs
-            .iter()
-            .flat_map(|dir_path| {
-                if let Ok(dir) = std::fs::read_dir(std::path::Path::new("assets").join(dir_path)) {
-                    return Some(dir);
-                };
-                warn!("[lommx ui] - cannot read dir `{dir_path}`");
-                None
-            })
-            .map(|dir| dir.into_iter().flatten())
-            .flatten()
-            .map(|entry| {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let path = entry.path();
-                let handle: Handle<XNode> = app.world().resource::<AssetServer>().load(path);
-                (name, handle)
-            })
-            .collect::<Vec<_>>();
-
-        let mut comp_registry = app.world_mut().resource_mut::<ComponentBindings>();
-
-        for (name, handle) in to_load.drain(..) {
-            comp_registry.register(name, move |mut cmd| {
-                cmd.insert(HtmlBundle {
-                    handle: handle.clone(),
-                    ..default()
-                });
-            });
-        }
+        // let mut to_load = self
+        //     .auto_load_dirs
+        //     .iter()
+        //     .flat_map(|dir_path| {
+        //         if let Ok(dir) = std::fs::read_dir(std::path::Path::new("assets").join(dir_path)) {
+        //             return Some(dir);
+        //         };
+        //         warn!("[lommx ui] - cannot read dir `{dir_path}`");
+        //         None
+        //     })
+        //     .map(|dir| dir.into_iter().flatten())
+        //     .flatten()
+        //     .map(|entry| {
+        //         let name = entry.file_name().to_string_lossy().to_string();
+        //         let path = entry.path();
+        //         let handle: Handle<Template> = app.world().resource::<AssetServer>().load(path);
+        //         (name, handle)
+        //     })
+        //     .collect::<Vec<_>>();
+        //
+        // let mut comp_registry = app.world_mut().resource_mut::<ComponentBindings>();
+        //
+        // for (name, handle) in to_load.drain(..) {
+        //     comp_registry.register(name, move |mut cmd| {
+        //         cmd.insert(HtmlBundle {
+        //             handle: handle.clone(),
+        //             ..default()
+        //         });
+        //     });
+        // }
     }
 }
 

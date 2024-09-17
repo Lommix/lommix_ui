@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		  xsi:noNamespaceSchemaLocation="../schema.xsd">
+
+	<property name="title">Effortless Ui</property>
+	<property name="author">Lommix</property>
+
+	<!-- the root node of each template can define default property values -->
+	<node flex_direction="column">
+		<!-- this is a user defined node `panel` that maps to include a another template -->
+		<panel secondary="#000"
+			   primary="#088"
+			   title="Popup">
+
+			<img align_self="center"
+				 height="200px"
+				 src="bevy_bird_dark.png"/>
+
+			<node justify_content="center"
+				  flex_direction="row">
+				<text font_size="40"> - {title} - </text>
+			</node>
+
+			<panel tag:lol="20px"
+				   primary="#515"
+				   secondary="#315"
+				   title="Foo">
+
+				<text font_size="40"> - {title} - </text>
+				<text font_size="40"> - {title} - </text>
+				<text font_size="40"> - {title} - </text>
+
+			</panel>
+
+			<panel tag:lol="20px"
+				   secondary="#a02"
+				   primary="#401"
+				   title="Foo">
+				<node flex_direction="column">
+					<node justify_content="space_between"
+						  margin="0px 5px">
+						<text>Inventory</text>
+						<text>[ scroll ]</text>
+					</node>
+					<button onspawn="scrollable"
+							tag:scroll_speed="1000"
+							target="inventory"
+							width="420px"
+							height="300px"
+							border_radius="8px"
+							overflow="hidden hidden"
+							border="2px"
+							border_color="#FFF"
+							align_content="center"
+							justify_content="center">
+						<node onspawn="inventory"
+							  id="inventory"
+							  display="grid"
+							  grid_template_columns="(6, auto)"
+							  padding="20px"
+							  column_gap="5px"
+							  row_gap="5px"/>
+					</button>
+				</node>
+			</panel>
+		</panel>
+	</node>
+
+</template>
