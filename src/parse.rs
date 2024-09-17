@@ -395,9 +395,7 @@ fn parse_style<'a>(
         b"border_radius" => map(parse_ui_rect, StyleAttr::BorderRadius)(value)?,
         b"background" => map(parse_color, StyleAttr::Background)(value)?,
         b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
-        rest => {
-
-            dbg!(String::from_utf8_lossy(rest));
+        _ => {
             return Err(nom::Err::Error(nom::error::make_error(
                 ident,
                 nom::error::ErrorKind::NoneOf,

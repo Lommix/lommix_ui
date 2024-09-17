@@ -257,6 +257,7 @@ fn hotreload(
     mut events: EventReader<AssetEvent<Template>>,
     templates: Query<(Entity, &Handle<Template>)>,
     sloted_nodes: Query<(Entity, &InsideSlot)>,
+    scopes: Query<&ScopeEntity>,
 ) {
     events.read().for_each(|ev| {
         let id = match ev {
@@ -279,6 +280,12 @@ fn hotreload(
                     let slot_holder = cmd.spawn_empty().push_children(&slots).id();
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
                 } else {
+                }
+
+                // despawn scope if highest parent
+                // highest node has no scope
+                if scopes.get(entity).is_err() {
+                    cmd.entity(entity).remove::<TemplateState>();
                 }
 
                 cmd.entity(entity)
@@ -325,7 +332,6 @@ pub struct CompileStateEvent;
 
 fn compile_state(
     trigger: Trigger<CompileStateEvent>,
-    // comiple instert self
     mut cmd: Commands,
     mut state: Query<(&mut TemplateState, &StateSubscriber)>,
     scopes: Query<&ScopeEntity>,
@@ -336,12 +342,11 @@ fn compile_state(
     mut styles: Query<(&mut Style, Option<&mut Text>)>,
 ) {
     let entity = trigger.entity();
-    info!("start compiling");
 
+    // ---------------------------------
+    // self compile state holding node
     let mut to_insert = vec![];
     if let Ok(expr) = expressions.get(entity) {
-        info!("self compiling");
-
         // get parent state
         let Some((pstate, _)) = scopes
             .get(entity)
@@ -352,13 +357,12 @@ fn compile_state(
             return;
         };
 
-        info!("found parent");
         expr.iter().for_each(|exp| {
             let Some(Attribute::PropertyDefinition(key, val)) = exp.compile(pstate) else {
                 return;
             };
 
-            info!("compiled prop def {key}");
+            // info!("compiled prop def {key}");
             to_insert.push((key, val));
         });
     }
@@ -369,13 +373,14 @@ fn compile_state(
         });
     });
 
+    // ---------------------------------
+    // compile down
     let Ok((state, subscriber)) = state.get(entity) else {
         return;
     };
 
     for sub in subscriber.iter() {
         if *sub == entity {
-            info!("skip self");
             continue;
         }
 
@@ -383,8 +388,8 @@ fn compile_state(
             // warn!("uncompile node, missing scope, style & expressions");
             return;
         };
-
-        info!("compiling subscriber `{sub}`");
+        // ---------------------------------
+        // expressions
         if let Ok(expressions) = expressions.get(*sub) {
             for attr_tokens in expressions.iter() {
                 if let Some(attr) = attr_tokens.compile(state) {
@@ -397,24 +402,21 @@ fn compile_state(
                         }
                         // can only be another include
                         Attribute::PropertyDefinition(key, val) => {
-                            info!("new prop def: {key}:{val}");
                             cmd.trigger_targets(CompileStateEvent, *sub);
                         }
                         any => {
-                            warn!("unimplemented attribute expression {:?}", any);
                             continue;
                         }
                     }
                 }
             }
         }
+        // ---------------------------------
+        // text content
         if let Some(mut text) = txt {
-            info!("found text");
-
             if let Ok(raw) = textcontent.get(*sub) {
                 text.sections.iter_mut().for_each(|section| {
                     section.value = compile_content(raw, state);
-                    info!("{}, new content: {}", **raw, section.value);
                 });
             } else {
                 warn!("missing template content");
@@ -437,7 +439,7 @@ fn move_children_to_slot(
                 .iter()
                 .find_map(|(slot_ent, slot)| (slot.owner == entity).then_some(slot_ent))
             else {
-                warn!("this node does not have a slot {entity}");
+                // warn!("this node does not have a slot {entity}");
                 return;
             };
 
@@ -456,8 +458,6 @@ fn move_children_to_slot(
                     }
                 })
             });
-
-            info!("filled slot of {entity} successfull");
 
             cmd.entity(entity).remove::<UnslotedChildren>();
             cmd.entity(placeholder_entity).despawn_recursive();
