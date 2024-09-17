@@ -7,6 +7,7 @@
 
 	<!-- the root node of each template can define default property values -->
 	<node flex_direction="column">
+
 		<!-- this is a user defined node `panel` that maps to include a another template -->
 		<panel secondary="#000"
 			   primary="#088"
@@ -21,8 +22,7 @@
 				<text font_size="40"> - {title} - </text>
 			</node>
 
-			<panel tag:lol="20px"
-				   primary="#515"
+			<panel primary="#515"
 				   secondary="#315"
 				   title="Foo">
 

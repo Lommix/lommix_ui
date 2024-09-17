@@ -15,7 +15,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((XmlUiPlugin::default(),))
+        .add_plugins(XmlUiPlugin::new().auto_load("components", "xml"))
         .add_systems(Startup, setup)
         .add_systems(
             Update,

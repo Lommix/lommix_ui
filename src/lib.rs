@@ -1,4 +1,9 @@
-use bevy::prelude::*;
+use std::{
+    hash::{Hash, Hasher},
+    time::Duration,
+};
+
+use bevy::{prelude::*, time::common_conditions::on_timer};
 use build::HtmlBundle;
 use data::Template;
 use prelude::ComponentBindings;
@@ -23,18 +28,22 @@ pub mod prelude {
     pub use crate::XmlUiPlugin;
 }
 
-#[derive(Default)]
+/// @todo: inline docs
+/// look at the examples
+#[derive(Default, Resource, Clone)]
 pub struct XmlUiPlugin {
-    auto_load_dirs: Vec<&'static str>,
-    extension: &'static str,
+    auto_load_dir: Option<&'static str>,
+    extension: Option<&'static str>,
 }
 
 impl XmlUiPlugin {
     pub fn new() -> Self {
         Self::default()
     }
-
-    pub fn auto_load(mut self, path: &str) -> Self {
+    /// auto_load("components","xml")
+    pub fn auto_load(mut self, path: &'static str, ext: &'static str) -> Self {
+        self.extension = Some(ext);
+        self.auto_load_dir = Some(path);
         self
     }
 }
@@ -47,45 +56,83 @@ impl Plugin for XmlUiPlugin {
             bindings::BindingPlugin,
         ));
 
-        // ------------------
-        // auto load dirs
-        // move to system
-        // let mut to_load = self
-        //     .auto_load_dirs
-        //     .iter()
-        //     .flat_map(|dir_path| {
-        //         if let Ok(dir) = std::fs::read_dir(std::path::Path::new("assets").join(dir_path)) {
-        //             return Some(dir);
-        //         };
-        //         warn!("[lommx ui] - cannot read dir `{dir_path}`");
-        //         None
-        //     })
-        //     .map(|dir| dir.into_iter().flatten())
-        //     .flatten()
-        //     .map(|entry| {
-        //         let name = entry.file_name().to_string_lossy().to_string();
-        //         let path = entry.path();
-        //         let handle: Handle<Template> = app.world().resource::<AssetServer>().load(path);
-        //         (name, handle)
-        //     })
-        //     .collect::<Vec<_>>();
-        //
-        // let mut comp_registry = app.world_mut().resource_mut::<ComponentBindings>();
-        //
-        // for (name, handle) in to_load.drain(..) {
-        //     comp_registry.register(name, move |mut cmd| {
-        //         cmd.insert(HtmlBundle {
-        //             handle: handle.clone(),
-        //             ..default()
-        //         });
-        //     });
-        // }
+        app.insert_resource(self.clone());
+
+        #[cfg(debug_assertions)]
+        app.add_systems(
+            First,
+            watch_autolaod_dirs.run_if(on_timer(Duration::from_secs(1))),
+        );
     }
 }
 
-// fn watch_comp_dirs(
-//     plugin_config : Res<Plugin<LommixUiPlugin>>,
-//
-// ){
-//
-// }
+fn watch_autolaod_dirs(
+    config: Res<XmlUiPlugin>,
+    server: Res<AssetServer>,
+    mut comps: ResMut<ComponentBindings>,
+    mut last_checksum: Local<u64>,
+) {
+    let (Some(dir), Some(ext)) = (config.auto_load_dir, config.extension) else {
+        return;
+    };
+
+    let Ok((checksum, paths)) = gen_checksum(dir, ext) else {
+        return;
+    };
+
+    if checksum == *last_checksum {
+        return;
+    }
+
+    for path in paths.iter() {
+        let handle: Handle<Template> = server.load(path);
+        let name = std::path::Path::new(path)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+
+        comps.register(name.to_string(), move |mut cmd| {
+            cmd.insert(HtmlBundle {
+                handle: handle.clone(),
+                ..default()
+            });
+        });
+
+        info!("registered/reloaded component `{name}` at `{path}`");
+    }
+
+    *last_checksum = checksum;
+}
+
+fn gen_checksum(path: &str, allowed_ext: &str) -> Result<(u64, Vec<String>), std::io::Error> {
+    let fullpath = format!("assets/{}", path);
+    let dir = std::fs::read_dir(fullpath)?.flatten();
+
+    let mut paths = vec![];
+    let mut hasher = std::hash::DefaultHasher::default();
+
+    for entry in dir {
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+
+        let is_ext = entry
+            .path()
+            .extension()
+            .map(|s| s.to_str())
+            .flatten()
+            .map(|ext| ext == allowed_ext)
+            .unwrap_or_default();
+
+        if !is_ext {
+            continue;
+        }
+
+        let file_name = entry.file_name().to_string_lossy().to_string();
+
+        file_name.hash(&mut hasher);
+        paths.push(format!("{}/{}", path, file_name));
+    }
+
+    Ok((hasher.finish(), paths))
+}
