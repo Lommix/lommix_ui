@@ -789,6 +789,7 @@ fn parse_val(input: &[u8]) -> IResult<&[u8], Val> {
         multispace0,
         alt((
             map(tag("auto"), |_| Val::Auto),
+            map(tag("0"), |_| Val::Px(0.)),
             map(tuple((float, tag("px"))), |(val, _)| Val::Px(val)),
             map(tuple((float, tag("%"))), |(val, _)| Val::Percent(val)),
             map(tuple((float, tag("vw"))), |(val, _)| Val::Vw(val)),
@@ -978,6 +979,7 @@ mod tests {
     //     assert_eq!(Ok(("".as_bytes(), expected)), result);
     // }
 
+    #[test_case("0", Val::Px(0.))]
     #[test_case("20vw", Val::Vw(20.))]
     #[test_case("20%", Val::Percent(20.))]
     #[test_case("20vh", Val::Vh(20.))]

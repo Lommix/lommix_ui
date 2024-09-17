@@ -3,10 +3,9 @@ name = "lommix_ui"
 authors = ["Lorenz Mielke"]
 version = "0.1.0"
 edition = "2021"
-
-
-[build]
-rustflags = ["--cfg=web_sys_unstable_apis"]
+description = "ui crate for bevy. Xml, hot reload, style dsl"
+keywords = ["bevy", "ui", "xml", "html", "dsl"]
+repository = "https://github.com/Lommix/lommix_ui"
 
 [profile.dev]
 opt-level = 1
@@ -38,3 +37,4 @@ bevy = { version = "0.14", default-features = false, features = [
   "vorbis",
   "png",
 ] }
+rand = "0.8.5"

@@ -18,8 +18,8 @@ mod parse;
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, StyleAttributes, Tag, Tags, TemplateState,
-        UiId, UiTarget,
+        CompileStateEvent, HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity,
+        StyleAttributes, Tag, Tags, TemplateState, UiId, UiTarget,
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;

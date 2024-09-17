@@ -78,7 +78,7 @@ impl AttrTokens {
             return None;
         };
 
-        // recurive compile, why not
+        // recurive compile, what could go wrong
         if let Attribute::Uncompiled(prop) = attr {
             return prop.compile(props);
         };

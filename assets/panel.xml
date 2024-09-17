@@ -7,8 +7,7 @@
 	<property name="secondary">#FFF</property>
 
 	<node justify_content="center"
-		  align_items="center"
-		  padding="20px">
+		  align_items="center">
 		<node flex_direction="column"
 			  width="100%"
 			  min_width="400px"
@@ -28,21 +27,22 @@
 					  hover:font_color="#FFF"
 					  font_size="20">{title} color: {secondary}</text>
 			</button>
-			<node flex_direction="column"
-				  row_gap="20px"
-				  width="100%"
-				  watch="header"
-				  margin="-2px auto auto auto"
-				  height="100%"
-				  padding="10px 10px"
-				  justify_content="center"
+			<node watch="header"
 				  border_color="#FFF"
 				  hover:border_color="#008"
-				  border="2px"
-				  background="{primary}"
-				  border_radius="auto auto 5px 5px"
-				  id="to_collapse">
-				<slot/>
+				  border="4px"
+				  background="{primary}">
+				<node flex_direction="column"
+					  row_gap="20px"
+					  width="100%"
+					  margin="-2px auto auto auto"
+					  height="100%"
+					  padding="20px 10px"
+					  justify_content="center"
+					  border_radius="auto auto 5px 5px"
+					  id="to_collapse">
+					<slot/>
+				</node>
 			</node>
 		</node>
 	</node>

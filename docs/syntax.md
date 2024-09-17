@@ -2,14 +2,14 @@
 
 ## Function bindings
 
-provides basics events for the `Interaction` Component and on `Spawn`.
+Provides basics events for the `Interaction` Component and on `Spawn`.
 
 -   `onspawn="init_friend_list"`
 -   `onenter="play_beep"`
 -   `onpress="start_game"`
 -   `onexit="fade_out"`
 
-in bevy your register your function on startup in the
+In bevy your register your function on startup in the
 
 ```rust
 fn setup(
@@ -26,7 +26,7 @@ fn setup(
 
 ## Register a custom node
 
-if autoloading from files is not enough, you need more control over the bundle
+If auto loading from files is not enough, you need more control over the bundle
 
 ```rust
 fn setup(
@@ -50,7 +50,7 @@ fn setup(
 
 ## Default elements
 
-default elements with events/special attributes.
+Default elements with events/special attributes.
 
 -   `<node>` : `NodeBundle`
     -   `onspawn=".."`,
@@ -71,7 +71,7 @@ default elements with events/special attributes.
 
 ## Conditional Styles
 
-apply on condition, for elements using the `Interaction` Component like buttons.
+Apply on condition, for elements using the `Interaction` Component like buttons.
 
 -   `hover:background_color="#665"`
 -   `pressed:background_color="#666"`

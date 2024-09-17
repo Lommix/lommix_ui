@@ -1,9 +1,4 @@
-use std::f32::consts::PI;
-
-use bevy::{
-    ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*, ui::FocusPolicy,
-    window::WindowResolution,
-};
+use bevy::{ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*};
 use lommix_ui::prelude::*;
 
 fn main() {
@@ -55,6 +50,29 @@ fn setup(
             cmd.entity(entity).insert(Collapse(true));
         }),
     );
+
+    function_bindings.register(
+        "debug",
+        cmd.register_one_shot_system(
+            |In(entity),
+             mut cmd: Commands,
+             mut state: Query<&mut TemplateState>,
+             scopes: Query<&ScopeEntity>| {
+                let Ok(scope) = scopes.get(entity) else {
+                    return;
+                };
+
+                let Ok(mut state) = state.get_mut(**scope) else {
+                    return;
+                };
+
+                let rng = rand::random::<u32>();
+                info!("{rng}");
+                state.set_prop("title", format!("{}", rng));
+                cmd.trigger_targets(CompileStateEvent, **scope);
+            },
+        ),
+    );
 }
 
 fn update_collapse(
@@ -68,7 +86,6 @@ fn update_collapse(
                 return;
             };
 
-            info!("collapsing {}", target.0);
             let display = match **collapse {
                 true => {
                     **collapse = false;
@@ -81,7 +98,6 @@ fn update_collapse(
             };
 
             if let Ok(mut style) = style.get_mut(**target) {
-                info!("change style");
                 style.display = display;
             }
         });
@@ -96,12 +112,10 @@ fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>
     let speed = tags
         .get(entity)
         .ok()
-        .map(|tags| {
+        .and_then(|tags| {
             tags.get_tag("scroll_speed")
-                .map(|fstr| fstr.parse::<f32>().ok())
-                .flatten()
+                .and_then(|fstr| fstr.parse::<f32>().ok())
         })
-        .flatten()
         .unwrap_or(10.);
 
     cmd.entity(entity).insert(Scrollable { speed, offset: 0. });
@@ -163,8 +177,7 @@ fn play_beep(
     let Some(path) = tags
         .get(entity)
         .ok()
-        .map(|t| t.get_tag("source").map(|s| s.to_string()))
-        .flatten()
+        .and_then(|t| t.get_tag("source").map(|s| s.to_string()))
     else {
         return;
     };

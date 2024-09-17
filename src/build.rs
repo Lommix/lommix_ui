@@ -14,21 +14,17 @@ impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<TemplateState>();
 
-        app.add_event::<CompileNodeEvent>();
+        app.add_event::<CompileStateEvent>();
         app.add_systems(
             Update,
             (
                 (hotreload, spawn_ui, move_children_to_slot, style_ui).chain(),
                 update_interaction,
-                on_state_change,
             ),
         );
-        app.observe(compile_node);
+        app.observe(compile_state);
     }
 }
-
-#[derive(Event)]
-pub struct CompileNodeEvent;
 
 #[derive(Component, Clone, Deref, DerefMut, Copy)]
 pub struct ScopeEntity(Entity);
@@ -83,11 +79,16 @@ pub struct UnslotedChildren(Entity);
 pub struct InteractionObverser(Vec<Entity>);
 
 // map to vtable one day
-#[derive(Component)]
+#[derive(Component, Deref, DerefMut)]
 pub struct TemplateExpresions(Vec<AttrTokens>);
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Tags(Vec<Tag>);
+
+/// @todo:refactor, currently cloning each nodes
+/// text template as component
+#[derive(Component, Deref, DerefMut)]
+pub struct RawContent(String);
 
 impl Tags {
     pub fn get_tag(&self, key: &str) -> Option<&str> {
@@ -269,24 +270,15 @@ fn hotreload(
             .iter()
             .filter(|(_, handle)| handle.id() == *id)
             .for_each(|(entity, _)| {
-                // let slots = find_sloted_children(entity, &children, &sloted_nodes, &templates);
-
-                info!("found slots: {}", sloted_nodes.iter().count());
-
-                // same include children are also replaced!!!
                 let slots = sloted_nodes
                     .iter()
                     .flat_map(|(slot_entity, slot)| (slot.owner == entity).then_some(slot_entity))
                     .collect::<Vec<_>>();
 
-                // check if there are already children in queue!
-
                 if slots.len() > 0 {
                     let slot_holder = cmd.spawn_empty().push_children(&slots).id();
-                    info!("preserving {} children for {entity}", slots.len());
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
                 } else {
-                    info!("no children found");
                 }
 
                 cmd.entity(entity)
@@ -324,57 +316,110 @@ fn style_ui(
                 any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
             });
             cmd.entity(entity).remove::<UnstyledTag>();
-            cmd.trigger_targets(CompileNodeEvent, entity);
+            // cmd.trigger_targets(CompileNodeEvent, entity);
         });
 }
 
-fn on_state_change(
-    mut cmd: Commands,
-    state_changes: Query<&StateSubscriber, Changed<TemplateState>>,
-) {
-    state_changes.iter().for_each(|subs| {
-        subs.iter().for_each(|e| {
-            cmd.trigger_targets(CompileNodeEvent, *e);
-        })
-    });
-}
+#[derive(Event)]
+pub struct CompileStateEvent;
 
-fn compile_node(
-    trigger: Trigger<CompileNodeEvent>,
-    state: Query<&TemplateState>,
-    server: Res<AssetServer>,
+fn compile_state(
+    trigger: Trigger<CompileStateEvent>,
+    // comiple instert self
     mut cmd: Commands,
-    mut vars: Query<(
-        &TemplateExpresions,
-        &ScopeEntity,
-        &mut Style,
-        Option<&mut Text>,
-    )>,
+    mut state: Query<(&mut TemplateState, &StateSubscriber)>,
+    scopes: Query<&ScopeEntity>,
+    textcontent: Query<&RawContent>,
+    expressions: Query<&TemplateExpresions>,
+    server: Res<AssetServer>,
+    // diff scope, but sub?
+    mut styles: Query<(&mut Style, Option<&mut Text>)>,
 ) {
     let entity = trigger.entity();
-    let Ok((expressions, scope, mut style, mut txt)) = vars.get_mut(entity) else {
-        // warn!("uncompile node, missing scope, style & expressions");
+    info!("start compiling");
+
+    let mut to_insert = vec![];
+    if let Ok(expr) = expressions.get(entity) {
+        info!("self compiling");
+
+        // get parent state
+        let Some((pstate, _)) = scopes
+            .get(entity)
+            .ok()
+            .map(|scope| state.get(**scope).ok())
+            .flatten()
+        else {
+            return;
+        };
+
+        info!("found parent");
+        expr.iter().for_each(|exp| {
+            let Some(Attribute::PropertyDefinition(key, val)) = exp.compile(pstate) else {
+                return;
+            };
+
+            info!("compiled prop def {key}");
+            to_insert.push((key, val));
+        });
+    }
+
+    to_insert.drain(..).for_each(|(key, val)| {
+        state.get_mut(entity).map(|(mut state, _)| {
+            state.set_prop(&key, val);
+        });
+    });
+
+    let Ok((state, subscriber)) = state.get(entity) else {
         return;
     };
 
-    let Ok(state) = state.get(**scope) else {
-        return;
-    };
-    for attr_tokens in expressions.0.iter() {
-        if let Some(attr) = attr_tokens.compile(state) {
-            match attr {
-                Attribute::Style(style_attr) => {
-                    style_attr.apply(entity, &mut cmd, &mut style, &mut txt, &server);
-                }
-                Attribute::Action(action) => {
-                    action.self_insert(cmd.entity(entity));
-                }
-                any => {
-                    warn!("unimplemented attribute expression {:?}", any);
-                    continue;
+    for sub in subscriber.iter() {
+        if *sub == entity {
+            info!("skip self");
+            continue;
+        }
+
+        let Ok((mut style, mut txt)) = styles.get_mut(*sub) else {
+            // warn!("uncompile node, missing scope, style & expressions");
+            return;
+        };
+
+        info!("compiling subscriber `{sub}`");
+        if let Ok(expressions) = expressions.get(*sub) {
+            for attr_tokens in expressions.iter() {
+                if let Some(attr) = attr_tokens.compile(state) {
+                    match attr {
+                        Attribute::Style(style_attr) => {
+                            style_attr.apply(entity, &mut cmd, &mut style, &mut txt, &server);
+                        }
+                        Attribute::Action(action) => {
+                            action.self_insert(cmd.entity(entity));
+                        }
+                        // can only be another include
+                        Attribute::PropertyDefinition(key, val) => {
+                            info!("new prop def: {key}:{val}");
+                            cmd.trigger_targets(CompileStateEvent, *sub);
+                        }
+                        any => {
+                            warn!("unimplemented attribute expression {:?}", any);
+                            continue;
+                        }
+                    }
                 }
             }
         }
+        if let Some(mut text) = txt {
+            info!("found text");
+
+            if let Ok(raw) = textcontent.get(*sub) {
+                text.sections.iter_mut().for_each(|section| {
+                    section.value = compile_content(raw, state);
+                    info!("{}, new content: {}", **raw, section.value);
+                });
+            } else {
+                warn!("missing template content");
+            }
+        };
     }
 }
 
@@ -498,6 +543,8 @@ fn spawn_ui(
             cmd.entity(root_entity)
                 .insert(subscriber)
                 .remove::<UnbuildTag>();
+
+            cmd.trigger_targets(CompileStateEvent, root_entity);
         });
 }
 
@@ -517,12 +564,7 @@ fn build_node(
     state_subscriber: &mut StateSubscriber,
 ) {
     if depth > 0 {
-        match &node.node_type {
-            NodeType::Include | NodeType::Custom(_) => (),
-            _ => {
-                cmd.entity(entity).insert(scope.clone());
-            }
-        }
+        cmd.entity(entity).insert(scope.clone());
     }
 
     if node.uncompiled.len() > 0 {
@@ -597,6 +639,18 @@ fn build_node(
                 .as_ref()
                 .map(|str| compile_content(str, state))
                 .unwrap_or_default();
+
+            // @todo: double check bad, refactor
+            if node
+                .content
+                .as_ref()
+                .map(|s| is_templated(s.as_str()))
+                .unwrap_or_default()
+            {
+                cmd.entity(entity)
+                    .insert(RawContent(node.content.clone().unwrap_or_default()));
+                state_subscriber.push(entity);
+            }
 
             cmd.entity(entity).insert((
                 Name::new("Text"),
@@ -712,6 +766,15 @@ fn build_node(
 
         cmd.entity(entity).add_child(child);
     }
+}
+
+pub fn is_templated(input: &str) -> bool {
+    let parts: Result<(&str, (&str, &str)), nom::Err<nom::error::Error<&str>>> = tuple((
+        take_until("{"),
+        delimited(tag("{"), preceded(multispace0, is_not("}")), tag("}")),
+    ))(input);
+
+    parts.is_ok()
 }
 
 pub(crate) fn compile_content(input: &str, defs: &TemplateState) -> String {

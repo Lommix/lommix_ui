@@ -1,7 +1,7 @@
 # Bevy Xml Ui
 
 `Xml` ui syntax parser & builder. Create reusable component
-templates in plain `Xml`. Enjoy hotreloading, autocomplete, formatting and linting (schema.xsd).
+templates in plain `Xml`. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
 
 Because there is nothing worse than waiting on compilation.
 
@@ -15,13 +15,13 @@ Because there is nothing worse than waiting on compilation.
 
 ## How To
 
-Add the plugin. Use an optional autload path (filename = componentname).
+Add the plugin. Use an optional auto load path (filename = component name).
 
 ```rust
 app.add_plugins(XmlUiPlugin::new().auto_load("components"));
 ```
 
-create components.
+Create components.
 
 ```html
 <!-- /assets/components/super_button.xml-->
@@ -49,7 +49,8 @@ create components.
 </template>
 ```
 
-use the component
+Component auto registers into your running app.
+Use them in the next template.
 
 ```html
 <!-- menu.xml -->
@@ -66,18 +67,24 @@ use the component
 </template>
 ```
 
-in your menu system
+How to load your UI root:
 
 ```rust
-cmd.spawn(HtmlBundle {
-    handle: server.load("menu.xml"),
-    state: TemplateState::new()
-        .with("title", "My actual translated title"))
-    ..default()
-});
+fn setup(
+    mut cmd: Commands,
+    server: Res<AssetServer>,
+) {
+    cmd.spawn(Camera2dBundle::default());
+    cmd.spawn(HtmlBundle {
+        handle: server.load("menu.xml"),
+        state: TemplateState::new()
+            .with("title", "My actual translated title"))
+        ..default()
+    });
+}
 ```
 
-checkout the examples for advanced interactions.
+Checkout the examples for advanced interactions.
 
 ## Syntax
 
@@ -85,7 +92,7 @@ checkout the examples for advanced interactions.
 
 [checkout the full syntax here](docs/syntax.md)
 
-## Autocomplete & Formating & Linting
+## Autocomplete & Formatting & Linting
 
 not perfect, but getting there. Checkout the example on how to use the provided
 schema.xsd. Feel free to extend it to your needs.
@@ -94,7 +101,7 @@ schema.xsd. Feel free to extend it to your needs.
 
 ## Goal
 
-The goal is to provide a very thin layer of ui syntax abstraction for seamless and fast iteration on your design.
+The goal is to provide a very thin layer of UI syntax abstraction for seamless and fast iteration on your design.
 
 ## Why Xml/Html(-like)
 
@@ -104,3 +111,8 @@ To make us of existing tooling like syntax highlights, auto format, basic lintin
 
 Animations and transitions, just like in bevy, are application level. There will probably be
 some defaults behind features at some point.
+
+## Known limitations
+
+-   Do not recursive import. [WIP]
+-   One root node per component.

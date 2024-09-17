@@ -6,13 +6,13 @@
 	<property name="author">Lommix</property>
 
 	<!-- the root node of each template can define default property values -->
-	<node flex_direction="column">
+	<node flex_direction="column"
+		  padding="40px">
 
 		<!-- this is a user defined node `panel` that maps to include a another template -->
 		<panel secondary="#000"
 			   primary="#088"
-			   title="Popup">
-
+			   title="{title}">
 			<img align_self="center"
 				 height="200px"
 				 src="bevy_bird_dark.png"/>
@@ -26,18 +26,29 @@
 				   secondary="#315"
 				   title="Foo">
 
-				<text font_size="40"> - {title} - </text>
-				<text font_size="40"> - {title} - </text>
-				<text font_size="40"> - {title} - </text>
+				<node align_items="center"
+					  flex_direction="columns">
+					<text font_size="40"> - {title} - </text>
+					<text font_size="40"> - {title} - </text>
+					<text font_size="40"> - {title} - </text>
+				</node>
 
 			</panel>
 
-			<panel tag:lol="20px"
-				   secondary="#a02"
+			<button background="#000"
+					hover:background="#555"
+					pressed:background="#055"
+					padding="10px"
+					onpress="debug">
+				<text align_self="center">Change Title</text>
+			</button>
+
+			<panel secondary="#a02"
 				   primary="#401"
 				   title="Foo">
 				<node flex_direction="column">
 					<node justify_content="space_between"
+						  padding="0 4px"
 						  margin="0px 5px">
 						<text>Inventory</text>
 						<text>[ scroll ]</text>
@@ -47,18 +58,15 @@
 							target="inventory"
 							width="420px"
 							height="300px"
-							border_radius="8px"
 							overflow="hidden hidden"
-							border="2px"
-							border_color="#FFF"
 							align_content="center"
 							justify_content="center">
 						<node onspawn="inventory"
 							  id="inventory"
 							  display="grid"
 							  grid_template_columns="(6, auto)"
-							  padding="20px"
-							  column_gap="5px"
+							  padding="10px"
+							  column_gap="7px"
 							  row_gap="5px"/>
 					</button>
 				</node>
