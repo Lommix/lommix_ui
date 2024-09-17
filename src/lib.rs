@@ -14,8 +14,6 @@ mod data;
 mod error;
 mod load;
 mod parse;
-mod state;
-// mod lexer;
 
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};

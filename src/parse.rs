@@ -26,12 +26,6 @@ use nom::{
     IResult,
 };
 
-
-pub fn parse_bytes_xml(input: &[u8]) -> Result<Xml, ParseError> {
-    let (_, node) = parse_xml_node(input)?;
-    Ok(node)
-}
-
 struct XmlAttr<'a> {
     prefix: Option<&'a [u8]>,
     key: &'a [u8],
@@ -51,7 +45,7 @@ impl std::fmt::Debug for XmlAttr<'_> {
 }
 
 pub(crate) fn parse_template(input: &[u8]) -> Result<Template, ParseError> {
-    let (input, h) = trim_comments(input)?;
+    let (input, _) = trim_comments(input)?;
     let (input, _xml_header) = alt((
         delimited(tag("<?"), take_until("?>"), tag("?>")).map(Some),
         |i| Ok((i, None)),
@@ -229,12 +223,8 @@ fn parse_xml_node(input: &[u8]) -> IResult<&[u8], Xml> {
 }
 
 fn parse_xml_end(input: &[u8]) -> IResult<&[u8], (Option<&[u8]>, &[u8])> {
-    let (input, (_, prefix, end_tag, _)) = tuple((
-        tag("</"),
-        parse_prefix0,
-        take_while1(|c: u8| c.is_ascii_alphabetic()),
-        tag(">"),
-    ))(input)?;
+    let (input, (_, prefix, end_tag, _)) =
+        tuple((tag("</"), parse_prefix0, take_snake, tag(">")))(input)?;
 
     Ok((input, (prefix, end_tag)))
 }
@@ -249,7 +239,6 @@ fn parse_xml_attr(input: &[u8]) -> IResult<&[u8], Vec<XmlAttr>> {
         |(prefix, key, value)| XmlAttr { prefix, key, value },
     ))(input)
 }
-
 
 fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (input, trimmed) = nom::character::complete::multispace0(input)?;
@@ -276,44 +265,6 @@ fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
             NodeType::Custom(custom)
         }),
     ))(input)
-}
-
-// true: empty tag
-fn parse_start_tag(input: &[u8]) -> IResult<&[u8], (&[u8], Vec<Attribute>, bool)> {
-    let (input, (_, element_tag, attributes, _, is_empty)) = tuple((
-        tag("<"),
-        take_while1(|c: u8| c.is_ascii_alphabetic()),
-        many0(parse_attribute),
-        multispace0,
-        alt((map(tag("/>"), |_| true), map(tag(">"), |_| false))),
-    ))(input)?;
-
-    Ok((input, (element_tag, attributes, is_empty)))
-}
-
-fn parse_end_tag(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    let (input, (_, end_tag, _)) = tuple((
-        tag("</"),
-        take_while1(|c: u8| c.is_ascii_alphabetic()),
-        tag(">"),
-    ))(input)?;
-
-    Ok((input, end_tag))
-}
-
-fn parse_content(input: &[u8]) -> IResult<&[u8], &str> {
-    // -------------
-    // trim comments -> to string
-    let (input, content) = map_res(take_while(|c: u8| c != b'>' && c != b'<'), |c| {
-        std::str::from_utf8(c)
-    })(input)?;
-
-    Ok((input, content.trim().trim_end()))
-}
-
-enum ValueType<'a> {
-    Prop(&'a [u8]),
-    Literal(&'a [u8]),
 }
 
 fn parse_prop_var<'a>(
@@ -385,83 +336,6 @@ pub(crate) fn attribute_from_parts<'a>(
     };
 
     Ok((b"", attribute))
-}
-
-//----------------------
-//depricated
-pub(crate) fn parse_attribute(input: &[u8]) -> IResult<&[u8], Attribute> {
-    let (input, (_, prefix, ident, _, value)) = tuple((
-        trim_comments,
-        parse_prefix0,
-        is_not("="),
-        tag("="),
-        alt((
-            map(delimited(tag("\"{"), is_not("}"), tag("}\"")), |v| {
-                ValueType::Prop(v)
-            }),
-            map(delimited(tag("{"), is_not("}"), tag("}")), |v| {
-                ValueType::Prop(v)
-            }),
-            map(delimited(tag("\""), is_not("\""), tag("\"")), |v| {
-                ValueType::Literal(v)
-            }),
-            map(take_while1(|b: u8| !b.is_ascii_whitespace()), |v| {
-                ValueType::Literal(v)
-            }),
-        )),
-    ))(input)?;
-
-    let value = match value {
-        ValueType::Prop(val) => {
-            return Ok((
-                input,
-                Attribute::Uncompiled(AttrTokens {
-                    prefix: prefix.map(|p| String::from_utf8_lossy(p).to_string()),
-                    ident: String::from_utf8_lossy(ident).to_string(),
-                    key: String::from_utf8_lossy(val).to_string(),
-                }),
-            ));
-        }
-        ValueType::Literal(val) => val,
-    };
-
-    match prefix {
-        Some(b"tag") => {
-            let (_, prop_ident) = as_string(ident)?;
-            let (_, prop_value) = as_string(value)?;
-            return Ok((input, Attribute::Tag(prop_ident, prop_value)));
-        }
-        Some(b"prop") => {
-            let (_, prop_ident) = as_string(ident)?;
-            let (_, prop_value) = as_string(value)?;
-            return Ok((input, Attribute::PropertyDefinition(prop_ident, prop_value)));
-        }
-        _ => (),
-    };
-
-    let attribute = match ident {
-        b"id" => Attribute::Id(as_string(value).map(|(_, hash)| hash)?),
-        b"target" => Attribute::Target(as_string(value).map(|(_, hash)| hash)?),
-        b"src" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
-        b"onexit" => Attribute::Action(Action::OnExit(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        b"onenter" => Attribute::Action(Action::OnEnter(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        b"onpress" => Attribute::Action(Action::OnPress(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        b"onspawn" => Attribute::Action(Action::OnSpawn(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        ident => {
-            let (_, style) = parse_style(prefix, ident, value)?;
-            Attribute::Style(style)
-        }
-    };
-
-    Ok((input, attribute))
 }
 
 #[rustfmt::skip]
@@ -1091,18 +965,18 @@ mod tests {
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
-    #[test_case(r#"font_size="20""#, Attribute::Style(StyleAttr::FontSize(20.)))]
-    #[test_case(r#"prop:myvar="test""#, Attribute::PropertyDefinition("myvar".into(), "test".into()))]
-    #[test_case(r#"onenter="test_enter""#, Attribute::Action(Action::OnEnter(vec!["test_enter".to_string()])))]
-    #[test_case(r#"onspawn="init_inventory""#, Attribute::Action(Action::OnSpawn(vec!["init_inventory".to_string()])))]
-    #[test_case(r#"onpress="test,test_50,test o""#, Attribute::Action(Action::OnPress(vec!["test".to_string(),"test_50".to_string(), "test o".to_string()])))]
-    #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
-    #[test_case(r#"height="{my_var}""#, Attribute::Uncompiled( AttrTokens{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
-    #[test_case(r#"font_size="{test_that}""#, Attribute::Uncompiled( AttrTokens{ key: "test_that".into(),prefix: None, ident: "font_size".into() }))]
-    fn test_parse_attribute(input: &str, expected: Attribute) {
-        let result = parse_attribute(input.as_bytes());
-        assert_eq!(Ok(("".as_bytes(), expected)), result);
-    }
+    // #[test_case(r#"font_size="20""#, Attribute::Style(StyleAttr::FontSize(20.)))]
+    // #[test_case(r#"prop:myvar="test""#, Attribute::PropertyDefinition("myvar".into(), "test".into()))]
+    // #[test_case(r#"onenter="test_enter""#, Attribute::Action(Action::OnEnter(vec!["test_enter".to_string()])))]
+    // #[test_case(r#"onspawn="init_inventory""#, Attribute::Action(Action::OnSpawn(vec!["init_inventory".to_string()])))]
+    // #[test_case(r#"onpress="test,test_50,test o""#, Attribute::Action(Action::OnPress(vec!["test".to_string(),"test_50".to_string(), "test o".to_string()])))]
+    // #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
+    // #[test_case(r#"height="{my_var}""#, Attribute::Uncompiled( AttrTokens{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
+    // #[test_case(r#"font_size="{test_that}""#, Attribute::Uncompiled( AttrTokens{ key: "test_that".into(),prefix: None, ident: "font_size".into() }))]
+    // fn test_parse_attribute(input: &str, expected: Attribute) {
+    //     let result = parse_attribute(input.as_bytes());
+    //     assert_eq!(Ok(("".as_bytes(), expected)), result);
+    // }
 
     #[test_case("20vw", Val::Vw(20.))]
     #[test_case("20%", Val::Percent(20.))]
@@ -1159,24 +1033,14 @@ mod tests {
     #[test_case(r#"  <!-- hello <tag/> <""/>world -->    ok"#, "ok")]
     #[test_case("   <!-- hello world -->    ok", "ok")]
     fn test_comments(input: &str, expected: &str) {
-        let (remaining, trimmed) = trim_comments(&input.as_bytes()).unwrap();
+        let (remaining, _trimmed) = trim_comments(&input.as_bytes()).unwrap();
         assert_eq!(std::str::from_utf8(remaining).unwrap(), expected);
     }
 
-    #[test_case("./assets/card.html")]
-    #[test_case("./assets/panel.html")]
-    #[test_case("./assets/menu.html")]
-    #[test_case("./assets/button.html")]
-    fn parse_file(file_path: &str) {
-        let input = std::fs::read_to_string(file_path).unwrap();
-        let node = parse_bytes_xml(input.as_bytes()).unwrap();
-        // dbg!(node);
-        // let = parse_xml_node
-    }
     #[test_case(r#"    pressed:background="fsdfsf"  pressed:background="fsdfsf"  <!-- test -->    pressed:background="fsdfsf" \n"#)]
     #[test_case(r#"pressed:background="fsdfsf"#)]
     fn test_parse_xml_attr(input: &str) {
-        let (_, attr) = parse_xml_attr(input.as_bytes())
+        let (_, _attr) = parse_xml_attr(input.as_bytes())
             .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
             .unwrap();
 
@@ -1189,16 +1053,16 @@ mod tests {
     #[test_case(r#"<property name="press"><property name="press"></property></property>"#)]
     #[test_case(
         r#"
-    <template>
+    <my_template>
         <name>test</name>
         <property this="press">test</property>
         <property this="press">test</property>
         <node></node>
-    </template>
+    </my_template>
     "#
     )]
     fn test_parse_xml_node(input: &str) {
-        let (_, xml) = parse_xml_node(input.as_bytes())
+        let (_, _xml) = parse_xml_node(input.as_bytes())
             .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
             .unwrap();
 
@@ -1211,7 +1075,7 @@ mod tests {
     #[test_case("./assets/card.xml")]
     fn test_parse_template_full(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
-        let template = parse_template(input.as_bytes()).unwrap();
+        let _template = parse_template(input.as_bytes()).unwrap();
         // dbg!(&template);
     }
 

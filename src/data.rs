@@ -1,4 +1,3 @@
-use crate::parse::parse_attribute;
 use crate::prelude::*;
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
@@ -67,14 +66,11 @@ impl AttrTokens {
             return None;
         };
 
-        let prefix = self
-            .prefix
-            .as_ref()
-            .map(|p| format!("{}:", p))
-            .unwrap_or_default();
-
-        let attribute_string = format!(r#"{}{}="{}""#, prefix, self.ident, prop_val);
-        let Ok((_, attr)) = parse_attribute(attribute_string.as_bytes()) else {
+        let Ok((_, attr)) = crate::parse::attribute_from_parts(
+            self.prefix.as_ref().map(|s| s.as_bytes()),
+            self.ident.as_bytes(),
+            prop_val.as_bytes(),
+        ) else {
             warn!(
                 "failed to parse property key: `{}` val:`{}`",
                 self.key, prop_val
@@ -98,7 +94,6 @@ pub enum Action {
     OnExit(Vec<String>),
     OnSpawn(Vec<String>),
 }
-
 impl Action {
     pub fn self_insert(self, mut cmd: EntityCommands) {
         match self {
@@ -116,13 +111,6 @@ impl Action {
             }
         }
     }
-}
-
-//@todo: - adding adding cascades
-#[derive(Debug)]
-pub enum Value<T> {
-    Value(T),
-    Inherit,
 }
 
 #[derive(Debug, PartialEq, Clone)]
