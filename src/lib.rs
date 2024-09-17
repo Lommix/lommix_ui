@@ -20,16 +20,26 @@ pub mod prelude {
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
-    pub use crate::LommixUiPlugin;
+    pub use crate::XmlUiPlugin;
 }
 
 #[derive(Default)]
-pub struct LommixUiPlugin {
+pub struct XmlUiPlugin {
     auto_load_dirs: Vec<&'static str>,
     extension: &'static str,
 }
 
-impl Plugin for LommixUiPlugin {
+impl XmlUiPlugin {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn auto_load(mut self, path: &str) -> Self {
+        self
+    }
+}
+
+impl Plugin for XmlUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             load::LoaderPlugin,

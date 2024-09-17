@@ -1,105 +1,106 @@
-# Bevy Html Ui
+# Bevy Xml Ui
 
-`html/Xml`-like bevy ui parser. First class support for hotreloading, custom nodes
-and Templating.
+`Xml` ui syntax parser & builder. Create reusable component
+templates in plain `Xml`. Enjoy hotreloading, autocomplete, formatting and linting (schema.xsd).
 
-This is a [MVP]. Expect alot of change.
+Because there is nothing worse than waiting on compilation.
 
 ## Featuring
 
--   Hotreload, iteratate fast.
+-   A style attribute for each use. `padding="10px auto 5% 60vw"` -> `Uirect`
+-   Hook into events with `onspawn`,`onenter`,`onexit`,`onpress`
 -   Conditional styling with prefix like `hover:..` & `pressed:..`
--   Component Templates with `<include>`
--   Event Hooks that bind to your `OneShotSystems`: `onpress="fn_id"` or `onspawn="init_item_preview"`
--   Add Custom tags for custom logic `tag:scroll_speed="20"` .. `Query<&Tags>`
--   `Properties`. Expose and inject your Values. `<item_card prop:bg="{item_rarity_color}" ..`
--   Very little dependecies. Minimal designed. No Widgets. Just the tools to make your own.
+-   Use `id`, `target` to connect elements and have access in bevy systems.
+-   `watch="target_id"` to hook to other elements interactions.
 
-## Example
+## How To
 
-you write html, you get bevy ui. hotreload, happy dev noises.
+Add the plugin. Use an optional autload path (filename = componentname).
+
+```rust
+app.add_plugins(XmlUiPlugin::new().auto_load("components"));
+```
+
+create components.
 
 ```html
-<div padding="10px">
-    <button
-        padding="5px"
-        hover:background="#0000FF"
-        background="#000000"
-        height="80px"
-        width="210px"
-        on:press="start_game"
-        border="10px"
-        border_color="#FFF"
-        border_radius="30px"
-    >
-        <text font_size="20" font_color="#FFF">click me</text>
-    </button>
-</div>
+<!-- /assets/components/super_button.xml-->
+<template>
+    <property name="text">Press me</property>
+    <property name="primary">#123</property>
+    <property name="secondary">#503</property>
+    <node padding="10px">
+        <button
+            id="button"
+            padding="5px"
+            background="{primary}"
+            border_color="{primary}"
+            hover:background="{secondary}"
+            hover:border_color="{secondary}"
+            height="80px"
+            width="210px"
+            border="10px"
+            border_radius="30px"
+            on:press="start_game"
+        >
+            <text watch="button" font_size="20" font_color="#FFF" hover:font_color="#752">{text}</text>
+        </button>
+    </node>
+</template>
 ```
+
+use the component
+
+```html
+<!-- menu.xml -->
+<template>
+    <property name="title">My Game</property>
+    ...
+    <node display="grid" grid_template_columns="(2, auto)">
+        <super_button text="Start Game" press="start_game" />
+        <super_button text="Settings" press="to_settings" />
+        <super_button text="Credits" press="to_credits" />
+        <super_button text="Exit" press="quit_game" />
+    </node>
+    ...
+</template>
+```
+
+in your menu system
+
+```rust
+cmd.spawn(HtmlBundle {
+    handle: server.load("menu.xml"),
+    state: TemplateState::new()
+        .with("title", "My actual translated title"))
+    ..default()
+});
+```
+
+checkout the examples for advanced interactions.
 
 ## Syntax
 
-`snake_case` all the way. Take any BeVy naming, make it `snake_case`, you found your value.
+`snake_case` all the way. Take any Bevy naming, make it `snake_case`, you found your value.
 
 [checkout the full syntax here](docs/syntax.md)
 
-## Customize
+## Autocomplete & Formating & Linting
 
-Add your own conmponent templates. `UiTarget` and `UiId` Components are resolved on build to contain the
-Entities of the corresponding element. With this, you can shape any custom logic and make it reuseable.
+not perfect, but getting there. Checkout the example on how to use the provided
+schema.xsd. Feel free to extend it to your needs.
 
-Any `tag:my_tag` gets added as `Tags` Component to the node entity.
-
-`id` and `target` are always local to the file and do not propagate to other templates (slots work).
-
-```html
-<!-- menu.html -->
-<my_panel>
-    <text>Hello Worl</text>
-</my_panel color="#000" close_button_text="X">
-```
-
-```html
-<!-- panel.html -->
-<node background_color="{color}" >
-    <button on_spawn="init_collapse" target="preview" tag:collapse_speed="20">
-        <text>{close_button_text}</text>
-    </button>
-
-    <node id="preview">
-        <slot />
-    </node>
-</nonde>
-```
-
-```rust
-fn setup(
-    server: Res<AssetServer>,
-    mut custom_comps: ResMut<ComponenRegistry>,
-) {
-    let panel_handle = server.load("panel.html");
-    custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert((HtmlBundle {
-            handle: panel_handle.clone(),
-            ..default()
-        },));
-    });
-}
-```
+[schema.xsd](schema.xsd)
 
 ## Goal
 
 The goal is to provide a very thin layer of ui syntax abstraction for seamless and fast iteration on your design.
 
-## Why Html (-like)
+## Why Xml/Html(-like)
 
-To make us of existing tooling like syntax highlights, auto format and basic linting. T
+To make us of existing tooling like syntax highlights, auto format, basic linting and even autocomplete.
 
 ## Animations & Transitions
 
 Animations and transitions, just like in bevy, are application level. There will probably be
 some defaults behind features at some point.
-
-## Errors
-
-They are messy, parser rewrite soon.

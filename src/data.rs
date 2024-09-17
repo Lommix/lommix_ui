@@ -153,6 +153,8 @@ pub enum StyleAttr {
     // ------------
     // border
     Border(UiRect),
+    BorderColor(Color),
+    BorderRadius(UiRect),
 
     // ------------
     // flex
@@ -184,8 +186,6 @@ pub enum StyleAttr {
     // -----
     // color
     Background(Color),
-    BorderColor(Color),
-    BorderRadius(UiRect),
 
     // -----
     Hover(Box<StyleAttr>),
