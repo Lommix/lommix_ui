@@ -22,6 +22,8 @@
 				<text font_size="40"> - {title} - </text>
 			</node>
 
+			<!-- <itemcard source="bevy_bird_dark.png"> </itemcard> -->
+
 			<panel primary="#515"
 				   secondary="#315"
 				   title="Foo">

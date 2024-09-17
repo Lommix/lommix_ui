@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
-	<property name="src">greet</property>
+	<property name="source">greet</property>
 	<node width="100px"
 		  height="100px"
 		  background="#660">
 
-		<text>helloworld</text>
+		<img src="{source}"/>
+		<slot/>
 	</node>
 </template>

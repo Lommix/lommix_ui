@@ -282,12 +282,6 @@ fn hotreload(
                 } else {
                 }
 
-                // despawn scope if highest parent
-                // highest node has no scope
-                if scopes.get(entity).is_err() {
-                    cmd.entity(entity).remove::<TemplateState>();
-                }
-
                 cmd.entity(entity)
                     .despawn_descendants()
                     .retain::<KeepComps>()
@@ -323,7 +317,6 @@ fn style_ui(
                 any => any.apply(entity, &mut cmd, &mut style, &mut maybe_text, &server),
             });
             cmd.entity(entity).remove::<UnstyledTag>();
-            // cmd.trigger_targets(CompileNodeEvent, entity);
         });
 }
 
