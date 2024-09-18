@@ -33,15 +33,16 @@
 					<text font_size="40"> - {title} - </text>
 				</node>
 
+				<button background="#000"
+						justify_content="center"
+						hover:background="#555"
+						pressed:background="#055"
+						border_radius="4px"
+						padding="10px"
+						onpress="debug">
+					<text font_size="25">Change Title</text>
+				</button>
 			</panel>
-
-			<button background="#000"
-					hover:background="#555"
-					pressed:background="#055"
-					padding="10px"
-					onpress="debug">
-				<text align_self="center">Change Title</text>
-			</button>
 
 			<panel secondary="#a02"
 				   primary="#401"

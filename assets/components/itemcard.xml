@@ -14,7 +14,7 @@
 			grid_template_columns="(1, 100px)(1, auto)">
 
 		<node watch="head"
-			  boder="0"
+			  border="0"
 			  hover:border_radius="0"
 			  hover:background="rgb(0.3,0.1,0.3)"
 			  background="rgb(0.1,0.1,0.3)"
