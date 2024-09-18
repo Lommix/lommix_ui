@@ -5,6 +5,9 @@ templates in plain `Xml`. Enjoy hot reloading, autocomplete, formatting and lint
 
 Because there is nothing worse than waiting on compilation.
 
+https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
+
+
 ## Featuring
 
 -   A style attribute for each use. `padding="10px auto 5% 60vw"` -> `Uirect`
