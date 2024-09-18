@@ -1,12 +1,13 @@
 # Bevy Xml Ui
 
+[WIP][MVP]
+
 `Xml` ui syntax parser & builder. Create reusable component
 templates in plain `Xml`. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
 
 Because there is nothing worse than waiting on compilation.
 
 https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
-
 
 ## Featuring
 
@@ -88,7 +89,11 @@ fn setup(
 }
 ```
 
-Checkout the examples for advanced interactions.
+Checkout the examples for advanced interactions, play with the assets.
+
+```bash
+cargo run --example ui
+```
 
 ## Syntax
 
