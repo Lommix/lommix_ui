@@ -19,7 +19,8 @@ pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
         CompileStateEvent, HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity,
-        StyleAttributes, Tag, Tags, TemplateState, UiId, UiTarget,
+        StyleAttributes, Tag, Tags, TemplateState, UiId, UiTarget, UiWatch, UnbuildTag,
+        UnstyledTag,
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
@@ -61,6 +62,9 @@ impl Plugin for XmlUiPlugin {
             First,
             watch_autolaod_dirs.run_if(on_timer(Duration::from_secs(1))),
         );
+
+        #[cfg(debug_assertions)]
+        app.add_systems(Startup, watch_autolaod_dirs);
     }
 }
 
@@ -94,6 +98,12 @@ fn watch_autolaod_dirs(
                 handle: handle.clone(),
                 ..default()
             });
+            // cmd.insert((
+            //     handle.clone(),
+            //     NodeBundle::default(),
+            //     UnbuildTag,
+            //     UnstyledTag,
+            // ));
         });
 
         info!("registered/reloaded component `{name}` at `{path}`");

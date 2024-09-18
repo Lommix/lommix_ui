@@ -36,12 +36,13 @@ fn setup(
     function_bindings.register("scrollable", cmd.register_one_shot_system(init_scrollable));
     function_bindings.register("play_beep", cmd.register_one_shot_system(play_beep));
 
-    let panel_handle = server.load("panel.xml");
+    // register custom node by hand
+    let panel_handle: Handle<Template> = server.load("panel.xml");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert((HtmlBundle {
+        entity_cmd.insert(HtmlBundle {
             handle: panel_handle.clone(),
             ..default()
-        },));
+        });
     });
 
     function_bindings.register(
@@ -67,13 +68,15 @@ fn setup(
                 };
 
                 let rng = rand::random::<u32>();
-                info!("{rng}");
                 state.set_prop("title", format!("{}", rng));
                 cmd.trigger_targets(CompileStateEvent, **scope);
             },
         ),
     );
 }
+
+#[derive(Component, Deref, DerefMut, Default)]
+pub struct Collapse(pub bool);
 
 fn update_collapse(
     mut interactions: Query<(&Interaction, &UiTarget, &mut Collapse), Changed<Interaction>>,
@@ -108,6 +111,7 @@ pub struct Scrollable {
     offset: f32,
     speed: f32,
 }
+
 fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>) {
     let speed = tags
         .get(entity)
@@ -214,6 +218,3 @@ fn cleaner(mut expired: Query<(Entity, &mut LifeTime)>, mut cmd: Commands, time:
 fn greet(In(entity): In<Entity>, mut _cmd: Commands) {
     info!("greetings from `{entity}`");
 }
-
-#[derive(Component, Deref, DerefMut, Default)]
-pub struct Collapse(pub bool);

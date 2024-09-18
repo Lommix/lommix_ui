@@ -34,7 +34,7 @@ impl ScopeEntity {
     }
 }
 
-#[derive(Component, Clone, Default, Reflect)]
+#[derive(Component, Debug, Clone, Default, Reflect)]
 #[reflect]
 pub struct TemplateState {
     pub props: HashMap<String, String>,
@@ -332,6 +332,7 @@ fn compile_state(
     expressions: Query<&TemplateExpresions>,
     server: Res<AssetServer>,
     // diff scope, but sub?
+    mut ui_images: Query<&mut UiImage>,
     mut styles: Query<(&mut Style, Option<&mut Text>)>,
 ) {
     let entity = trigger.entity();
@@ -354,8 +355,6 @@ fn compile_state(
             let Some(Attribute::PropertyDefinition(key, val)) = exp.compile(pstate) else {
                 return;
             };
-
-            // info!("compiled prop def {key}");
             to_insert.push((key, val));
         });
     }
@@ -394,10 +393,16 @@ fn compile_state(
                             action.self_insert(cmd.entity(entity));
                         }
                         // can only be another include
-                        Attribute::PropertyDefinition(key, val) => {
+                        Attribute::PropertyDefinition(_key, _val) => {
                             cmd.trigger_targets(CompileStateEvent, *sub);
                         }
-                        any => {
+                        Attribute::Path(path) => {
+                            //is image, reload
+                            if let Ok(mut img) = ui_images.get_mut(*sub) {
+                                img.texture = server.load(path);
+                            }
+                        }
+                        _any => {
                             continue;
                         }
                     }
@@ -500,6 +505,8 @@ fn spawn_ui(
                 _ = state.try_set_prop(key, val.clone());
             });
 
+            // info!("spawned with {:?}", state);
+
             build_node(
                 0,
                 root_entity,
@@ -556,6 +563,7 @@ fn build_node(
     state: &mut TemplateState,
     state_subscriber: &mut StateSubscriber,
 ) {
+    // first node is the state holder
     if depth > 0 {
         cmd.entity(entity).insert(scope.clone());
     }
@@ -573,6 +581,7 @@ fn build_node(
             .iter()
             .cloned()
             .fold(TemplateState::default(), |mut m, (key, value)| {
+                // info!("passing {key}:{value} on type {:?}", &node.node_type);
                 m.props.insert(key, value);
                 m
             });
@@ -581,6 +590,7 @@ fn build_node(
         listener.clone().self_insert(cmd.entity(entity));
     });
 
+    // ------------------ link
     if let Some(id) = &node.id {
         id_table.ids.insert(id.clone(), entity);
     }
@@ -613,6 +623,7 @@ fn build_node(
             ));
         }
         NodeType::Image => {
+            //compile if is passed down
             let path = node.src.clone().unwrap_or_default();
             let handle = server.load::<Image>(path);
 
@@ -689,15 +700,11 @@ fn build_node(
                     );
                     cmd.entity(slot_holder).add_child(child);
                 });
-
-                cmd.entity(entity).insert((
-                    UnslotedChildren(slot_holder),
-                    handle,
-                    UnbuildTag,
-                    NodeBundle::default(),
-                    passed_state,
-                ));
+                cmd.entity(entity).insert((UnslotedChildren(slot_holder),));
             }
+
+            cmd.entity(entity)
+                .insert((handle, UnbuildTag, NodeBundle::default(), passed_state));
 
             return;
         }
@@ -723,13 +730,10 @@ fn build_node(
                     cmd.entity(slot_holder).add_child(child);
                 });
 
-                cmd.entity(entity).insert((
-                    UnslotedChildren(slot_holder),
-                    passed_state,
-                    UnbuildTag,
-                ));
+                cmd.entity(entity).insert((UnslotedChildren(slot_holder),));
             }
 
+            cmd.entity(entity).insert((passed_state, UnbuildTag));
             return;
         }
         NodeType::Slot => {

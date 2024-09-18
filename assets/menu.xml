@@ -17,16 +17,14 @@
 				 height="200px"
 				 src="bevy_bird_dark.png"/>
 
-			<node justify_content="center"
-				  flex_direction="row">
-				<text font_size="40"> - {title} - </text>
-			</node>
-
-			<!-- <itemcard source="bevy_bird_dark.png"> </itemcard> -->
+			<panel title="Include Components">
+				<itemcard source="bevy_bird_dark.png"
+						  title="Golden sword"/>
+			</panel>
 
 			<panel primary="#515"
 				   secondary="#315"
-				   title="Foo">
+				   title="Update Properties">
 
 				<node align_items="center"
 					  flex_direction="columns">
