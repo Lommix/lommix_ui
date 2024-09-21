@@ -27,6 +27,7 @@
 			 src="bevy_bird_dark.png"/>
 		<text align_self="end"
 			  font_size="10px"
+			  font_color="#FFF"
 			  justify_self="center"
 			  position="absolute">{title}</text>
 	</button>

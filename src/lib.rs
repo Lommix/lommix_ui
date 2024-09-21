@@ -4,12 +4,13 @@ use std::{
 };
 
 use bevy::{prelude::*, time::common_conditions::on_timer};
-use build::HtmlBundle;
+use build::TemplateBundle;
 use data::Template;
 use prelude::ComponentBindings;
 
 mod bindings;
 mod build;
+mod compile;
 mod data;
 mod error;
 mod load;
@@ -19,10 +20,10 @@ mod styles;
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        CompileStateEvent, HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity,
-        StyleAttributes, Tag, Tags, TemplateState, UiId, UiTarget, UiWatch, UnbuildTag,
-        UnstyledTag,
+        TemplateBundle, OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity, Tag, Tags, TemplateState, UiId,
+        UiTarget, UiWatch, UnbuildTag,
     };
+    pub use crate::compile::{CompileContextEvent, CompileNodeEvent};
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
     pub use crate::styles::NodeStyle;
@@ -56,6 +57,7 @@ impl Plugin for XmlUiPlugin {
             build::BuildPlugin,
             bindings::BindingPlugin,
             styles::TransitionPlugin,
+            compile::CompilePlugin,
         ));
 
         app.insert_resource(self.clone());
@@ -97,7 +99,7 @@ fn watch_autolaod_dirs(
             .to_string_lossy();
 
         comps.register(name.to_string(), move |mut cmd| {
-            cmd.insert(HtmlBundle {
+            cmd.insert(TemplateBundle {
                 handle: handle.clone(),
                 ..default()
             });

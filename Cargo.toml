@@ -39,3 +39,4 @@ bevy = { version = "0.14", default-features = false, features = [
   "png",
 ] }
 rand = "0.8.5"
+bevy-inspector-egui = "0.26.0"

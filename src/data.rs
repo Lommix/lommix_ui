@@ -52,7 +52,8 @@ pub enum Attribute {
     Tag(String, String),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Reflect, PartialEq, Clone)]
+#[reflect]
 pub struct AttrTokens {
     pub prefix: Option<String>,
     pub ident: String,
@@ -87,7 +88,8 @@ impl AttrTokens {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug,Reflect, PartialEq, Clone)]
+#[reflect]
 pub enum Action {
     OnPress(Vec<String>),
     OnEnter(Vec<String>),

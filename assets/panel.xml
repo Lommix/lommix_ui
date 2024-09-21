@@ -16,9 +16,11 @@
 			<button id="header"
 					width="100%"
 					padding="20px 5px"
+					hover:padding="20px 10px"
 					justify_content="space_between"
 					background="#FFF"
 					hover:background="#008"
+					delay="0.1"
 					align_items="center"
 					onspawn="collapse"
 					target="to_collapse">

@@ -11,6 +11,11 @@ impl Plugin for TransitionPlugin {
             Update,
             (update_transitions, update_interactions, update_node_style),
         );
+
+        app.register_type::<PressedTimer>();
+        app.register_type::<HoverTimer>();
+        app.register_type::<ComputedStyle>();
+        app.register_type::<NodeStyle>();
     }
 }
 
@@ -60,6 +65,7 @@ fn update_interactions(
         });
 }
 
+// @todo: broadcast update
 fn update_transitions(
     mut pressed_timers: Query<(Entity, &mut PressedTimer)>,
     mut hover_timers: Query<(Entity, &mut HoverTimer)>,
@@ -73,6 +79,7 @@ fn update_transitions(
     });
 }
 
+// @todo: split
 fn update_node_style(
     mut nodes: Query<(Entity, &mut Style, &NodeStyle)>,
     mut bg: Query<&mut BackgroundColor>,
@@ -106,7 +113,8 @@ fn update_node_style(
         });
 }
 
-#[derive(Component, Default, Deref, DerefMut)]
+#[derive(Component, Reflect, Default, Deref, DerefMut)]
+#[reflect]
 pub struct PressedTimer(Timer);
 impl PressedTimer {
     pub fn new(d: Duration) -> Self {
@@ -114,7 +122,8 @@ impl PressedTimer {
     }
 }
 
-#[derive(Component, Default, Deref, DerefMut)]
+#[derive(Component, Default, Reflect, Deref, DerefMut)]
+#[reflect]
 pub struct HoverTimer(Timer);
 impl HoverTimer {
     pub fn new(d: Duration) -> Self {
@@ -122,7 +131,8 @@ impl HoverTimer {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug, Reflect)]
+#[reflect]
 pub struct ComputedStyle {
     style: Style,
     border_color: Color,
@@ -134,10 +144,28 @@ pub struct ComputedStyle {
     delay: f32,
 }
 
-#[derive(Component, Default, Debug)]
+impl Default for ComputedStyle {
+    fn default() -> Self {
+        Self {
+            style: Style::default(),
+            border_color: Color::NONE,
+            border_radius: UiRect::default(),
+            background: Color::NONE,
+            font: Handle::default(),
+            font_size: 12.,
+            font_color: Color::WHITE,
+            delay: 0.,
+        }
+    }
+}
+
+#[derive(Component, Default, Debug, Reflect)]
+#[reflect]
 pub struct NodeStyle {
     regular: ComputedStyle,
+    #[reflect(ignore)]
     hover: Vec<StyleAttr>,
+    #[reflect(ignore)]
     pressed: Vec<StyleAttr>,
 }
 
@@ -155,9 +183,11 @@ impl NodeStyle {
     ) {
         style.clone_from(&self.regular.style);
         bg.as_mut().map(|bg| bg.0 = self.regular.background);
+
         bcolor
             .as_mut()
             .map(|bcolor| bcolor.0 = self.regular.border_color);
+
         bradius.as_mut().map(|bradius| {
             bradius.top_left = self.regular.border_radius.top;
             bradius.top_right = self.regular.border_radius.right;
@@ -208,6 +238,90 @@ impl NodeStyle {
                 }
             }
         });
+    }
+
+    pub fn add_style_attr(&mut self, attr: StyleAttr) {
+        match attr {
+            StyleAttr::Hover(style) => {
+                let style = *style;
+                match self
+                    .hover
+                    .iter()
+                    .position(|s| std::mem::discriminant(s) == std::mem::discriminant(&style))
+                {
+                    Some(index) => self.hover.insert(index, style),
+                    None => self.hover.push(style),
+                }
+            }
+            StyleAttr::Pressed(style) => {
+                let style = *style;
+                match self
+                    .pressed
+                    .iter()
+                    .position(|s| std::mem::discriminant(s) == std::mem::discriminant(&style))
+                {
+                    Some(index) => self.hover.insert(index, style),
+                    None => self.pressed.push(style),
+                }
+            }
+            StyleAttr::Display(display) => self.regular.style.display = display,
+            StyleAttr::Position(position_type) => self.regular.style.position_type = position_type,
+            StyleAttr::Overflow(overflow) => self.regular.style.overflow = overflow,
+            StyleAttr::Left(val) => self.regular.style.left = val,
+            StyleAttr::Right(val) => self.regular.style.right = val,
+            StyleAttr::Top(val) => self.regular.style.top = val,
+            StyleAttr::Bottom(val) => self.regular.style.bottom = val,
+            StyleAttr::Width(val) => self.regular.style.width = val,
+            StyleAttr::Height(val) => self.regular.style.height = val,
+            StyleAttr::MinWidth(val) => self.regular.style.min_width = val,
+            StyleAttr::MinHeight(val) => self.regular.style.min_height = val,
+            StyleAttr::MaxWidth(val) => self.regular.style.max_width = val,
+            StyleAttr::MaxHeight(val) => self.regular.style.min_height = val,
+            StyleAttr::AspectRatio(f) => self.regular.style.aspect_ratio = Some(f),
+            StyleAttr::AlignItems(align_items) => self.regular.style.align_items = align_items,
+            StyleAttr::JustifyItems(justify_items) => {
+                self.regular.style.justify_items = justify_items
+            }
+            StyleAttr::AlignSelf(align_self) => self.regular.style.align_self = align_self,
+            StyleAttr::JustifySelf(justify_self) => self.regular.style.justify_self = justify_self,
+            StyleAttr::AlignContent(align_content) => {
+                self.regular.style.align_content = align_content
+            }
+            StyleAttr::JustifyContent(justify_content) => {
+                self.regular.style.justify_content = justify_content
+            }
+            StyleAttr::Margin(ui_rect) => self.regular.style.margin = ui_rect,
+            StyleAttr::Padding(ui_rect) => self.regular.style.padding = ui_rect,
+            StyleAttr::Border(ui_rect) => self.regular.style.border = ui_rect,
+            StyleAttr::BorderColor(color) => self.regular.border_color = color,
+            StyleAttr::BorderRadius(ui_rect) => self.regular.border_radius = ui_rect,
+            StyleAttr::FlexDirection(flex_direction) => {
+                self.regular.style.flex_direction = flex_direction
+            }
+            StyleAttr::FlexWrap(flex_wrap) => self.regular.style.flex_wrap = flex_wrap,
+            StyleAttr::FlexGrow(f) => self.regular.style.flex_grow = f,
+            StyleAttr::FlexShrink(f) => self.regular.style.flex_shrink = f,
+            StyleAttr::FlexBasis(val) => self.regular.style.flex_basis = val,
+            StyleAttr::RowGap(val) => self.regular.style.row_gap = val,
+            StyleAttr::ColumnGap(val) => self.regular.style.column_gap = val,
+            StyleAttr::GridAutoFlow(grid_auto_flow) => {
+                self.regular.style.grid_auto_flow = grid_auto_flow
+            }
+            StyleAttr::GridTemplateRows(vec) => self.regular.style.grid_template_rows = vec,
+            StyleAttr::GridTemplateColumns(vec) => self.regular.style.grid_template_columns = vec,
+            StyleAttr::GridAutoRows(vec) => self.regular.style.grid_auto_rows = vec,
+            StyleAttr::GridAutoColumns(vec) => self.regular.style.grid_auto_columns = vec,
+            StyleAttr::GridRow(grid_placement) => self.regular.style.grid_row = grid_placement,
+            StyleAttr::GridColumn(grid_placement) => {
+                self.regular.style.grid_column = grid_placement
+            }
+            StyleAttr::Direction(direction) => self.regular.style.direction = direction,
+            StyleAttr::FontSize(f) => self.regular.font_size = f,
+            StyleAttr::FontColor(color) => self.regular.font_color = color,
+            StyleAttr::Background(color) => self.regular.background = color,
+            StyleAttr::Delay(f) => self.regular.delay = f,
+            StyleAttr::Font(_) => todo!(),
+        };
     }
 }
 
@@ -263,13 +377,18 @@ fn apply_lerp_style(
             style.border = lerp_rect(&default.style.border, ui_rect, ratio)
         }
         StyleAttr::BorderColor(color) => {
-            // bcolor.0 = lerp_color(&default.border_color, color, ratio)
+            bcolor
+                .as_mut()
+                .map(|bcolor| bcolor.0 = lerp_color(&default.border_color, color, ratio));
         }
         StyleAttr::BorderRadius(ui_rect) => {
-            // bradius.top_left = lerp_val(&default.border_radius.top, &ui_rect.top, ratio);
-            // bradius.top_right = lerp_val(&default.border_radius.right, &ui_rect.right, ratio);
-            // bradius.bottom_right = lerp_val(&default.border_radius.bottom, &ui_rect.bottom, ratio);
-            // bradius.bottom_left = lerp_val(&default.border_radius.left, &ui_rect.left, ratio);
+            bradius.as_mut().map(|bradius| {
+                bradius.top_left = lerp_val(&default.border_radius.top, &ui_rect.top, ratio);
+                bradius.top_right = lerp_val(&default.border_radius.right, &ui_rect.right, ratio);
+                bradius.bottom_right =
+                    lerp_val(&default.border_radius.bottom, &ui_rect.bottom, ratio);
+                bradius.bottom_left = lerp_val(&default.border_radius.left, &ui_rect.left, ratio);
+            });
         }
         StyleAttr::FlexDirection(flex_direction) => style.flex_direction = *flex_direction,
         StyleAttr::FlexWrap(flex_wrap) => style.flex_wrap = *flex_wrap,
@@ -291,7 +410,8 @@ fn apply_lerp_style(
         StyleAttr::GridColumn(grid_placement) => style.grid_column = *grid_placement,
         StyleAttr::Direction(direction) => style.direction = *direction,
         StyleAttr::Background(color) => {
-            // bcolor.0 = lerp_color(&default.background, &color, ratio);
+            bg.as_mut()
+                .map(|bg| bg.0 = lerp_color(&default.border_color, color, ratio));
         }
         StyleAttr::FontColor(color) => {
             text.as_mut().map(|txt| {
@@ -325,142 +445,9 @@ impl From<Vec<StyleAttr>> for NodeStyle {
     fn from(mut styles: Vec<StyleAttr>) -> Self {
         let mut out = NodeStyle::default();
         for style in styles.drain(..) {
-            match style {
-                StyleAttr::Hover(style) => out.hover.push(*style),
-                StyleAttr::Pressed(style) => out.pressed.push(*style),
-                StyleAttr::Display(display) => out.regular.style.display = display,
-                StyleAttr::Position(position_type) => {
-                    out.regular.style.position_type = position_type
-                }
-                StyleAttr::Overflow(overflow) => out.regular.style.overflow = overflow,
-                StyleAttr::Left(val) => out.regular.style.left = val,
-                StyleAttr::Right(val) => out.regular.style.right = val,
-                StyleAttr::Top(val) => out.regular.style.top = val,
-                StyleAttr::Bottom(val) => out.regular.style.bottom = val,
-                StyleAttr::Width(val) => out.regular.style.width = val,
-                StyleAttr::Height(val) => out.regular.style.height = val,
-                StyleAttr::MinWidth(val) => out.regular.style.min_width = val,
-                StyleAttr::MinHeight(val) => out.regular.style.min_height = val,
-                StyleAttr::MaxWidth(val) => out.regular.style.max_width = val,
-                StyleAttr::MaxHeight(val) => out.regular.style.min_height = val,
-                StyleAttr::AspectRatio(f) => out.regular.style.aspect_ratio = Some(f),
-                StyleAttr::AlignItems(align_items) => out.regular.style.align_items = align_items,
-                StyleAttr::JustifyItems(justify_items) => {
-                    out.regular.style.justify_items = justify_items
-                }
-                StyleAttr::AlignSelf(align_self) => out.regular.style.align_self = align_self,
-                StyleAttr::JustifySelf(justify_self) => {
-                    out.regular.style.justify_self = justify_self
-                }
-                StyleAttr::AlignContent(align_content) => {
-                    out.regular.style.align_content = align_content
-                }
-                StyleAttr::JustifyContent(justify_content) => {
-                    out.regular.style.justify_content = justify_content
-                }
-                StyleAttr::Margin(ui_rect) => out.regular.style.margin = ui_rect,
-                StyleAttr::Padding(ui_rect) => out.regular.style.padding = ui_rect,
-                StyleAttr::Border(ui_rect) => out.regular.style.border = ui_rect,
-                StyleAttr::BorderColor(color) => out.regular.border_color = color,
-                StyleAttr::BorderRadius(ui_rect) => out.regular.border_radius = ui_rect,
-                StyleAttr::FlexDirection(flex_direction) => {
-                    out.regular.style.flex_direction = flex_direction
-                }
-                StyleAttr::FlexWrap(flex_wrap) => out.regular.style.flex_wrap = flex_wrap,
-                StyleAttr::FlexGrow(f) => out.regular.style.flex_grow = f,
-                StyleAttr::FlexShrink(f) => out.regular.style.flex_shrink = f,
-                StyleAttr::FlexBasis(val) => out.regular.style.flex_basis = val,
-                StyleAttr::RowGap(val) => out.regular.style.row_gap = val,
-                StyleAttr::ColumnGap(val) => out.regular.style.column_gap = val,
-                StyleAttr::GridAutoFlow(grid_auto_flow) => {
-                    out.regular.style.grid_auto_flow = grid_auto_flow
-                }
-                StyleAttr::GridTemplateRows(vec) => out.regular.style.grid_template_rows = vec,
-                StyleAttr::GridTemplateColumns(vec) => {
-                    out.regular.style.grid_template_columns = vec
-                }
-                StyleAttr::GridAutoRows(vec) => out.regular.style.grid_auto_rows = vec,
-                StyleAttr::GridAutoColumns(vec) => out.regular.style.grid_auto_columns = vec,
-                StyleAttr::GridRow(grid_placement) => out.regular.style.grid_row = grid_placement,
-                StyleAttr::GridColumn(grid_placement) => {
-                    out.regular.style.grid_column = grid_placement
-                }
-                StyleAttr::Direction(direction) => out.regular.style.direction = direction,
-                StyleAttr::FontSize(f) => out.regular.font_size = f,
-                StyleAttr::FontColor(color) => out.regular.font_color = color,
-                StyleAttr::Background(color) => out.regular.background = color,
-                StyleAttr::Delay(f) => out.regular.delay = f,
-                StyleAttr::Font(_) => todo!(),
-            };
+            out.add_style_attr(style);
         }
         out
-    }
-}
-
-fn lerp_style(start: &StyleAttr, end: &StyleAttr, ratio: f32) -> StyleAttr {
-    match (start, end) {
-        (StyleAttr::Left(start), StyleAttr::Left(end)) => {
-            StyleAttr::Left(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::Right(start), StyleAttr::Right(end)) => {
-            StyleAttr::Right(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::Top(start), StyleAttr::Top(end)) => StyleAttr::Top(lerp_val(start, end, ratio)),
-        (StyleAttr::Bottom(start), StyleAttr::Bottom(end)) => {
-            StyleAttr::Bottom(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::Width(start), StyleAttr::Width(end)) => {
-            StyleAttr::Width(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::Height(start), StyleAttr::Height(end)) => {
-            StyleAttr::Height(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::MinWidth(start), StyleAttr::MinWidth(end)) => {
-            StyleAttr::MinWidth(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::MinHeight(start), StyleAttr::MinHeight(end)) => {
-            StyleAttr::MinHeight(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::MaxWidth(start), StyleAttr::MaxWidth(end)) => {
-            StyleAttr::MaxWidth(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::MaxHeight(start), StyleAttr::MaxHeight(end)) => {
-            StyleAttr::MaxHeight(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::Margin(start), StyleAttr::Margin(end)) => {
-            StyleAttr::Margin(lerp_rect(start, end, ratio))
-        }
-        (StyleAttr::Padding(start), StyleAttr::Padding(end)) => {
-            StyleAttr::Padding(lerp_rect(start, end, ratio))
-        }
-        (StyleAttr::Border(start), StyleAttr::Border(end)) => {
-            StyleAttr::Border(lerp_rect(start, end, ratio))
-        }
-        (StyleAttr::BorderColor(start), StyleAttr::BorderColor(end)) => {
-            StyleAttr::BorderColor(lerp_color(start, end, ratio))
-        }
-        (StyleAttr::BorderRadius(start), StyleAttr::BorderRadius(end)) => {
-            StyleAttr::BorderRadius(lerp_rect(start, end, ratio))
-        }
-        (StyleAttr::FlexBasis(start), StyleAttr::FlexBasis(end)) => {
-            StyleAttr::FlexBasis(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::RowGap(start), StyleAttr::RowGap(end)) => {
-            StyleAttr::RowGap(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::ColumnGap(start), StyleAttr::ColumnGap(end)) => {
-            StyleAttr::ColumnGap(lerp_val(start, end, ratio))
-        }
-        (StyleAttr::FontSize(start), StyleAttr::FontSize(end)) => {
-            StyleAttr::FontSize(start.lerp(*end, ratio))
-        }
-        (StyleAttr::FontColor(start), StyleAttr::FontColor(end)) => {
-            StyleAttr::FontColor(lerp_color(start, end, ratio))
-        }
-        (StyleAttr::Background(start), StyleAttr::Background(end)) => {
-            StyleAttr::Background(lerp_color(start, end, ratio))
-        }
-        _ => end.clone(),
     }
 }
 
