@@ -10,16 +10,15 @@
 		  padding="40px">
 
 		<!-- this is a user defined node `panel` that maps to include a another template -->
-		<panel secondary="#000"
-			   primary="#088"
+		<panel primary="#245"
 			   title="{title}">
 			<img align_self="center"
 				 height="200px"
 				 src="bevy_bird_dark.png"/>
 
 			<panel title="Include Components">
-				<itemcard source="bevy_bird_dark.png"
-						  title="Golden sword"/>
+				<preview source="bevy_bird_dark.png"
+						 title="Golden sword"/>
 			</panel>
 
 			<panel primary="#515"
@@ -33,9 +32,12 @@
 					<text font_size="40"> - {title} - </text>
 				</node>
 
-				<button background="#000"
+				<button background="#FF0"
 						justify_content="center"
 						hover:background="#555"
+						hover:padding="50px"
+						pressed:padding="50px"
+						delay="0.1"
 						pressed:background="#055"
 						border_radius="4px"
 						padding="10px"
@@ -43,7 +45,6 @@
 					<text font_size="25">Change Title</text>
 				</button>
 			</panel>
-
 			<panel secondary="#a02"
 				   primary="#401"
 				   title="Foo">

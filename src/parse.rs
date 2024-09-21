@@ -378,7 +378,7 @@ fn parse_style<'a>(
         b"font" => map(as_string, StyleAttr::Font)(value)?,
         b"font_color" => map(parse_color, StyleAttr::FontColor)(value)?,
         b"font_size" => map(parse_float, StyleAttr::FontSize)(value)?,
-        b"duration" => map(parse_float, StyleAttr::Duration)(value)?,
+        b"delay" => map(parse_float, StyleAttr::Delay)(value)?,
         b"max_height" => map(parse_val, StyleAttr::MaxHeight)(value)?,
         b"max_width" => map(parse_val, StyleAttr::MaxWidth)(value)?,
         b"min_height" => map(parse_val, StyleAttr::MinHeight)(value)?,

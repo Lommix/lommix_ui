@@ -10,6 +10,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::default())
         .add_plugins(XmlUiPlugin::new().auto_load("components", "xml"))
         .add_systems(Startup, setup)
         .add_systems(
@@ -26,7 +27,7 @@ fn setup(
     mut custom_comps: ResMut<ComponentBindings>,
 ) {
     cmd.spawn(Camera2dBundle::default());
-    cmd.spawn(HtmlBundle {
+    cmd.spawn(TemplateBundle {
         handle: server.load("menu.xml"),
         ..default()
     });
@@ -39,7 +40,7 @@ fn setup(
     // register custom node by hand
     let panel_handle: Handle<Template> = server.load("panel.xml");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert(HtmlBundle {
+        entity_cmd.insert(TemplateBundle {
             handle: panel_handle.clone(),
             ..default()
         });
@@ -69,7 +70,7 @@ fn setup(
 
                 let rng = rand::random::<u32>();
                 state.set_prop("title", format!("{}", rng));
-                cmd.trigger_targets(CompileStateEvent, **scope);
+                cmd.trigger_targets(CompileContextEvent, **scope);
             },
         ),
     );
@@ -161,7 +162,7 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
 fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..100 {
-            cmd.spawn(HtmlBundle {
+            cmd.spawn(TemplateBundle {
                 handle: server.load("card.xml"),
                 state: TemplateState::new()
                     .with("title", &format!("item {i}"))

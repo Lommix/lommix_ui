@@ -52,7 +52,8 @@ pub enum Attribute {
     Tag(String, String),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Reflect, PartialEq, Clone)]
+#[reflect]
 pub struct AttrTokens {
     pub prefix: Option<String>,
     pub ident: String,
@@ -87,7 +88,8 @@ impl AttrTokens {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug,Reflect, PartialEq, Clone)]
+#[reflect]
 pub enum Action {
     OnPress(Vec<String>),
     OnEnter(Vec<String>),
@@ -181,7 +183,7 @@ pub enum StyleAttr {
 
     // -----
     // animations
-    Duration(f32),
+    Delay(f32),
 }
 
 impl From<StyleAttr> for Attribute {
@@ -198,8 +200,6 @@ impl StyleAttr {
         style: &mut Style,
         text: &mut Option<Mut<UiText>>,
         server: &AssetServer,
-        // parents: &Query<&Parents>,
-        // styles: &Qurty<&Attributes>,
     ) {
         match self {
             StyleAttr::Display(display) => style.display = *display,
