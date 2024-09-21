@@ -1,6 +1,6 @@
 use crate::{
     data::{Action, AttrTokens, Attribute, NodeType, Template, XNode},
-    prelude::{ComponentBindings, StyleAttr},
+    prelude::{ComponentBindings, StyleAttr}, styles::NodeStyle,
 };
 use bevy::{prelude::*, utils::HashMap};
 use nom::{
@@ -107,6 +107,12 @@ pub struct Tag {
 
 #[derive(Component, DerefMut, Deref, Clone)]
 pub struct StyleAttributes(pub Vec<StyleAttr>);
+
+#[derive(Component, DerefMut, Deref, Clone)]
+pub struct HoverStyle(pub Vec<StyleAttr>);
+
+#[derive(Component, DerefMut, Deref, Clone)]
+pub struct PressedStyle(pub Vec<StyleAttr>);
 
 impl StyleAttributes {
     pub fn replace_or_insert(&mut self, attr: StyleAttr) {
@@ -575,7 +581,9 @@ fn build_node(
         state_subscriber.push(entity);
     }
 
-    let style_attributes = StyleAttributes(node.styles.clone());
+    // let style_attributes = StyleAttributes(node.styles.clone());
+    let style_attributes = NodeStyle::from(node.styles.clone());
+
     let passed_state =
         node.defs
             .iter()

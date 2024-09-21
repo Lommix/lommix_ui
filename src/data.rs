@@ -181,7 +181,7 @@ pub enum StyleAttr {
 
     // -----
     // animations
-    Duration(f32),
+    Delay(f32),
 }
 
 impl From<StyleAttr> for Attribute {
@@ -198,8 +198,6 @@ impl StyleAttr {
         style: &mut Style,
         text: &mut Option<Mut<UiText>>,
         server: &AssetServer,
-        // parents: &Query<&Parents>,
-        // styles: &Qurty<&Attributes>,
     ) {
         match self {
             StyleAttr::Display(display) => style.display = *display,

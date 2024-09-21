@@ -14,6 +14,7 @@ mod data;
 mod error;
 mod load;
 mod parse;
+mod styles;
 
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
@@ -24,6 +25,7 @@ pub mod prelude {
     };
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
+    pub use crate::styles::NodeStyle;
     pub use crate::XmlUiPlugin;
 }
 
@@ -53,6 +55,7 @@ impl Plugin for XmlUiPlugin {
             load::LoaderPlugin,
             build::BuildPlugin,
             bindings::BindingPlugin,
+            styles::TransitionPlugin,
         ));
 
         app.insert_resource(self.clone());
@@ -98,12 +101,6 @@ fn watch_autolaod_dirs(
                 handle: handle.clone(),
                 ..default()
             });
-            // cmd.insert((
-            //     handle.clone(),
-            //     NodeBundle::default(),
-            //     UnbuildTag,
-            //     UnstyledTag,
-            // ));
         });
 
         info!("registered/reloaded component `{name}` at `{path}`");
