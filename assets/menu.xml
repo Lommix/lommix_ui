@@ -32,12 +32,13 @@
 					<text font_size="40"> - {title} - </text>
 				</node>
 
-				<button background="#FF0"
+				<button background="#002"
 						justify_content="center"
-						hover:background="#555"
-						hover:padding="50px"
+						hover:background="#004"
+						hover:padding="100px"
 						pressed:padding="50px"
-						delay="0.1"
+						delay="0.5"
+						ease="exponential_out"
 						pressed:background="#055"
 						border_radius="4px"
 						padding="10px"
