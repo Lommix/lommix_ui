@@ -129,7 +129,7 @@ fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>
 fn update_scroll(
     mut events: EventReader<MouseWheel>,
     mut scrollables: Query<(&mut Scrollable, &UiTarget, &Interaction)>,
-    mut targets: Query<(&mut Style, &Node)>,
+    mut targets: Query<(&mut NodeStyle, &Node)>,
     time: Res<Time>,
 ) {
     // whatever
@@ -142,7 +142,7 @@ fn update_scroll(
             scroll.offset = (scroll.offset + ev.y.signum() * scroll.speed * time.delta_seconds())
                 .clamp(-node.unrounded_size().y, 0.);
 
-            style.top = Val::Px(scroll.offset);
+            style.regular.style.top = Val::Px(scroll.offset);
         });
     });
 }

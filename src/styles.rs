@@ -135,16 +135,16 @@ impl HoverTimer {
 #[derive(Debug, Reflect)]
 #[reflect]
 pub struct ComputedStyle {
-    style: Style,
-    border_color: Color,
-    border_radius: UiRect,
-    background: Color,
-    font: Handle<Font>,
-    font_size: f32,
-    font_color: Color,
-    delay: f32,
+    pub style: Style,
+    pub border_color: Color,
+    pub border_radius: UiRect,
+    pub background: Color,
+    pub font: Handle<Font>,
+    pub font_size: f32,
+    pub font_color: Color,
+    pub delay: f32,
     #[reflect(ignore)]
-    easing: Option<interpolation::EaseFunction>,
+    pub easing: Option<interpolation::EaseFunction>,
 }
 
 impl Default for ComputedStyle {
@@ -166,11 +166,11 @@ impl Default for ComputedStyle {
 #[derive(Component, Default, Debug, Reflect)]
 #[reflect]
 pub struct NodeStyle {
-    regular: ComputedStyle,
+    pub regular: ComputedStyle,
     #[reflect(ignore)]
-    hover: Vec<StyleAttr>,
+    pub hover: Vec<StyleAttr>,
     #[reflect(ignore)]
-    pressed: Vec<StyleAttr>,
+    pub pressed: Vec<StyleAttr>,
 }
 
 impl NodeStyle {
