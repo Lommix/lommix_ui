@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
+use interpolation::Ease;
 
 use crate::{build::InteractionObverser, data::StyleAttr};
 
@@ -142,6 +143,8 @@ pub struct ComputedStyle {
     font_size: f32,
     font_color: Color,
     delay: f32,
+    #[reflect(ignore)]
+    easing: Option<interpolation::EaseFunction>,
 }
 
 impl Default for ComputedStyle {
@@ -155,6 +158,7 @@ impl Default for ComputedStyle {
             font_size: 12.,
             font_color: Color::WHITE,
             delay: 0.,
+            easing: Some(interpolation::EaseFunction::CubicInOut),
         }
     }
 }
@@ -205,10 +209,16 @@ impl NodeStyle {
 
         hover_timer.map(|timer| {
             if timer.fraction() > 0.01 {
+                let ratio = self
+                    .regular
+                    .easing
+                    .map(|ez| timer.fraction().calc(ez))
+                    .unwrap_or(timer.fraction());
+
                 for attr in self.hover.iter() {
                     apply_lerp_style(
                         attr,
-                        timer.fraction(),
+                        ratio,
                         &self.regular,
                         style,
                         &mut bg,
@@ -223,10 +233,16 @@ impl NodeStyle {
 
         pressed_timer.map(|timer| {
             if timer.fraction() > 0.01 {
+                let ratio = self
+                    .regular
+                    .easing
+                    .map(|ez| timer.fraction().calc(ez))
+                    .unwrap_or(timer.fraction());
+
                 for attr in self.hover.iter() {
                     apply_lerp_style(
                         attr,
-                        timer.fraction(),
+                        ratio,
                         &self.regular,
                         style,
                         &mut bg,
@@ -320,7 +336,9 @@ impl NodeStyle {
             StyleAttr::FontColor(color) => self.regular.font_color = color,
             StyleAttr::Background(color) => self.regular.background = color,
             StyleAttr::Delay(f) => self.regular.delay = f,
-            StyleAttr::Font(_) => todo!(),
+            StyleAttr::Easing(ease) => self.regular.easing = Some(ease),
+            // StyleAttr::Font(font) => self.regular.font = server
+            _ => (),
         };
     }
 }

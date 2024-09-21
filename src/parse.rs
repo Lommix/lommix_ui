@@ -379,6 +379,7 @@ fn parse_style<'a>(
         b"font_color" => map(parse_color, StyleAttr::FontColor)(value)?,
         b"font_size" => map(parse_float, StyleAttr::FontSize)(value)?,
         b"delay" => map(parse_float, StyleAttr::Delay)(value)?,
+        b"ease" => map(parse_easing, StyleAttr::Easing)(value)?,
         b"max_height" => map(parse_val, StyleAttr::MaxHeight)(value)?,
         b"max_width" => map(parse_val, StyleAttr::MaxWidth)(value)?,
         b"min_height" => map(parse_val, StyleAttr::MinHeight)(value)?,
@@ -412,6 +413,50 @@ fn parse_style<'a>(
 
 fn parse_float(input: &[u8]) -> IResult<&[u8], f32> {
     nom::number::complete::float(input)
+}
+
+fn parse_easing(input: &[u8]) -> IResult<&[u8], interpolation::EaseFunction> {
+    match input {
+        b"cubic" => Ok((input, interpolation::EaseFunction::CubicInOut)),
+        b"bounce" => Ok((input, interpolation::EaseFunction::BounceOut)),
+        b"sine" => Ok((input, interpolation::EaseFunction::SineInOut)),
+        b"quad" => Ok((input, interpolation::EaseFunction::QuadraticInOut)),
+
+        b"quadratic_in" => Ok((input, interpolation::EaseFunction::QuadraticIn)),
+        b"quadratic_out" => Ok((input, interpolation::EaseFunction::QuadraticOut)),
+        b"quadratic_in_out" => Ok((input, interpolation::EaseFunction::QuadraticInOut)),
+        b"cubic_in" => Ok((input, interpolation::EaseFunction::CubicIn)),
+        b"cubic_out" => Ok((input, interpolation::EaseFunction::CubicOut)),
+        b"cubic_in_out" => Ok((input, interpolation::EaseFunction::CubicInOut)),
+        b"quartic_in" => Ok((input, interpolation::EaseFunction::QuarticIn)),
+        b"quartic_out" => Ok((input, interpolation::EaseFunction::QuarticOut)),
+        b"quartic_in_out" => Ok((input, interpolation::EaseFunction::QuarticInOut)),
+        b"quintic_in" => Ok((input, interpolation::EaseFunction::QuinticIn)),
+        b"quintic_out" => Ok((input, interpolation::EaseFunction::QuinticOut)),
+        b"quintic_in_out" => Ok((input, interpolation::EaseFunction::QuinticInOut)),
+        b"sine_in" => Ok((input, interpolation::EaseFunction::SineIn)),
+        b"sine_out" => Ok((input, interpolation::EaseFunction::SineOut)),
+        b"sine_in_out" => Ok((input, interpolation::EaseFunction::SineInOut)),
+        b"circular_in" => Ok((input, interpolation::EaseFunction::CircularIn)),
+        b"circular_out" => Ok((input, interpolation::EaseFunction::CircularOut)),
+        b"circular_in_out" => Ok((input, interpolation::EaseFunction::CircularInOut)),
+        b"exponential_in" => Ok((input, interpolation::EaseFunction::ExponentialIn)),
+        b"exponential_out" => Ok((input, interpolation::EaseFunction::ExponentialOut)),
+        b"exponential_in_out" => Ok((input, interpolation::EaseFunction::ExponentialInOut)),
+        b"elastic_in" => Ok((input, interpolation::EaseFunction::ElasticIn)),
+        b"elastic_out" => Ok((input, interpolation::EaseFunction::ElasticOut)),
+        b"elastic_in_out" => Ok((input, interpolation::EaseFunction::ElasticInOut)),
+        b"back_in" => Ok((input, interpolation::EaseFunction::BackIn)),
+        b"back_out" => Ok((input, interpolation::EaseFunction::BackOut)),
+        b"back_in_out" => Ok((input, interpolation::EaseFunction::BackInOut)),
+        b"bounce_in" => Ok((input, interpolation::EaseFunction::BounceIn)),
+        b"bounce_out" => Ok((input, interpolation::EaseFunction::BounceOut)),
+        b"bounce_in_out" => Ok((input, interpolation::EaseFunction::BounceInOut)),
+        _ => Err(nom::Err::Error(nom::error::make_error(
+            input,
+            nom::error::ErrorKind::Tag,
+        ))),
+    }
 }
 
 fn parse_position_type(input: &[u8]) -> IResult<&[u8], PositionType> {
