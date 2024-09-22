@@ -11,9 +11,9 @@ use bevy::{
     color::Color,
     ui::{UiRect, Val},
 };
-use nom::bytes::complete::{is_a, is_not, take_until, take_while1};
-use nom::combinator::{flat_map, map_parser, not, peek, rest};
-use nom::multi::{many0, many1, separated_list1};
+use nom::bytes::complete::{is_not, take_until, take_while1};
+use nom::combinator::{not, rest};
+use nom::multi::{many0, separated_list1};
 use nom::sequence::terminated;
 use nom::Parser;
 use nom::{
@@ -22,7 +22,7 @@ use nom::{
     character::complete::multispace0,
     combinator::{complete, map, map_res},
     number::complete::float,
-    sequence::{delimited, preceded, tuple, Tuple},
+    sequence::{delimited, preceded, tuple},
     IResult,
 };
 

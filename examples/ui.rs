@@ -81,7 +81,7 @@ pub struct Collapse(pub bool);
 
 fn update_collapse(
     mut interactions: Query<(&Interaction, &UiTarget, &mut Collapse), Changed<Interaction>>,
-    mut style: Query<&mut Style>,
+    mut style: Query<&mut NodeStyle>,
 ) {
     interactions
         .iter_mut()
@@ -102,7 +102,7 @@ fn update_collapse(
             };
 
             if let Ok(mut style) = style.get_mut(**target) {
-                style.display = display;
+                style.regular.style.display = display;
             }
         });
 }

@@ -1,7 +1,7 @@
 use crate::{
     compile::{compile_content, CompileContextEvent},
-    data::{Action, AttrTokens, Attribute, NodeType, Template, XNode},
-    prelude::{ComponentBindings, StyleAttr},
+    data::{AttrTokens, NodeType, Template, XNode},
+    prelude::ComponentBindings,
     styles::NodeStyle,
 };
 use bevy::{prelude::*, utils::HashMap};
