@@ -171,3 +171,38 @@ Apply on condition, for elements using the `Interaction` Component like buttons.
 -   `#FFFFFFAA` with alpha
 -   `rgb(1,1,0.5)`
 -   `rgba(1,1,0.8,1)`
+
+## Transitions & easing
+
+-   `delay="0.2"` 0.2seconds
+-   `ease="cubic_in"`
+    -   `quadratic_in`
+    -   `quadratic_out`
+    -   `quadratic_in_out`
+    -   `cubic_in`
+    -   `cubic_out`
+    -   `cubic_in_out`
+    -   `quartic_in`
+    -   `quartic_out`
+    -   `quartic_in_out`
+    -   `quintic_in`
+    -   `quintic_out`
+    -   `quintic_in_out`
+    -   `sine_in`
+    -   `sine_out`
+    -   `sine_in_out`
+    -   `circular_in`
+    -   `circular_out`
+    -   `circular_in_out`
+    -   `exponential_in`
+    -   `exponential_out`
+    -   `exponential_in_out`
+    -   `elastic_in`
+    -   `elastic_out`
+    -   `elastic_in_out`
+    -   `back_in`
+    -   `back_out`
+    -   `back_in_out`
+    -   `bounce_in`
+    -   `bounce_out`
+    -   `bounce_in_out`
