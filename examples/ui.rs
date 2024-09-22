@@ -1,5 +1,5 @@
 use bevy::{ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*};
-use lommix_ui::prelude::*;
+use bevy_html_ui::prelude::*;
 
 fn main() {
     App::new()
@@ -11,7 +11,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::default())
-        .add_plugins(XmlUiPlugin::new().auto_load("components", "xml"))
+        .add_plugins(HtmlUiPlugin::new().auto_load("components", "xml"))
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -139,9 +139,7 @@ fn update_scroll(
                 return;
             };
 
-            scroll.offset = (scroll.offset + ev.y.signum() * scroll.speed * time.delta_seconds())
-                .clamp(-node.unrounded_size().y, 0.);
-
+            scroll.offset = scroll.offset + ev.y.signum() * scroll.speed * time.delta_seconds();
             style.regular.style.top = Val::Px(scroll.offset);
         });
     });
@@ -161,7 +159,7 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
 
 fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
     cmd.entity(entity).with_children(|cmd| {
-        for i in 0..100 {
+        for i in 0..200 {
             cmd.spawn(TemplateBundle {
                 handle: server.load("card.xml"),
                 state: TemplateState::new()

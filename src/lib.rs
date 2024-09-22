@@ -27,18 +27,18 @@ pub mod prelude {
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
     pub use crate::styles::{HoverTimer, InteractionTimer, NodeStyle, PressedTimer};
-    pub use crate::XmlUiPlugin;
+    pub use crate::HtmlUiPlugin;
 }
 
 /// @todo: inline docs
 /// look at the examples
 #[derive(Default, Resource, Clone)]
-pub struct XmlUiPlugin {
+pub struct HtmlUiPlugin {
     auto_load_dir: Option<&'static str>,
     extension: Option<&'static str>,
 }
 
-impl XmlUiPlugin {
+impl HtmlUiPlugin {
     pub fn new() -> Self {
         Self::default()
     }
@@ -50,7 +50,7 @@ impl XmlUiPlugin {
     }
 }
 
-impl Plugin for XmlUiPlugin {
+impl Plugin for HtmlUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             load::LoaderPlugin,
@@ -74,7 +74,7 @@ impl Plugin for XmlUiPlugin {
 }
 
 fn watch_autolaod_dirs(
-    config: Res<XmlUiPlugin>,
+    config: Res<HtmlUiPlugin>,
     server: Res<AssetServer>,
     mut comps: ResMut<ComponentBindings>,
     mut last_checksum: Local<u64>,
