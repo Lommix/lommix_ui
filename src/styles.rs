@@ -1,18 +1,12 @@
-use std::time::Duration;
-
+use crate::{build::InteractionObverser, data::StyleAttr};
 use bevy::prelude::*;
 use interpolation::Ease;
-
-use crate::{build::InteractionObverser, data::StyleAttr};
+use std::time::Duration;
 
 pub struct TransitionPlugin;
 impl Plugin for TransitionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (update_transitions, update_interactions, update_node_style),
-        );
-
+        app.add_systems(Update, (continues_interaction_checking, update_node_style));
         app.register_type::<PressedTimer>();
         app.register_type::<HoverTimer>();
         app.register_type::<ComputedStyle>();
@@ -20,67 +14,99 @@ impl Plugin for TransitionPlugin {
     }
 }
 
-/*
-tyl
- A -> B
- A <- B
-
- Vals
-
- Animation: list of Vec<style->style>
-*/
-fn update_interactions(
-    mut cmd: Commands,
-    interactions: Query<(Entity, &Interaction, &NodeStyle), Changed<Interaction>>,
-    observer: Query<&InteractionObverser>,
-) {
-    interactions
-        .iter()
-        .for_each(|(entity, interaction, node_style)| {
-            let iter = observer
-                .get(entity)
-                .map(|obs| obs.iter())
-                .unwrap_or_default()
-                .chain(std::iter::once(&entity));
-
-            let delay = Duration::from_secs_f32(node_style.regular.delay);
-            match interaction {
-                Interaction::Pressed => {
-                    iter.for_each(|ent| {
-                        cmd.entity(*ent).insert(PressedTimer::new(delay));
-                    });
-                }
-                Interaction::Hovered => {
-                    iter.for_each(|ent| {
-                        cmd.entity(*ent).insert(HoverTimer::new(delay));
-                    });
-                }
-                Interaction::None => {
-                    iter.for_each(|ent| {
-                        cmd.entity(*ent)
-                            .remove::<PressedTimer>()
-                            .remove::<HoverTimer>();
-                    });
-                }
-            }
-        });
+#[derive(Component, Default, Reflect)]
+#[reflect]
+pub struct InteractionTimer {
+    elapsed: Duration,
+    max: Duration,
 }
 
-// @todo: broadcast update
-fn update_transitions(
-    mut pressed_timers: Query<(Entity, &mut PressedTimer)>,
-    mut hover_timers: Query<(Entity, &mut HoverTimer)>,
+impl InteractionTimer {
+    pub fn new(max: Duration) -> Self {
+        Self {
+            elapsed: Duration::ZERO,
+            max,
+        }
+    }
+
+    pub fn fraction(&self) -> f32 {
+        self.elapsed.div_duration_f32(self.max)
+    }
+
+    pub fn forward(&mut self, delta: Duration) {
+        self.elapsed = self
+            .elapsed
+            .checked_add(delta)
+            .map(|d| d.min(self.max))
+            .unwrap_or(self.elapsed);
+    }
+
+    pub fn backward(&mut self, delta: Duration) {
+        self.elapsed = self.elapsed.checked_sub(delta).unwrap_or(Duration::ZERO);
+    }
+}
+
+// @mvp
+// something is off with interactions of transforming nodes
+fn continues_interaction_checking(
+    interactions: Query<(Entity, &Interaction), With<NodeStyle>>,
+    mut hovers: Query<&mut HoverTimer>,
+    mut presseds: Query<&mut PressedTimer>,
+    observer: Query<&InteractionObverser>,
     time: Res<Time>,
 ) {
-    hover_timers.iter_mut().for_each(|(_, mut trans)| {
-        trans.tick(time.delta());
-    });
-    pressed_timers.iter_mut().for_each(|(_, mut trans)| {
-        trans.tick(time.delta());
+    interactions.iter().for_each(|(entity, interaction)| {
+        let subs = observer
+            .get(entity)
+            .map(|obs| obs.iter())
+            .unwrap_or_default()
+            .chain(std::iter::once(&entity));
+
+        match interaction {
+            Interaction::Pressed => {
+                // ++ pressed ++ hover
+                subs.for_each(|sub| {
+                    if let (Ok(mut htimer), Ok(mut ptimer)) =
+                        (hovers.get_mut(*sub), presseds.get_mut(*sub))
+                    {
+                        ptimer.forward(time.delta());
+                        htimer.forward(time.delta());
+                    } else {
+                        warn!("non interacting node obsering `{sub}`")
+                    }
+                });
+            }
+            Interaction::Hovered => {
+                // ++ hover -- pressed
+                subs.for_each(|sub| {
+                    if let (Ok(mut htimer), Ok(mut ptimer)) =
+                        (hovers.get_mut(*sub), presseds.get_mut(*sub))
+                    {
+                        ptimer.backward(time.delta());
+                        htimer.forward(time.delta());
+                    } else {
+                        warn!("non interacting node obsering `{sub}`")
+                    }
+                });
+            }
+            Interaction::None => {
+                // -- hover --pressed
+                subs.for_each(|sub| {
+                    if let (Ok(mut htimer), Ok(mut ptimer)) =
+                        (hovers.get_mut(*sub), presseds.get_mut(*sub))
+                    {
+                        ptimer.backward(time.delta());
+                        htimer.backward(time.delta());
+                    } else {
+                        warn!("non interacting node obsering `{sub}`")
+                    }
+                });
+            }
+        };
     });
 }
 
-// @todo: split
+// @todo: split, event based updates
 fn update_node_style(
     mut nodes: Query<(Entity, &mut Style, &NodeStyle)>,
     mut bg: Query<&mut BackgroundColor>,
@@ -116,19 +142,21 @@ fn update_node_style(
 
 #[derive(Component, Reflect, Default, Deref, DerefMut)]
 #[reflect]
-pub struct PressedTimer(Timer);
+pub struct PressedTimer(InteractionTimer);
+
 impl PressedTimer {
     pub fn new(d: Duration) -> Self {
-        Self(Timer::new(d, TimerMode::Once))
+        Self(InteractionTimer::new(d))
     }
 }
 
 #[derive(Component, Default, Reflect, Deref, DerefMut)]
 #[reflect]
-pub struct HoverTimer(Timer);
+pub struct HoverTimer(InteractionTimer);
+
 impl HoverTimer {
     pub fn new(d: Duration) -> Self {
-        Self(Timer::new(d, TimerMode::Once))
+        Self(InteractionTimer::new(d))
     }
 }
 
@@ -239,7 +267,7 @@ impl NodeStyle {
                     .map(|ez| timer.fraction().calc(ez))
                     .unwrap_or(timer.fraction());
 
-                for attr in self.hover.iter() {
+                for attr in self.pressed.iter() {
                     apply_lerp_style(
                         attr,
                         ratio,
@@ -429,7 +457,7 @@ fn apply_lerp_style(
         StyleAttr::Direction(direction) => style.direction = *direction,
         StyleAttr::Background(color) => {
             bg.as_mut()
-                .map(|bg| bg.0 = lerp_color(&default.border_color, color, ratio));
+                .map(|bg| bg.0 = lerp_color(&default.background, color, ratio));
         }
         StyleAttr::FontColor(color) => {
             text.as_mut().map(|txt| {

@@ -20,13 +20,13 @@ mod styles;
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        TemplateBundle, OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity, Tag, Tags, TemplateState, UiId,
-        UiTarget, UiWatch, UnbuildTag,
+        OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity, Tag, Tags, TemplateBundle, TemplateState,
+        UiId, UiTarget, UiWatch, UnbuildTag,
     };
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};
     pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
     pub use crate::error::ParseError;
-    pub use crate::styles::NodeStyle;
+    pub use crate::styles::{HoverTimer, InteractionTimer, NodeStyle, PressedTimer};
     pub use crate::XmlUiPlugin;
 }
 

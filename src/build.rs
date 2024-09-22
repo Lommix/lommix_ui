@@ -1,8 +1,10 @@
+use std::time::Duration;
+
 use crate::{
     compile::{compile_content, CompileContextEvent},
     data::{AttrTokens, NodeType, Template, XNode},
     prelude::ComponentBindings,
-    styles::NodeStyle,
+    styles::{HoverTimer, NodeStyle, PressedTimer},
 };
 use bevy::{prelude::*, utils::HashMap};
 use nom::{
@@ -341,6 +343,13 @@ fn build_node(
     }
 
     let style_attributes = NodeStyle::from(node.styles.clone());
+    cmd.entity(entity)
+        .insert(PressedTimer::new(Duration::from_secs_f32(
+            style_attributes.regular.delay,
+        )))
+        .insert(HoverTimer::new(Duration::from_secs_f32(
+            style_attributes.regular.delay,
+        )));
 
     let passed_state =
         node.defs

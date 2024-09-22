@@ -10,7 +10,7 @@
 		  padding="40px">
 
 		<!-- this is a user defined node `panel` that maps to include a another template -->
-		<panel primary="#245"
+		<panel primary="#AAF"
 			   title="{title}">
 			<img align_self="center"
 				 height="200px"
@@ -34,12 +34,13 @@
 
 				<button background="#002"
 						justify_content="center"
-						hover:background="#004"
-						hover:padding="100px"
-						pressed:padding="50px"
-						delay="0.5"
-						ease="exponential_out"
-						pressed:background="#055"
+						hover:background="#008"
+						pressed:background="#955"
+						hover:padding="10px 55px"
+						border="2px"
+						border_color="#FFF"
+						delay="0.4"
+						ease="bounce"
 						border_radius="4px"
 						padding="10px"
 						onpress="debug">

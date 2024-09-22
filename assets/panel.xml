@@ -32,6 +32,7 @@
 			<node watch="header"
 				  border_color="#FFF"
 				  hover:border_color="#008"
+				  delay="0.1"
 				  border="4px"
 				  background="{primary}">
 				<node flex_direction="column"

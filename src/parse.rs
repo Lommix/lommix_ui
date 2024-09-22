@@ -993,8 +993,6 @@ fn from_hex_nib(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
 
 #[cfg(test)]
 mod tests {
-    use std::string;
-
     use super::*;
     use test_case::test_case;
 
