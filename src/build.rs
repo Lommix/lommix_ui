@@ -345,10 +345,10 @@ fn build_node(
     let style_attributes = NodeStyle::from(node.styles.clone());
     cmd.entity(entity)
         .insert(PressedTimer::new(Duration::from_secs_f32(
-            style_attributes.regular.delay,
+            style_attributes.regular.delay.max(0.01),
         )))
         .insert(HoverTimer::new(Duration::from_secs_f32(
-            style_attributes.regular.delay,
+            style_attributes.regular.delay.max(0.01),
         )));
 
     let passed_state =

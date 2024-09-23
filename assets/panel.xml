@@ -26,20 +26,19 @@
 					target="to_collapse">
 				<text font_color="#055"
 					  watch="header"
+					  delay="0.1"
 					  hover:font_color="#FFF"
 					  font_size="20">{title} color: {secondary}</text>
 			</button>
 			<node watch="header"
 				  border_color="#FFF"
 				  hover:border_color="#008"
-				  delay="0.1"
 				  border="4px"
 				  background="{primary}">
 				<node flex_direction="column"
 					  row_gap="20px"
 					  width="100%"
 					  margin="-2px auto auto auto"
-					  height="100%"
 					  padding="20px 10px"
 					  justify_content="center"
 					  border_radius="auto auto 5px 5px"

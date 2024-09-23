@@ -129,13 +129,13 @@ fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>
 fn update_scroll(
     mut events: EventReader<MouseWheel>,
     mut scrollables: Query<(&mut Scrollable, &UiTarget, &Interaction)>,
-    mut targets: Query<(&mut NodeStyle, &Node)>,
+    mut targets: Query<&mut NodeStyle>,
     time: Res<Time>,
 ) {
     // whatever
     events.read().for_each(|ev| {
         scrollables.iter_mut().for_each(|(mut scroll, target, _)| {
-            let Ok((mut style, node)) = targets.get_mut(**target) else {
+            let Ok(mut style) = targets.get_mut(**target) else {
                 return;
             };
 

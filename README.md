@@ -1,15 +1,17 @@
-# Bevy Xml Ui
+# Bevy Html Ui
 
 [WIP][MVP]
 
-`Xml` ui syntax parser & builder. Create reusable component
-templates in plain `Xml`. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
+`Html`/`Xml` ui syntax parser & builder. Create reusable component
+templates in plain `Html`/`Xml`. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
 
 Because there is nothing worse than waiting on compilation.
 
 https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 
 ## Featuring
+
+A keyword for every bevy related ui style. Take any Bevy naming, make it `snake_case`, you found your value.
 
 -   A style attribute for each use. `padding="10px auto 5% 60vw"` -> `Uirect`
 -   Hook into events with `onspawn`,`onenter`,`onexit`,`onpress`
@@ -28,7 +30,7 @@ app.add_plugins(XmlUiPlugin::new().auto_load("components"));
 Create components.
 
 ```html
-<!-- /assets/components/super_button.xml-->
+<!-- /assets/components/my_button.xml-->
 <template>
     <property name="action">greet</property>
     <property name="text">Press me</property>
@@ -67,10 +69,10 @@ Use them in the next template.
     <property name="title">My Game</property>
     ...
     <node display="grid" grid_template_columns="(2, auto)">
-        <super_button text="Start Game" action="start_game" />
-        <super_button text="Settings" action="to_settings" />
-        <super_button text="Credits" action="to_credits" />
-        <super_button text="Exit" action="quit_game" />
+        <my_button text="Start Game" action="start_game" />
+        <my_button text="Settings" action="to_settings" />
+        <my_button text="Credits" action="to_credits" />
+        <my_button text="Exit" action="quit_game" />
     </node>
     ...
 </template>
@@ -100,8 +102,6 @@ cargo run --example ui
 ```
 
 ## Syntax
-
-`snake_case` all the way. Take any Bevy naming, make it `snake_case`, you found your value.
 
 [checkout the full syntax here](docs/syntax.md)
 
