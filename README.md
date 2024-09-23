@@ -3,7 +3,8 @@
 [WIP][MVP]
 
 `Html`/`Xml` ui syntax parser & builder. Create reusable component
-templates in plain `Html`/`Xml`. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
+templates in plain `Html`/`Xml`. Use Attributes to describe style.
+Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
 
 Because there is nothing worse than waiting on compilation.
 
@@ -13,11 +14,12 @@ https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 
 A keyword for every bevy related ui style. Take any Bevy naming, make it `snake_case`, you found your value.
 
--   A style attribute for each use. `padding="10px auto 5% 60vw"` -> `Uirect`
--   Hook into events with `onspawn`,`onenter`,`onexit`,`onpress`
--   Conditional styling with prefix like `hover:..` & `pressed:..`
--   Use `id`, `target` to connect elements and have access in bevy systems.
--   `watch="target_id"` to hook to other elements interactions.
+-   A simple way to describe complex styles via attributes. `padding="20px 0 5% 1vw"`, `grid_template_columns="(3,auto)"`
+-   Wire up your bevy systems with `onspawn`,`onenter`,`onexit`,`onpress`.
+-   Use `id`, `target` to connect elements and have access as components in bevy systems.
+-   Conditional style transitions with `hover:`,`pressed:`,`delay` & `ease`.
+-   propagate style transitions with `watch`.
+-   very thin dependencies.
 
 ## How To
 
@@ -120,14 +122,14 @@ The goal is to provide a very thin layer of UI syntax abstraction for seamless a
 
 To make us of existing tooling like syntax highlights, auto format, basic linting and even autocomplete.
 
-## Animations & Transitions
+## Trade offs
 
-Animations and transitions, just like in bevy, are application level. There will probably be
-some defaults behind features at some point.
+-   You loose control over all `Style` related Components for all nodes part of a template. Instead use `NodeStyle` which holds
+    the `regular` state and `hover` + `pressed` style attributes.
 
 ## Known limitations
 
 -   Do not recursive import. [mem stonks]
 -   One root node per component.
 -   .xsd schema is broken~
--   broken docs
+-   docs are uncomplete and sometimes outdated.
