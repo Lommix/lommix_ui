@@ -104,7 +104,7 @@ Checkout the examples for advanced interactions, play with the assets.
 cargo run --example ui
 
 # simple textinputs with a submit form
-cargo run --example text_input
+cargo run --example input
 
 # simple sliders
 cargo run --example slider
