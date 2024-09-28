@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
+	<property name="placeholder">placeholder</property>
+	<button target="text"
+			background="#000"
+			border="2px"
+			border_color="#FFF"
+			active:border_color="#80A"
+			padding="10px"
+			min_height="42px"
+			border_radius="10px">
+		<text font_size="24"
+			  id="text">{placeholder}</text>
+	</button>
+</template>

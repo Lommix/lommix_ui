@@ -40,7 +40,7 @@
 						border="2px"
 						border_color="#FFF"
 						delay="0.4"
-						ease="bounce"
+						ease="bounce_out"
 						border_radius="4px"
 						padding="10px"
 						onpress="debug">

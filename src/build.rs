@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     compile::{compile_content, CompileContextEvent},
-    data::{AttrTokens, NodeType, Template, XNode},
+    data::{AttrTokens, HtmlTemplate, NodeType, XNode},
     prelude::ComponentBindings,
     styles::{HoverTimer, NodeStyle, PressedTimer},
 };
@@ -108,9 +108,9 @@ pub struct Tag {
     pub value: String,
 }
 
-/// the entities owned uid `id="my_id"`
+/// the entities owned uid hashed as u64
 #[derive(Component, Default, Hash, Deref, DerefMut)]
-pub struct UiId(u64);
+pub struct UiId(String);
 
 /// the entity behind `id` in `target="id"`
 #[derive(Component, DerefMut, Deref)]
@@ -141,8 +141,8 @@ pub struct OnExit(pub Vec<String>);
 
 /// Spawns a ui template behind an asset.
 #[derive(Bundle, Default)]
-pub struct TemplateBundle {
-    pub handle: Handle<Template>,
+pub struct HtmlBundle {
+    pub handle: Handle<HtmlTemplate>,
     pub node: NodeBundle,
     pub unbuild: UnbuildTag,
     pub state: TemplateState,
@@ -150,8 +150,8 @@ pub struct TemplateBundle {
 
 fn hotreload(
     mut cmd: Commands,
-    mut events: EventReader<AssetEvent<Template>>,
-    templates: Query<(Entity, &Handle<Template>)>,
+    mut events: EventReader<AssetEvent<HtmlTemplate>>,
+    templates: Query<(Entity, &Handle<HtmlTemplate>)>,
     sloted_nodes: Query<(Entity, &InsideSlot)>,
 ) {
     events.read().for_each(|ev| {
@@ -188,7 +188,7 @@ fn hotreload(
 struct KeepComps {
     pub parent: Parent,
     pub children: Children,
-    pub ui: TemplateBundle,
+    pub ui: HtmlBundle,
     pub unsloed: UnslotedChildren,
     pub slot: SlotPlaceholder,
     pub inside: InsideSlot,
@@ -254,8 +254,8 @@ impl IdLookUpTable {
 
 fn spawn_ui(
     mut cmd: Commands,
-    mut unbuild: Query<(Entity, &Handle<Template>, &mut TemplateState), With<UnbuildTag>>,
-    assets: Res<Assets<Template>>,
+    mut unbuild: Query<(Entity, &Handle<HtmlTemplate>, &mut TemplateState), With<UnbuildTag>>,
+    assets: Res<Assets<HtmlTemplate>>,
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
 ) {
@@ -287,6 +287,10 @@ fn spawn_ui(
                 &mut state,
                 &mut subscriber,
             );
+
+            id_table.ids.iter().for_each(|(id_string, entity)| {
+                cmd.entity(*entity).insert(UiId(id_string.clone()));
+            });
 
             id_table.targets.iter().for_each(|(entity, target_id)| {
                 match id_table.ids.get(target_id) {
@@ -323,7 +327,7 @@ fn build_node(
     scope: ScopeEntity,
     node: &XNode,
     cmd: &mut Commands,
-    assets: &Assets<Template>,
+    assets: &Assets<HtmlTemplate>,
     server: &AssetServer,
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
@@ -448,7 +452,7 @@ fn build_node(
         }
         NodeType::Include => {
             let path = node.src.clone().unwrap_or_default();
-            let handle = server.load::<Template>(path);
+            let handle = server.load::<HtmlTemplate>(path);
             if node.children.len() > 0 {
                 let slot_holder = cmd.spawn(NodeBundle::default()).id();
                 node.children.iter().for_each(|child_node| {

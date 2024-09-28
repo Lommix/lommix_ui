@@ -32,7 +32,7 @@ pub struct XNode {
 }
 
 #[derive(Debug, Asset, TypePath)]
-pub struct Template {
+pub struct HtmlTemplate {
     pub name: Option<String>,
     pub properties: HashMap<String, String>,
     pub root: Vec<XNode>,
@@ -87,7 +87,7 @@ impl AttrTokens {
     }
 }
 
-#[derive(Debug,Reflect, PartialEq, Clone)]
+#[derive(Debug, Reflect, PartialEq, Clone)]
 #[reflect]
 pub enum Action {
     OnPress(Vec<String>),
@@ -177,8 +177,10 @@ pub enum StyleAttr {
     Background(Color),
 
     // -----
+    // @todo: blocks reflect, rethink
     Hover(Box<StyleAttr>),
     Pressed(Box<StyleAttr>),
+    Active(Box<StyleAttr>),
 
     // -----
     // animations

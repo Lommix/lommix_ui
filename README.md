@@ -17,7 +17,7 @@ A keyword for every bevy related ui style. Take any Bevy naming, make it `snake_
 -   A simple way to describe complex styles via attributes. `padding="20px 0 5% 1vw"`, `grid_template_columns="(3,auto)"`
 -   Wire up your bevy systems with `onspawn`,`onenter`,`onexit`,`onpress`.
 -   Use `id`, `target` to connect elements and have access as components in bevy systems.
--   Conditional style transitions with `hover:`,`pressed:`,`delay` & `ease`.
+-   Conditional style transitions with `hover:`,`pressed:`,`active:`,`delay` & `ease`.
 -   propagate style transitions with `watch`.
 -   very thin dependencies.
 
@@ -26,7 +26,7 @@ A keyword for every bevy related ui style. Take any Bevy naming, make it `snake_
 Add the plugin. Use an optional auto load path (filename = component name).
 
 ```rust
-app.add_plugins(XmlUiPlugin::new().auto_load("components"));
+app.add_plugins(HtmlUiPlugin::new().auto_load("components"));
 ```
 
 Create components.
@@ -100,14 +100,18 @@ fn setup(
 Checkout the examples for advanced interactions, play with the assets.
 
 ```bash
+# basic menu demo
 cargo run --example ui
+
+# simple textinputs with a submit form
+cargo run --example text_input
 ```
 
 ## Syntax
 
 [checkout the full syntax here](docs/syntax.md)
 
-## Autocomplete & Formatting & Linting
+## Autocomplete, Formatting & Linting
 
 not perfect, but getting there. Checkout the example on how to use the provided
 schema.xsd. Feel free to extend it to your needs.
@@ -125,11 +129,11 @@ To make us of existing tooling like syntax highlights, auto format, basic lintin
 ## Trade offs
 
 -   You loose control over all `Style` related Components for all nodes part of a template. Instead use `NodeStyle` which holds
-    the `regular` state and `hover` + `pressed` style attributes.
+    the `regular` state and `hover`,`pressed` + `active` style attributes.
 
-## Known limitations
+## Known limitations and Pitfalls
 
 -   Do not recursive import. [mem stonks]
 -   One root node per component.
--   .xsd schema is broken~
+-   .xsd schema is broken/unfinished.
 -   docs are uncomplete and sometimes outdated.

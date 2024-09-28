@@ -27,8 +27,8 @@ fn setup(
     mut custom_comps: ResMut<ComponentBindings>,
 ) {
     cmd.spawn(Camera2dBundle::default());
-    cmd.spawn(TemplateBundle {
-        handle: server.load("menu.xml"),
+    cmd.spawn(HtmlBundle {
+        handle: server.load("demo/menu.xml"),
         ..default()
     });
 
@@ -38,9 +38,9 @@ fn setup(
     function_bindings.register("play_beep", cmd.register_one_shot_system(play_beep));
 
     // register custom node by hand
-    let panel_handle: Handle<Template> = server.load("panel.xml");
+    let panel_handle: Handle<HtmlTemplate> = server.load("demo/panel.xml");
     custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert(TemplateBundle {
+        entity_cmd.insert(HtmlBundle {
             handle: panel_handle.clone(),
             ..default()
         });
@@ -160,8 +160,8 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
 fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..200 {
-            cmd.spawn(TemplateBundle {
-                handle: server.load("card.xml"),
+            cmd.spawn(HtmlBundle {
+                handle: server.load("demo/card.xml"),
                 state: TemplateState::new()
                     .with("title", &format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),

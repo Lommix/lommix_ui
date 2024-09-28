@@ -40,3 +40,19 @@ bevy = { version = "0.14", default-features = false, features = [
 ] }
 rand = "0.8.5"
 bevy-inspector-egui = "0.26.0"
+
+[[example]]
+name = "ui"
+path = "examples/ui.rs"
+
+[[example]]
+name = "input"
+path = "examples/input.rs"
+
+[[example]]
+name = "slider"
+path = "examples/slider.rs"
+
+[[example]]
+name = "dropdown"
+path = "examples/dropdown.rs"

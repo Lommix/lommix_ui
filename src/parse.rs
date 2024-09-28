@@ -1,4 +1,4 @@
-use crate::data::{Action, AttrTokens, Attribute, StyleAttr, Template, XNode};
+use crate::data::{Action, AttrTokens, Attribute, StyleAttr, HtmlTemplate, XNode};
 use crate::error::ParseError;
 use crate::prelude::NodeType;
 use bevy::ui::{
@@ -44,7 +44,7 @@ impl std::fmt::Debug for XmlAttr<'_> {
     }
 }
 
-pub(crate) fn parse_template(input: &[u8]) -> Result<Template, ParseError> {
+pub(crate) fn parse_template(input: &[u8]) -> Result<HtmlTemplate, ParseError> {
     let (input, _) = trim_comments(input)?;
     let (input, _xml_header) = alt((
         delimited(tag("<?"), take_until("?>"), tag("?>")).map(Some),
@@ -81,7 +81,7 @@ pub(crate) fn parse_template(input: &[u8]) -> Result<Template, ParseError> {
         }
     }
 
-    Ok(Template {
+    Ok(HtmlTemplate {
         name,
         properties,
         root,
@@ -407,6 +407,7 @@ fn parse_style<'a>(
     match prefix {
         Some(b"pressed") => Ok((input, StyleAttr::Pressed(Box::new(style)))),
         Some(b"hover") => Ok((input, StyleAttr::Hover(Box::new(style)))),
+        Some(b"active") => Ok((input, StyleAttr::Active(Box::new(style)))),
         _ => Ok((input, style)),
     }
 }

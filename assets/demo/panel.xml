@@ -16,17 +16,18 @@
 			<button id="header"
 					width="100%"
 					padding="20px 5px"
-					hover:padding="20px 10px"
+					hover:padding="20px 8px"
+					delay="0.2"
+					ease="cubic_out"
 					justify_content="space_between"
 					background="#FFF"
 					hover:background="#008"
-					delay="0.1"
 					align_items="center"
 					onspawn="collapse"
 					target="to_collapse">
 				<text font_color="#055"
 					  watch="header"
-					  delay="0.1"
+					  delay="0.2"
 					  hover:font_color="#FFF"
 					  font_size="20">{title} color: {secondary}</text>
 			</button>

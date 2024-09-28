@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
+
+	<node padding="50px"
+		  border="4px"
+		  border_radius="10px"
+		  margin="50px"
+		  border_color="#000"
+		  background="#338"
+		  flex_direction="column">
+
+		<text font_size="32"
+			  padding="0  20px">Volume Control</text>
+
+		<text>Master</text>
+		<slider id="master"/>
+		<text>Dialog</text>
+		<slider id="dialog"/>
+		<text id="sfx">sfx</text>
+		<slider/>
+		<text id="music">Music</text>
+		<slider/>
+	</node>
+</template>

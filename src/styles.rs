@@ -21,6 +21,9 @@ pub struct InteractionTimer {
     max: Duration,
 }
 
+#[derive(Component)]
+pub struct UiActive;
+
 impl InteractionTimer {
     pub fn new(max: Duration) -> Self {
         Self {
@@ -108,7 +111,7 @@ fn continues_interaction_checking(
 
 // @todo: split, event based updates
 fn update_node_style(
-    mut nodes: Query<(Entity, &mut Style, &NodeStyle)>,
+    mut nodes: Query<(Entity, &mut Style, &NodeStyle, Option<&UiActive>)>,
     mut bg: Query<&mut BackgroundColor>,
     mut bradius: Query<&mut BorderRadius>,
     mut bcolor: Query<&mut BorderColor>,
@@ -119,7 +122,7 @@ fn update_node_style(
 ) {
     nodes
         .iter_mut()
-        .for_each(|(entity, mut style, node_styles)| {
+        .for_each(|(entity, mut style, node_styles, active_state)| {
             let pressed_timer = pressed_timer.get(entity).ok();
             let hover_timer = hover_timer.get(entity).ok();
             let bg = bg.get_mut(entity).ok();
@@ -129,6 +132,7 @@ fn update_node_style(
 
             node_styles.apply_style(
                 &mut style,
+                active_state.is_some(),
                 bg,
                 bradius,
                 bcolor,
@@ -199,12 +203,15 @@ pub struct NodeStyle {
     pub hover: Vec<StyleAttr>,
     #[reflect(ignore)]
     pub pressed: Vec<StyleAttr>,
+    #[reflect(ignore)]
+    pub active: Vec<StyleAttr>,
 }
 
 impl NodeStyle {
     pub fn apply_style(
         &self,
         style: &mut Style,
+        is_active: bool,
         mut bg: Option<Mut<BackgroundColor>>,
         mut bradius: Option<Mut<BorderRadius>>,
         mut bcolor: Option<Mut<BorderColor>>,
@@ -282,6 +289,22 @@ impl NodeStyle {
                 }
             }
         });
+
+        if is_active {
+            for attr in self.active.iter() {
+                apply_lerp_style(
+                    attr,
+                    1., //@todo: fade-in/out?
+                    &self.regular,
+                    style,
+                    &mut bg,
+                    &mut bradius,
+                    &mut bcolor,
+                    &mut text,
+                    server,
+                );
+            }
+        }
     }
 
     pub fn add_style_attr(&mut self, attr: StyleAttr) {
@@ -304,8 +327,19 @@ impl NodeStyle {
                     .iter()
                     .position(|s| std::mem::discriminant(s) == std::mem::discriminant(&style))
                 {
-                    Some(index) => self.hover.insert(index, style),
+                    Some(index) => self.pressed.insert(index, style),
                     None => self.pressed.push(style),
+                }
+            }
+            StyleAttr::Active(style) => {
+                let style = *style;
+                match self
+                    .active
+                    .iter()
+                    .position(|s| std::mem::discriminant(s) == std::mem::discriminant(&style))
+                {
+                    Some(index) => self.active.insert(index, style),
+                    None => self.active.push(style),
                 }
             }
             StyleAttr::Display(display) => self.regular.style.display = display,
@@ -462,14 +496,14 @@ fn apply_lerp_style(
         StyleAttr::FontColor(color) => {
             text.as_mut().map(|txt| {
                 txt.sections.iter_mut().for_each(|sec| {
-                    sec.style.color = *color;
+                    sec.style.color = lerp_color(&default.font_color, color, ratio);
                 });
             });
         }
         StyleAttr::FontSize(s) => {
             text.as_mut().map(|txt| {
                 txt.sections.iter_mut().for_each(|sec| {
-                    sec.style.font_size = *s;
+                    sec.style.font_size = default.font_size.lerp(*s, ratio);
                 });
             });
         }
@@ -481,6 +515,7 @@ fn apply_lerp_style(
             });
         }
         _ => (),
+        // StyleAttr::Active(style_attr) => todo!(),
         // StyleAttr::Hover(style_attr) => todo!(),
         // StyleAttr::Pressed(style_attr) => todo!(),
         // StyleAttr::Delay(_) => todo!(),

@@ -9,16 +9,18 @@ Provides basics events for the `Interaction` Component and on `Spawn`.
 -   `onpress="start_game"`
 -   `onexit="fade_out"`
 
-In bevy your register your function on startup in the
+`onspawn` works for all nodes and custom components.
+
+In bevy your register your function on startup in your code:
 
 ```rust
 fn setup(
     mut function_bindings: ResMut<FunctionBindings>,
 ) {
     function_bindings.register(
-        "collapse",
+        "init_friend_list",
         cmd.register_one_shot_system(|In(entity), mut cmd: Commands| {
-            cmd.entity(entity).insert(Collapse(true));
+            cmd.entity(entity).insert(FriendList::default());
         }),
     );
 }
@@ -47,26 +49,26 @@ fn setup(
 -   `id="my_node"`: gives an identifier to a node, that is only valid inside the component.
 -   `target="my_node"`: adds a target component to the node, if `my_var` is a valid node id.
 -   `watch="my_node"`: any `hover:style` and `pressed:style` gets applied when the watched node is interacted with.
+-   `active:background="#000"` styles with the active prefix only apply, when the `UiActive` Component
+    is present on the node. This is a way to control optional styles and transitions from code.
+
+`id`,`tartget`,`watch` are template local and do not propagate outside of the file.
 
 ## Default elements
 
 Default elements with events/special attributes.
 
 -   `<node>` : `NodeBundle`
-    -   `onspawn=".."`,
 -   `<img>` : `ImageBundle`
     -   `src="image_path"`
-    -   `onspawn=".."`,
 -   `<button>` : `ButtonBundle`
     -   `onpress=".."`,
     -   `onenter=".."`,
     -   `onexit=".."`,
     -   `onspawn=".."`,
 -   `<text>` : `TexBundle`
-    -   `onspawn=".."`,
 -   `<Include>`
     -   `src="include_path"`
-    -   `onspawn=".."`,
 -   `<slot>` : marks a slot if block is included. There is currently only support for 1 slot.
 
 ## Conditional Styles

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
+	<node padding="50px"
+		  margin="10px"
+		  border="2px"
+		  border_radius="15px"
+		  flex_direction="column"
+		  row_gap="5px"
+		  background="#222"
+		  border_color="#FFF">
+
+		<text font_size="32"
+			  padding="10px">Simple Text Input</text>
+
+		<node id="input_form"
+			  flex_direction="column">
+			<text font_size="24"
+				  margin="10px 0 0 0">field 1</text>
+			<input id="field_1"
+				   placeholder="placeholder 1"/>
+			<text font_size="24"
+				  margin="10px 0 0 0">field 2</text>
+			<input id="field_2"
+				   placeholder="placeholder 2"/>
+			<text font_size="24"
+				  margin="10px 0 0 0">field 3</text>
+			<input id="field_3"
+				   placeholder="placeholder 3"/>
+		</node>
+
+		<button id="login_btn"
+				onpress="submit"
+				target="input_form"
+				background="#000"
+				border_color="#FFF"
+				hover:border_color="#80A"
+				border="2px"
+				margin="20px 0 0 0"
+				justify_content="center"
+				padding="15px"
+				border_radius="5px">
+			<text font_size="32"
+				  hover:font_size="48"
+				  delay="0.2"
+				  ease="cubic_out"
+				  watch="login_btn">Submit</text>
+		</button>
+	</node>
+</template>

@@ -1,4 +1,4 @@
-use crate::{data::Template, error::ParseError, parse::parse_template};
+use crate::{data::HtmlTemplate, error::ParseError, parse::parse_template};
 use bevy::{
     asset::{AssetLoader, AsyncReadExt},
     prelude::*,
@@ -7,15 +7,15 @@ use bevy::{
 pub struct LoaderPlugin;
 impl Plugin for LoaderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_asset::<Template>();
-        app.init_asset_loader::<XmlUiLoader>();
+        app.init_asset::<HtmlTemplate>();
+        app.init_asset_loader::<HtmlUiLoader>();
     }
 }
 
 #[derive(Default)]
-pub struct XmlUiLoader;
-impl AssetLoader for XmlUiLoader {
-    type Asset = Template;
+pub struct HtmlUiLoader;
+impl AssetLoader for HtmlUiLoader {
+    type Asset = HtmlTemplate;
     type Settings = ();
     type Error = ParseError;
 

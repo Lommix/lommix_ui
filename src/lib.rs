@@ -4,8 +4,8 @@ use std::{
 };
 
 use bevy::{prelude::*, time::common_conditions::on_timer};
-use build::TemplateBundle;
-use data::Template;
+use build::HtmlBundle;
+use data::HtmlTemplate;
 use prelude::ComponentBindings;
 
 mod bindings;
@@ -20,13 +20,13 @@ mod styles;
 pub mod prelude {
     pub use crate::bindings::{ComponentBindings, FunctionBindings};
     pub use crate::build::{
-        OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity, Tag, Tags, TemplateBundle, TemplateState,
+        OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity, Tag, Tags, HtmlBundle, TemplateState,
         UiId, UiTarget, UiWatch, UnbuildTag,
     };
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};
-    pub use crate::data::{Action, Attribute, NodeType, StyleAttr, Template};
+    pub use crate::data::{Action, Attribute, NodeType, StyleAttr, HtmlTemplate};
     pub use crate::error::ParseError;
-    pub use crate::styles::{HoverTimer, InteractionTimer, NodeStyle, PressedTimer};
+    pub use crate::styles::{HoverTimer, InteractionTimer, NodeStyle, PressedTimer, UiActive};
     pub use crate::HtmlUiPlugin;
 }
 
@@ -92,14 +92,14 @@ fn watch_autolaod_dirs(
     }
 
     for path in paths.iter() {
-        let handle: Handle<Template> = server.load(path);
+        let handle: Handle<HtmlTemplate> = server.load(path);
         let name = std::path::Path::new(path)
             .file_stem()
             .unwrap_or_default()
             .to_string_lossy();
 
         comps.register(name.to_string(), move |mut cmd| {
-            cmd.insert(TemplateBundle {
+            cmd.insert(HtmlBundle {
                 handle: handle.clone(),
                 ..default()
             });
