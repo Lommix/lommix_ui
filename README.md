@@ -105,6 +105,9 @@ cargo run --example ui
 
 # simple textinputs with a submit form
 cargo run --example text_input
+
+# simple sliders
+cargo run --example slider
 ```
 
 ## Syntax
