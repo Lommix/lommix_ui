@@ -56,7 +56,7 @@ fn continues_interaction_checking(
     mut hovers: Query<&mut HoverTimer>,
     mut presseds: Query<&mut PressedTimer>,
     observer: Query<&InteractionObverser>,
-    time: Res<Time>,
+    time: Res<Time<Real>>,
 ) {
     interactions.iter().for_each(|(entity, interaction)| {
         let subs = observer
