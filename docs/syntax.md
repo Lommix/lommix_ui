@@ -95,8 +95,14 @@ Apply on condition, for elements using the `Interaction` Component like buttons.
 -   `max_width="5vw"`
 -   `max_height="5%"`
 -   `min_height="56px"`
--   `aspect_ratio="50"` : flaot
+-   `aspect_ratio="50"` : float
 -   `duration="50"` -> adds a Duration Component, [WIP], animations
+
+## `ImageScaleMode`
+
+-   `image_scale_mode="10px tile(1) stretch 1"` : slice mode (border x-axis y-axis scale)
+-   `image_scale_mode="5px stretch tile(1) 5"` : slice mode
+-   `image_scale_mode="true true 5"` : tiled mode (x-axis y-axis scale)
 
 ## `Flex`
 

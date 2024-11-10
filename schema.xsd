@@ -80,6 +80,15 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
+		<xs:attribute name="image_scale_mode">
+			<xs:annotation>
+				<xs:documentation></xs:documentation>
+				<xs:appinfo>
+					<hover:namespaceInfo xmlns:hover="http://example.com/hover"/>
+					<pressed:namespaceInfo xmlns:pressed="http://example.com/pressed"/>
+				</xs:appinfo>
+			</xs:annotation>
+		</xs:attribute>
 		<xs:attribute name="margin">
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
@@ -592,10 +601,11 @@
 		<xs:complexType>
 			<xs:sequence>
 				<xs:element name="name"
-					minOccurs="0"
+							minOccurs="0"
 							type="xs:string"/>
 				<xs:element ref="property"
-							minOccurs="0" maxOccurs="unbounded"/>
+							minOccurs="0"
+							maxOccurs="unbounded"/>
 				<!-- <xs:group ref="nodes" minOccurs="0" /> -->
 				<xs:any minOccurs="0"/>
 			</xs:sequence>

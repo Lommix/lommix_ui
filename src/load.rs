@@ -8,31 +8,33 @@ pub struct LoaderPlugin;
 impl Plugin for LoaderPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset::<HtmlTemplate>();
-        app.init_asset_loader::<HtmlUiLoader>();
+        app.init_asset_loader::<HtmlAssetLoader>();
     }
 }
 
 #[derive(Default)]
-pub struct HtmlUiLoader;
-impl AssetLoader for HtmlUiLoader {
+pub struct HtmlAssetLoader;
+impl AssetLoader for HtmlAssetLoader {
     type Asset = HtmlTemplate;
     type Settings = ();
     type Error = ParseError;
 
-    fn load<'a>(
+    async fn load<'a>(
         &'a self,
-        reader: &'a mut bevy::asset::io::Reader,
+        reader: &'a mut bevy::asset::io::Reader<'_>,
         _settings: &'a Self::Settings,
-        _load_context: &'a mut bevy::asset::LoadContext,
-    ) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
-        Box::pin(async move {
-            let mut bytes = Vec::new();
-            reader
-                .read_to_end(&mut bytes)
-                .await
-                .map_err(|err| ParseError::FailedToRead(err.to_string()))?;
+        _load_context: &'a mut bevy::asset::LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader
+            .read_to_end(&mut bytes)
+            .await
+            .map_err(|err| ParseError::FailedToRead(err.to_string()))?;
 
-            parse_template(&bytes)
-        })
+        parse_template(&bytes)
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["html", "xml"]
     }
 }

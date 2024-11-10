@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 
 ## Featuring
 
-A keyword for every bevy related ui style. Take any Bevy naming, make it `snake_case`, you found your value.
+A keyword for every bevy related UI style. Take any Bevy naming, make it `snake_case`, you found your value.
 
 -   A simple way to describe complex styles via attributes. `padding="20px 0 5% 1vw"`, `grid_template_columns="(3,auto)"`
 -   Wire up your bevy systems with `onspawn`,`onenter`,`onexit`,`onpress`.
@@ -23,16 +23,16 @@ A keyword for every bevy related ui style. Take any Bevy naming, make it `snake_
 
 ## How To
 
-Add the plugin. Use an optional auto load path (filename = component name).
+Add the plugin.
 
 ```rust
-app.add_plugins(HtmlUiPlugin::new().auto_load("components"));
+app.add_plugins(HtmlUiPlugin);
 ```
 
-Create components.
+Create components in html or xml, same syntax.
 
 ```html
-<!-- /assets/components/my_button.xml-->
+<!-- /assets/my_button.xml-->
 <template>
     <property name="action">greet</property>
     <property name="text">Press me</property>
@@ -56,26 +56,60 @@ Create components.
             border_radius="30px"
             onpress="{action}"
         >
-            <text watch="button" font_size="20" font_color="#FFF" hover:font_color="#752">{text}</text>
+            <text
+                watch="button"
+                font_size="20"
+                font_color="#FFF"
+                hover:font_color="#752"
+            >
+                {text}
+            </text>
         </button>
     </node>
 </template>
 ```
 
-Component auto registers into your running app, if `auto_load` is set.
-Use them in the next template.
+You can now use the `include` node to import your component:
+
+```
+<include src="my_button.xml" text="Start Game" action="start_game" />
+```
+
+Or even better, register it as a custom component in a startup system to use
+it in any other template!
+
+```rust
+fn startup(
+    server: Res<AssetServer>,
+    mut custom_comps: ResMut<ComponentBindings>,
+) {
+    let button_template: Handle<HtmlTemplate> = server.load("my_button.xml");
+    custom_comps.register("my_button", move |mut entity_cmd: EntityCommands| {
+        entity_cmd.insert(HtmlBundle {
+            handle: button_template.clone(),
+            ..default()
+        });
+    });
+```
+
+And now you have a new node!
 
 ```html
 <!-- menu.xml -->
 <template>
     <property name="title">My Game</property>
     ...
-    <node display="grid" grid_template_columns="(2, auto)">
-        <my_button text="Start Game" action="start_game" />
-        <my_button text="Settings" action="to_settings" />
-        <my_button text="Credits" action="to_credits" />
-        <my_button text="Exit" action="quit_game" />
-    </node>
+    <img
+        display="grid"
+        grid_template_columns="(2, auto)"
+        src="ui_panel.png"
+        image_scale_mode="10px tile(1) tile(1) 4"
+        >
+            <my_button text="Start Game" action="start_game" />
+            <my_button text="Settings" action="to_settings" />
+            <my_button text="Credits" action="to_credits" />
+            <my_button text="Exit" action="quit_game" />
+    </img>
     ...
 </template>
 ```
@@ -97,13 +131,14 @@ fn setup(
 }
 ```
 
-Checkout the examples for advanced interactions, play with the assets.
+Checkout the examples for advanced interactions, play with the assets. Keep in mind these are
+very crude as proof of concept.
 
 ```bash
 # basic menu demo
 cargo run --example ui
 
-# simple textinputs with a submit form
+# simple text inputs with a submit form
 cargo run --example input
 
 # simple sliders
@@ -116,14 +151,15 @@ cargo run --example slider
 
 ## Autocomplete, Formatting & Linting
 
-not perfect, but getting there. Checkout the example on how to use the provided
+Not perfect, but getting there. Checkout the example on how to use the provided
 schema.xsd. Feel free to extend it to your needs.
 
 [schema.xsd](schema.xsd)
 
 ## Goal
 
-The goal is to provide a very thin layer of UI syntax abstraction for seamless and fast iteration on your design.
+The goal is to provide a very thin layer of UI syntax abstraction for seamless and fast iteration on your design,
+while keeping any kind of logic in bevy.
 
 ## Why Xml/Html(-like)
 

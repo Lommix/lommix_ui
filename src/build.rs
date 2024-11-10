@@ -402,6 +402,10 @@ fn build_node(
             let path = node.src.clone().unwrap_or_default();
             let handle = server.load::<Image>(path);
 
+            if let Some(scale_mode) = style_attributes.regular.image_scale_mode.as_ref() {
+                cmd.entity(entity).insert(scale_mode.clone());
+            }
+
             cmd.entity(entity).insert((
                 Name::new("Image"),
                 ImageBundle {

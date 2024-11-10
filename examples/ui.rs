@@ -11,7 +11,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::default())
-        .add_plugins(HtmlUiPlugin::new().auto_load("components", "xml"))
+        .add_plugins(HtmlUiPlugin)
         .add_systems(Startup, setup)
         .add_systems(
             Update,

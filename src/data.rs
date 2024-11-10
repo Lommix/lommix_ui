@@ -38,7 +38,7 @@ pub struct HtmlTemplate {
     pub root: Vec<XNode>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
     PropertyDefinition(String, String), // to remove
@@ -114,7 +114,7 @@ impl Action {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum StyleAttr {
     Display(Display),
     Position(PositionType),
@@ -186,4 +186,10 @@ pub enum StyleAttr {
     // animations
     Delay(f32),
     Easing(interpolation::EaseFunction),
+    // -----
+    // image
+    // scale mode
+    // atlas
+    ImageScaleMode(ImageScaleMode),
+    // ImageAtlas(TextureAtlas),
 }

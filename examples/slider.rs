@@ -3,7 +3,12 @@ use bevy_html_ui::prelude::*;
 
 pub fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, HtmlUiPlugin::default()))
+        .add_plugins((
+            DefaultPlugins.set(ImagePlugin {
+                default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
+            }),
+            HtmlUiPlugin::default(),
+        ))
         .add_plugins(SliderPlugin)
         .add_systems(Startup, setup_scene)
         .run();

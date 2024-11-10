@@ -1,6 +1,7 @@
-use crate::data::{Action, AttrTokens, Attribute, StyleAttr, HtmlTemplate, XNode};
+use crate::data::{Action, AttrTokens, Attribute, HtmlTemplate, StyleAttr, XNode};
 use crate::error::ParseError;
 use crate::prelude::NodeType;
+use bevy::sprite::{BorderRect, ImageScaleMode, SliceScaleMode, TextureSlicer};
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap, GridAutoFlow,
     GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis,
@@ -349,6 +350,7 @@ fn parse_style<'a>(
         b"display" => map(parse_display, StyleAttr::Display)(value)?,
         b"overflow" => map(parse_overflow, StyleAttr::Overflow)(value)?,
         b"direction" => map(parse_direction, StyleAttr::Direction)(value)?,
+
         // align & justify
         b"align_self" => map(parse_align_self, StyleAttr::AlignSelf)(value)?,
         b"align_items" => map(parse_align_items, StyleAttr::AlignItems)(value)?,
@@ -356,6 +358,7 @@ fn parse_style<'a>(
         b"justify_self" => map(parse_justify_self, StyleAttr::JustifySelf)(value)?,
         b"justify_items" => map(parse_justify_items, StyleAttr::JustifyItems)(value)?,
         b"justify_content" => map(parse_justify_content, StyleAttr::JustifyContent)(value)?,
+
         // flex
         b"flex_direction" => map(parse_flex_direction, StyleAttr::FlexDirection)(value)?,
         b"flex_wrap" => map(parse_flex_wrap, StyleAttr::FlexWrap)(value)?,
@@ -373,6 +376,9 @@ fn parse_style<'a>(
         b"grid_template_columns" => map(many0(parse_grid_track_repeated), |v| StyleAttr::GridTemplateColumns(v))(value)?,
         b"grid_row" => map(parse_grid_placement, |v| StyleAttr::GridRow(v))(value)?,
         b"grid_column" => map(parse_grid_placement, |v| StyleAttr::GridColumn(v))(value)?,
+
+        //slices
+        b"image_scale_mode" => map(parse_image_scale_mode, |v| StyleAttr::ImageScaleMode(v))(value)?,
 
         // values
         b"font" => map(as_string, StyleAttr::Font)(value)?,
@@ -618,6 +624,68 @@ fn take_snake(input: &[u8]) -> IResult<&[u8], &[u8]> {
     take_while(|b: u8| b.is_ascii_alphabetic() || b == b'_')(input)
 }
 
+fn parse_image_scale_mode(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
+    alt((parse_image_tile, parse_image_slice))(input)
+}
+
+// 10px tiled tiled 1
+fn parse_image_slice(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
+    let (input, (val, x, y, s)) = tuple((
+        preceded(multispace0, parse_px),
+        preceded(multispace0, parse_slice_scale),
+        preceded(multispace0, parse_slice_scale),
+        preceded(multispace0, parse_float),
+    ))(input)?;
+
+    Ok((
+        input,
+        ImageScaleMode::Sliced(TextureSlicer {
+            border: BorderRect::square(val),
+            center_scale_mode: x,
+            sides_scale_mode: y,
+            max_corner_scale: s,
+        }),
+    ))
+}
+
+fn parse_image_tile(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
+    let (input, (x, y, s)) = tuple((
+        preceded(multispace0, parse_bool),
+        preceded(multispace0, parse_bool),
+        preceded(multispace0, parse_float),
+    ))(input)?;
+
+    Ok((
+        input,
+        ImageScaleMode::Tiled {
+            tile_x: x,
+            tile_y: y,
+            stretch_value: s,
+        },
+    ))
+}
+
+fn parse_bool(input: &[u8]) -> IResult<&[u8], bool> {
+    alt((map(tag("true"), |_| true), map(tag("false"), |_| false)))(input)
+}
+
+// stretch
+// tile(1)
+fn parse_slice_scale(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
+    alt((parse_stretch, parse_tile))(input)
+}
+
+fn parse_stretch(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
+    map(tag("stretch"), |_| SliceScaleMode::Stretch)(input)
+}
+
+fn parse_tile(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
+    map(
+        tuple((tag("tile"), delimited(tag("("), parse_float, tag(")")))),
+        |(_, v)| SliceScaleMode::Tile { stretch_value: v },
+    )(input)
+}
+
 /// convert string values to uirect
 /// 20px/% single
 /// 10px/% 10px axis
@@ -845,6 +913,10 @@ fn parse_val(input: &[u8]) -> IResult<&[u8], Val> {
     )(input)
 }
 
+fn parse_px(input: &[u8]) -> IResult<&[u8], f32> {
+    terminated(parse_float, tag("px"))(input)
+}
+
 // rgb(1,1,1)
 // rgba(1,1,1,1)
 // #000000
@@ -995,6 +1067,7 @@ fn from_hex_nib(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::sprite::{BorderRect, ImageScaleMode, TextureSlicer};
     use test_case::test_case;
 
     #[test_case("#FFFFFFFF", Color::WHITE)]
@@ -1113,10 +1186,10 @@ mod tests {
         // dbg!(&xml);
     }
 
-    #[test_case("./assets/menu.xml")]
-    #[test_case("./assets/panel.xml")]
-    #[test_case("./assets/button.xml")]
-    #[test_case("./assets/card.xml")]
+    #[test_case("./assets/demo/menu.xml")]
+    #[test_case("./assets/demo/panel.xml")]
+    #[test_case("./assets/demo/button.xml")]
+    #[test_case("./assets/demo/card.xml")]
     fn test_parse_template_full(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
         let _template = parse_template(input.as_bytes()).unwrap();
@@ -1129,5 +1202,18 @@ mod tests {
         let first = &attr[0];
         let (_, attribute) = attribute_from_parts(first.prefix, first.key, first.value).unwrap();
         dbg!(attribute);
+    }
+
+    #[test_case(r#"10px stretch stretch 1"#)]
+    fn test_parse_nine_slice(input: &str) {
+        let (_, slice) = parse_image_slice(input.as_bytes()).unwrap();
+        dbg!(slice);
+
+        // let t = TextureSlicer{
+        //     border: BorderRect::(Val::Px(10.)),
+        //     center_scale_mode: todo!(),
+        //     sides_scale_mode: todo!(),
+        //     max_corner_scale: todo!(),
+        // };
     }
 }

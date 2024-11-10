@@ -2,13 +2,11 @@
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
 
-	<node padding="50px"
-		  border="4px"
-		  border_radius="10px"
-		  margin="50px"
-		  border_color="#000"
-		  background="#338"
-		  flex_direction="column">
+	<img image_scale_mode="10px tile(1) tile(1) 4"
+		 src="ui_panel.png"
+		 padding="50px"
+		 margin="50px"
+		 flex_direction="column">
 
 		<text font_size="32"
 			  padding="0  20px">Volume Control</text>
@@ -21,5 +19,5 @@
 		<slider/>
 		<text id="music">Music</text>
 		<slider/>
-	</node>
+	</img>
 </template>

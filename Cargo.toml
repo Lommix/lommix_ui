@@ -53,6 +53,6 @@ path = "examples/input.rs"
 name = "slider"
 path = "examples/slider.rs"
 
-[[example]]
-name = "dropdown"
-path = "examples/dropdown.rs"
+# [[example]]
+# name = "dropdown"
+# path = "examples/dropdown.rs"
