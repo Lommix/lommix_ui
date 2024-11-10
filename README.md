@@ -2,9 +2,10 @@
 
 [WIP][MVP]
 
-`Html`/`Xml` ui syntax parser & builder. Create reusable component
-templates in plain `Html`/`Xml`. Use Attributes to describe style.
-Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
+Bevy UI serialized to html. Create reusable templates with variable properties
+and simple one-shot systems to event bindings.
+
+Use attributes to describe style. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
 
 Because there is nothing worse than waiting on compilation.
 
@@ -15,7 +16,7 @@ https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 A keyword for every bevy related UI style. Take any Bevy naming, make it `snake_case`, you found your value.
 
 -   A simple way to describe complex styles via attributes. `padding="20px 0 5% 1vw"`, `grid_template_columns="(3,auto)"`
--   Wire up your bevy systems with `onspawn`,`onenter`,`onexit`,`onpress`.
+-   Wire up your bevy systems with `onspawn`,`onenter`,`onexit`,`onpress` events.
 -   Use `id`, `target` to connect elements and have access as components in bevy systems.
 -   Conditional style transitions with `hover:`,`pressed:`,`active:`,`delay` & `ease`.
 -   propagate style transitions with `watch`.
