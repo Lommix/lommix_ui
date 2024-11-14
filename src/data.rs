@@ -66,19 +66,22 @@ impl AttrTokens {
             return None;
         };
 
-        let Ok((_, attr)) = crate::parse::attribute_from_parts(
+        let (_, attr) = match crate::parse::attribute_from_parts::<nom::error::VerboseError<&[u8]>>(
             self.prefix.as_ref().map(|s| s.as_bytes()),
             self.ident.as_bytes(),
             prop_val.as_bytes(),
-        ) else {
-            warn!(
-                "failed to parse property key: `{}` val:`{}`",
-                self.key, prop_val
-            );
-            return None;
+        ) {
+            Ok(val) => val,
+            Err(_) => {
+                warn!(
+                    "failed to parse property key: `{}` val:`{}`",
+                    self.key, prop_val
+                );
+                return None;
+            }
         };
 
-        // recurive compile, what could go wrong
+        // recursive compile, what could go wrong
         if let Attribute::Uncompiled(prop) = attr {
             return prop.compile(props);
         };

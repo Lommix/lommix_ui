@@ -1,12 +1,4 @@
-use std::{
-    hash::{Hash, Hasher},
-    time::Duration,
-};
-
-use bevy::{prelude::*, time::common_conditions::on_timer};
-use build::HtmlBundle;
-use data::HtmlTemplate;
-use prelude::ComponentBindings;
+use bevy::prelude::*;
 
 mod bindings;
 mod build;

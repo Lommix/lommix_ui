@@ -31,7 +31,13 @@ impl AssetLoader for HtmlAssetLoader {
             .await
             .map_err(|err| ParseError::FailedToRead(err.to_string()))?;
 
-        parse_template(&bytes)
+        match parse_template::<nom::error::VerboseError<&[u8]>>(&bytes) {
+            Ok((_, template)) => Ok(template),
+            Err(err) => {
+                let msg = crate::parse::convert_verbose_error(&bytes, err);
+                Err(ParseError::Nom(msg))
+            }
+        }
     }
 
     fn extensions(&self) -> &[&str] {

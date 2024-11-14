@@ -1,5 +1,4 @@
 use crate::data::{Action, AttrTokens, Attribute, HtmlTemplate, StyleAttr, XNode};
-use crate::error::ParseError;
 use crate::prelude::NodeType;
 use bevy::sprite::{BorderRect, ImageScaleMode, SliceScaleMode, TextureSlicer};
 use bevy::ui::{
@@ -13,7 +12,7 @@ use bevy::{
     ui::{UiRect, Val},
 };
 use nom::bytes::complete::{is_not, take_until, take_while1};
-use nom::combinator::{not, rest};
+use nom::combinator::{map_parser, not, rest};
 use nom::multi::{many0, separated_list1};
 use nom::sequence::terminated;
 use nom::Parser;
@@ -21,7 +20,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
     character::complete::multispace0,
-    combinator::{complete, map, map_res},
+    combinator::{complete, map},
     number::complete::float,
     sequence::{delimited, preceded, tuple},
     IResult,
@@ -45,19 +44,23 @@ impl std::fmt::Debug for XmlAttr<'_> {
     }
 }
 
-pub(crate) fn parse_template(input: &[u8]) -> Result<HtmlTemplate, ParseError> {
-    let (input, _) = trim_comments(input)?;
+pub(crate) fn parse_template<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], HtmlTemplate, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    trim_comments0(input)?;
     let (input, _xml_header) = alt((
         delimited(tag("<?"), take_until("?>"), tag("?>")).map(Some),
         |i| Ok((i, None)),
     ))(input)?;
-    let (_, xml) = parse_xml_node(input)?;
+
+    let (_, mut xml) = parse_xml_node(input)?;
 
     let mut name = None;
     let mut properties = HashMap::default();
     let mut root = vec![];
 
-    for child in xml.children.iter() {
+    for child in xml.children.drain(..) {
         match child.name {
             b"property" => {
                 if let (Some(key), Some(value)) = (
@@ -78,61 +81,87 @@ pub(crate) fn parse_template(input: &[u8]) -> Result<HtmlTemplate, ParseError> {
                     name = Some(str_name);
                 };
             }
-            _ => root.push(XNode::try_from(child)?),
+            _ => {
+                let (_, node) = from_raw_xml::<E>(child)?;
+                root.push(node);
+            }
         }
     }
 
-    Ok(HtmlTemplate {
-        name,
-        properties,
-        root,
-    })
+    Ok((
+        "".as_bytes(),
+        HtmlTemplate {
+            name,
+            properties,
+            root,
+        },
+    ))
+}
+
+fn trim_comments0<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<&[u8]>, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    many0(parse_comment::<E>)(input)
+}
+
+fn parse_comment<'a, E>(input: &'a [u8]) -> IResult<&[u8], &[u8], E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    preceded(
+        multispace0,
+        delimited(tag("<!--"), take_until("-->"), tag("-->")),
+    )(input)
 }
 
 // try from
-impl TryFrom<&Xml<'_>> for XNode {
-    type Error = ParseError;
+fn from_raw_xml<'a, E>(mut xml: Xml<'a>) -> IResult<&[u8], XNode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    let (_, node_type) = parse_node_type(xml.name)?;
 
-    fn try_from(xml: &Xml<'_>) -> Result<Self, Self::Error> {
-        let (_, node_type) = parse_node_type(xml.name)?;
+    let content = xml
+        .value
+        .map(|bytes| String::from_utf8_lossy(bytes).to_string());
 
-        let content = xml
-            .value
-            .map(|bytes| String::from_utf8_lossy(bytes).to_string());
+    let mut styles = vec![];
+    let mut defs = vec![];
+    let mut event_listener = vec![];
+    let mut uncompiled = vec![];
+    let mut tags = vec![];
+    let mut src = None;
+    let mut id = None;
+    let mut target = None;
+    let mut watch = None;
 
-        let mut styles = vec![];
-        let mut defs = vec![];
-        let mut event_listener = vec![];
-        let mut uncompiled = vec![];
-        let mut tags = vec![];
-        let mut src = None;
-        let mut id = None;
-        let mut target = None;
-        let mut watch = None;
-
-        for attr in xml.attributes.iter() {
-            match attribute_from_parts(attr.prefix, attr.key, attr.value).map(|(_, a)| a)? {
-                Attribute::Style(style_attr) => styles.push(style_attr),
-                Attribute::PropertyDefinition(key, val) => defs.push((key, val)),
-                Attribute::Uncompiled(attr_tokens) => uncompiled.push(attr_tokens),
-                Attribute::Action(action) => event_listener.push(action),
-                Attribute::Path(path) => src = Some(path),
-                Attribute::Target(tar) => target = Some(tar),
-                Attribute::Id(i) => id = Some(i),
-                Attribute::Tag(key, val) => tags.push((key, val)),
-                Attribute::Watch(watch_id) => watch = Some(watch_id),
-            }
+    for attr in xml.attributes.iter() {
+        let (_input, attr) = attribute_from_parts(attr.prefix, attr.key, attr.value)?;
+        match attr {
+            Attribute::Style(style_attr) => styles.push(style_attr),
+            Attribute::PropertyDefinition(key, val) => defs.push((key, val)),
+            Attribute::Uncompiled(attr_tokens) => uncompiled.push(attr_tokens),
+            Attribute::Action(action) => event_listener.push(action),
+            Attribute::Path(path) => src = Some(path),
+            Attribute::Target(tar) => target = Some(tar),
+            Attribute::Id(i) => id = Some(i),
+            Attribute::Tag(key, val) => tags.push((key, val)),
+            Attribute::Watch(watch_id) => watch = Some(watch_id),
         }
+    }
 
-        // dbg!(&src);
+    // dbg!(&src);
 
-        let mut children = vec![];
-        for child in xml.children.iter() {
-            let node: XNode = child.try_into()?;
-            children.push(node);
-        }
+    let mut children = vec![];
+    for child in xml.children.drain(..) {
+        let (_, node) = from_raw_xml(child)?;
+        children.push(node);
+    }
 
-        Ok(Self {
+    Ok((
+        "".as_bytes(),
+        XNode {
             src,
             styles,
             target,
@@ -145,8 +174,8 @@ impl TryFrom<&Xml<'_>> for XNode {
             content,
             node_type,
             children,
-        })
-    }
+        },
+    ))
 }
 
 struct Xml<'a> {
@@ -171,16 +200,21 @@ impl std::fmt::Debug for Xml<'_> {
     }
 }
 
-fn parse_xml_node(input: &[u8]) -> IResult<&[u8], Xml> {
-    let (input, _) = trim_comments(input)?;
+fn parse_xml_node<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Xml<'a>, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    let (input, _) = trim_comments0(input)?;
+    let (input, _) = multispace0(input)?;
 
     not(tag("</"))(input)?;
 
-    let (input, (prefix, start_name)) =
-        preceded(tag("<"), tuple((parse_prefix0, take_snake)))(input)?;
+    let (input, (prefix, start_name)) = preceded(
+        tag("<"),
+        preceded(multispace0, tuple((parse_prefix0, take_snake))),
+    )(input)?;
 
     let (input, attributes) = parse_xml_attr(input)?;
-
     let (input, is_empty) = alt((
         preceded(multispace0, tag("/>")).map(|_| true),
         preceded(multispace0, tag(">")).map(|_| false),
@@ -200,10 +234,13 @@ fn parse_xml_node(input: &[u8]) -> IResult<&[u8], Xml> {
     }
 
     let (input, children) = many0(parse_xml_node)(input)?;
-    let (input, _) = trim_comments(input)?;
+
+    let (input, _) = trim_comments0(input)?;
+
     let (input, value) = map(take_while(|b: u8| b != b'<'), |c: &[u8]| {
         (c.len() > 0).then_some(c)
     })(input)?;
+
     let (input, (end_prefix, end_name)) = parse_xml_end(input)?;
     if start_name != end_name || prefix != end_prefix {
         return Err(nom::Err::Failure(nom::error::make_error(
@@ -223,17 +260,23 @@ fn parse_xml_node(input: &[u8]) -> IResult<&[u8], Xml> {
     ))
 }
 
-fn parse_xml_end(input: &[u8]) -> IResult<&[u8], (Option<&[u8]>, &[u8])> {
+fn parse_xml_end<'a, E>(input: &'a [u8]) -> IResult<&[u8], (Option<&[u8]>, &[u8]), E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, (_, prefix, end_tag, _)) =
         tuple((tag("</"), parse_prefix0, take_snake, tag(">")))(input)?;
 
     Ok((input, (prefix, end_tag)))
 }
 
-fn parse_xml_attr(input: &[u8]) -> IResult<&[u8], Vec<XmlAttr>> {
+fn parse_xml_attr<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<XmlAttr>, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     many0(map(
         tuple((
-            preceded(trim_comments, parse_prefix0),
+            preceded(multispace0, parse_prefix0),
             terminated(take_snake, tag("=")),
             delimited(tag("\""), is_not("\""), tag("\"")),
         )),
@@ -241,18 +284,21 @@ fn parse_xml_attr(input: &[u8]) -> IResult<&[u8], Vec<XmlAttr>> {
     ))(input)
 }
 
-fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    let (input, trimmed) = nom::character::complete::multispace0(input)?;
-    let o: Result<(&[u8], Vec<&[u8]>), nom::Err<nom::error::Error<&[u8]>>> = many0(terminated(
-        delimited(tag("<!--"), take_until("-->"), tag("-->")),
-        multispace0,
-    ))(input);
+// fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
+//     let (input, trimmed) = nom::character::complete::multispace0(input)?;
+//     let o: Result<(&[u8], Vec<&[u8]>), nom::Err<nom::error::Error<&[u8]>>> = many0(terminated(
+//         delimited(tag("<!--"), take_until("-->"), tag("-->")),
+//         multispace0,
+//     ))(input);
+//
+//     o.map(|(r, _)| (r, "".as_bytes()))
+//         .or_else(|_| Ok((input, trimmed)))
+// }
 
-    o.map(|(r, _)| (r, "".as_bytes()))
-        .or_else(|_| Ok((input, trimmed)))
-}
-
-fn parse_node_type(input: &[u8]) -> IResult<&[u8], NodeType> {
+fn parse_node_type<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], NodeType, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("node"), |_| NodeType::Node),
         map(tag("img"), |_| NodeType::Image),
@@ -286,11 +332,14 @@ fn parse_prop_var<'a>(
     }
 }
 
-pub(crate) fn attribute_from_parts<'a>(
+pub(crate) fn attribute_from_parts<'a, E>(
     prefix: Option<&'a [u8]>,
     key: &'a [u8],
     value: &'a [u8],
-) -> IResult<&'a [u8], Attribute> {
+) -> IResult<&'a [u8], Attribute, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     if let Some(attr) = parse_prop_var(prefix, key, value) {
         return Ok((b"", attr));
     }
@@ -326,7 +375,7 @@ pub(crate) fn attribute_from_parts<'a>(
         b"onspawn" => Attribute::Action(Action::OnSpawn(
             as_string_list(value).map(|(_, string)| string)?,
         )),
-        any => match parse_style(prefix, any, value) {
+        any => match parse_style::<E>(prefix, any, value) {
             Ok((_, style)) => Attribute::Style(style),
             Err(_) => {
                 let (_, value) = as_string(value)?;
@@ -340,11 +389,14 @@ pub(crate) fn attribute_from_parts<'a>(
 }
 
 #[rustfmt::skip]
-fn parse_style<'a>(
+fn parse_style<'a, E>(
     prefix: Option<&'a [u8]>,
     ident: &'a [u8],
     value: &'a [u8],
-) -> IResult<&'a [u8], StyleAttr> {
+) -> IResult<&'a [u8], StyleAttr,E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, style) = match ident {
         b"position" => map(parse_position_type, StyleAttr::Position)(value)?,
         b"display" => map(parse_display, StyleAttr::Display)(value)?,
@@ -418,11 +470,17 @@ fn parse_style<'a>(
     }
 }
 
-fn parse_float(input: &[u8]) -> IResult<&[u8], f32> {
+fn parse_float<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     nom::number::complete::float(input)
 }
 
-fn parse_easing(input: &[u8]) -> IResult<&[u8], interpolation::EaseFunction> {
+fn parse_easing<'a, E>(input: &'a [u8]) -> IResult<&[u8], interpolation::EaseFunction, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     match input {
         b"cubic" => Ok((input, interpolation::EaseFunction::CubicInOut)),
         b"bounce" => Ok((input, interpolation::EaseFunction::BounceOut)),
@@ -466,14 +524,20 @@ fn parse_easing(input: &[u8]) -> IResult<&[u8], interpolation::EaseFunction> {
     }
 }
 
-fn parse_position_type(input: &[u8]) -> IResult<&[u8], PositionType> {
+fn parse_position_type<'a, E>(input: &'a [u8]) -> IResult<&[u8], PositionType, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("absolute"), |_| PositionType::Absolute),
         map(tag("relative"), |_| PositionType::Relative),
     ))(input)
 }
 
-fn parse_display(input: &[u8]) -> IResult<&[u8], Display> {
+fn parse_display<'a, E>(input: &'a [u8]) -> IResult<&[u8], Display, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("none"), |_| Display::None),
         map(tag("flex"), |_| Display::Flex),
@@ -482,7 +546,10 @@ fn parse_display(input: &[u8]) -> IResult<&[u8], Display> {
     ))(input)
 }
 
-fn parse_direction(input: &[u8]) -> IResult<&[u8], Direction> {
+fn parse_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], Direction, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("inherit"), |_| Direction::Inherit),
         map(tag("left_to_right"), |_| Direction::LeftToRight),
@@ -490,12 +557,18 @@ fn parse_direction(input: &[u8]) -> IResult<&[u8], Direction> {
     ))(input)
 }
 
-fn parse_overflow(input: &[u8]) -> IResult<&[u8], Overflow> {
+fn parse_overflow<'a, E>(input: &'a [u8]) -> IResult<&[u8], Overflow, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, (x, _, y)) = tuple((parse_overflow_axis, multispace0, parse_overflow_axis))(input)?;
     Ok((input, Overflow { x, y }))
 }
 
-fn parse_overflow_axis(input: &[u8]) -> IResult<&[u8], OverflowAxis> {
+fn parse_overflow_axis<'a, E>(input: &'a [u8]) -> IResult<&[u8], OverflowAxis, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("visible"), |_| OverflowAxis::Visible),
         map(tag("hidden"), |_| OverflowAxis::Hidden),
@@ -503,7 +576,10 @@ fn parse_overflow_axis(input: &[u8]) -> IResult<&[u8], OverflowAxis> {
     ))(input)
 }
 
-fn parse_align_items(input: &[u8]) -> IResult<&[u8], AlignItems> {
+fn parse_align_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignItems, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("default"), |_| AlignItems::Default),
         map(tag("center"), |_| AlignItems::Center),
@@ -516,7 +592,10 @@ fn parse_align_items(input: &[u8]) -> IResult<&[u8], AlignItems> {
     ))(input)
 }
 
-fn parse_align_content(input: &[u8]) -> IResult<&[u8], AlignContent> {
+fn parse_align_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignContent, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("center"), |_| AlignContent::Center),
         map(tag("start"), |_| AlignContent::Start),
@@ -530,7 +609,10 @@ fn parse_align_content(input: &[u8]) -> IResult<&[u8], AlignContent> {
     ))(input)
 }
 
-fn parse_align_self(input: &[u8]) -> IResult<&[u8], AlignSelf> {
+fn parse_align_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignSelf, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("auto"), |_| AlignSelf::Auto),
         map(tag("center"), |_| AlignSelf::Center),
@@ -542,7 +624,10 @@ fn parse_align_self(input: &[u8]) -> IResult<&[u8], AlignSelf> {
     ))(input)
 }
 
-fn parse_justify_items(input: &[u8]) -> IResult<&[u8], JustifyItems> {
+fn parse_justify_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyItems, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("default"), |_| JustifyItems::Default),
         map(tag("center"), |_| JustifyItems::Center),
@@ -553,7 +638,10 @@ fn parse_justify_items(input: &[u8]) -> IResult<&[u8], JustifyItems> {
     ))(input)
 }
 
-fn parse_justify_content(input: &[u8]) -> IResult<&[u8], JustifyContent> {
+fn parse_justify_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyContent, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("center"), |_| JustifyContent::Center),
         map(tag("start"), |_| JustifyContent::Start),
@@ -567,7 +655,10 @@ fn parse_justify_content(input: &[u8]) -> IResult<&[u8], JustifyContent> {
     ))(input)
 }
 
-fn parse_justify_self(input: &[u8]) -> IResult<&[u8], JustifySelf> {
+fn parse_justify_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifySelf, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("auto"), |_| JustifySelf::Auto),
         map(tag("center"), |_| JustifySelf::Center),
@@ -578,7 +669,10 @@ fn parse_justify_self(input: &[u8]) -> IResult<&[u8], JustifySelf> {
     ))(input)
 }
 
-fn parse_flex_direction(input: &[u8]) -> IResult<&[u8], FlexDirection> {
+fn parse_flex_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexDirection, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("row"), |_| FlexDirection::Row),
         map(tag("column"), |_| FlexDirection::Column),
@@ -588,7 +682,10 @@ fn parse_flex_direction(input: &[u8]) -> IResult<&[u8], FlexDirection> {
     ))(input)
 }
 
-fn parse_flex_wrap(input: &[u8]) -> IResult<&[u8], FlexWrap> {
+fn parse_flex_wrap<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexWrap, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         map(tag("wrap"), |_| FlexWrap::Wrap),
         map(tag("no_wrap"), |_| FlexWrap::NoWrap),
@@ -596,11 +693,17 @@ fn parse_flex_wrap(input: &[u8]) -> IResult<&[u8], FlexWrap> {
     ))(input)
 }
 
-fn as_string(input: &[u8]) -> IResult<&[u8], String> {
+fn as_string<'a, E>(input: &'a [u8]) -> IResult<&[u8], String, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     map(rest, |v| String::from_utf8_lossy(v).to_string())(input)
 }
 
-fn as_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
+fn as_string_list<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<String>, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     map(
         separated_list1(tag(","), take_while1(|b: u8| b != b',' && b != b'"')),
         |bytes: Vec<&[u8]>| {
@@ -612,24 +715,37 @@ fn as_string_list(input: &[u8]) -> IResult<&[u8], Vec<String>> {
     )(input)
 }
 
-#[rustfmt::skip]
-fn parse_prefix0(input: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
-    alt((
-        terminated(take_snake,tag(":")).map(Some),
-        |i| Ok((i, None)),
-    ))(input)
+// parse xml prefix
+fn parse_prefix0<'a, E>(input: &'a [u8]) -> IResult<&[u8], Option<&[u8]>, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    match terminated(take_snake::<E>, tag(":"))(input) {
+        Ok((input, prefix)) => Ok((input, Some(prefix))),
+        Err(_) => Ok((input, None)),
+    }
 }
 
-fn take_snake(input: &[u8]) -> IResult<&[u8], &[u8]> {
+// parses snake case identifier
+fn take_snake<'a, E>(input: &'a [u8]) -> IResult<&[u8], &[u8], E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     take_while(|b: u8| b.is_ascii_alphabetic() || b == b'_')(input)
 }
 
-fn parse_image_scale_mode(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
+fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((parse_image_tile, parse_image_slice))(input)
 }
 
 // 10px tiled tiled 1
-fn parse_image_slice(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
+fn parse_image_slice<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, (val, x, y, s)) = tuple((
         preceded(multispace0, parse_px),
         preceded(multispace0, parse_slice_scale),
@@ -648,7 +764,10 @@ fn parse_image_slice(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
     ))
 }
 
-fn parse_image_tile(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
+fn parse_image_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, (x, y, s)) = tuple((
         preceded(multispace0, parse_bool),
         preceded(multispace0, parse_bool),
@@ -665,21 +784,33 @@ fn parse_image_tile(input: &[u8]) -> IResult<&[u8], ImageScaleMode> {
     ))
 }
 
-fn parse_bool(input: &[u8]) -> IResult<&[u8], bool> {
+fn parse_bool<'a, E>(input: &'a [u8]) -> IResult<&[u8], bool, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((map(tag("true"), |_| true), map(tag("false"), |_| false)))(input)
 }
 
 // stretch
 // tile(1)
-fn parse_slice_scale(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
+fn parse_slice_scale<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((parse_stretch, parse_tile))(input)
 }
 
-fn parse_stretch(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
+fn parse_stretch<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     map(tag("stretch"), |_| SliceScaleMode::Stretch)(input)
 }
 
-fn parse_tile(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
+fn parse_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     map(
         tuple((tag("tile"), delimited(tag("("), parse_float, tag(")")))),
         |(_, v)| SliceScaleMode::Tile { stretch_value: v },
@@ -690,7 +821,10 @@ fn parse_tile(input: &[u8]) -> IResult<&[u8], SliceScaleMode> {
 /// 20px/% single
 /// 10px/% 10px axis
 /// 10px 10px 10px 10px rect
-fn parse_ui_rect(input: &[u8]) -> IResult<&[u8], UiRect> {
+fn parse_ui_rect<'a, E>(input: &'a [u8]) -> IResult<&[u8], UiRect, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     alt((
         // 10px 10px 10px 10px
         complete(map(
@@ -723,7 +857,10 @@ fn parse_ui_rect(input: &[u8]) -> IResult<&[u8], UiRect> {
 }
 
 // grid_template_rows="auto 10% 10%"
-fn parse_grid_track(input: &[u8]) -> IResult<&[u8], GridTrack> {
+fn parse_grid_track<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridTrack, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, track) = delimited(
         multispace0,
         alt((
@@ -748,15 +885,20 @@ fn parse_grid_track(input: &[u8]) -> IResult<&[u8], GridTrack> {
 // (5, auto)
 // (2, 150px)
 #[rustfmt::skip]
-fn parse_grid_track_repeated(input: &[u8]) -> IResult<&[u8], RepeatedGridTrack> {
+fn parse_grid_track_repeated<'a,E>(input: &'a [u8]) -> IResult<&[u8], RepeatedGridTrack,E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
 
     let (input, (_,repeat,_, value ,_)) = tuple((
         preceded(multispace0, tag("(")),
-        preceded(multispace0, map_res(integer,|i:i64| u16::try_from(i))),
+        preceded(multispace0, map(parse_number,|n| u16::try_from(n).unwrap_or_default())),
         preceded(multispace0, tag(",")),
-        preceded(multispace0, take_while1(|b: u8| b.is_ascii_alphanumeric())),
+        preceded(multispace0, take_until(")")),
         preceded(multispace0, tag(")")),
     ))(input)?;
+
+
 
     let (_, track) : (&[u8], RepeatedGridTrack) = alt((
             map(tag("auto"), |_| RepeatedGridTrack::auto::<RepeatedGridTrack>(repeat)),
@@ -775,7 +917,10 @@ fn parse_grid_track_repeated(input: &[u8]) -> IResult<&[u8], RepeatedGridTrack> 
     Ok((input, track))
 }
 
-fn parse_auto_flow(input: &[u8]) -> IResult<&[u8], GridAutoFlow> {
+fn parse_auto_flow<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridAutoFlow, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     delimited(
         multispace0,
         alt((
@@ -788,21 +933,44 @@ fn parse_auto_flow(input: &[u8]) -> IResult<&[u8], GridAutoFlow> {
     )(input)
 }
 
-fn integer(input: &[u8]) -> IResult<&[u8], i64> {
-    let (input, integer) = map_res(
-        map_res(take_while(|u: u8| u.is_ascii_digit() || u == b'-'), |d| {
-            std::str::from_utf8(d)
-        }),
-        |str| str.parse::<i64>(),
-    )(input)?;
+fn parse_str<'a, E>(input: &'a [u8]) -> IResult<&[u8], &str, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    match std::str::from_utf8(input) {
+        Ok(str) => Ok(("".as_bytes(), str)),
+        Err(_) => Err(nom::Err::Error(E::from_error_kind(
+            input,
+            nom::error::ErrorKind::MapRes,
+        ))),
+    }
+}
 
-    Ok((input, integer))
+fn parse_number<'a, E>(input: &'a [u8]) -> IResult<&[u8], i64, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    let (input, num_bytes) =
+        take_while(|u: u8| u.is_ascii_alphanumeric() || u == b'-' || u == b'+')(input)?;
+
+    let (_, str) = parse_str(num_bytes)?;
+
+    match str.parse::<i64>() {
+        Ok(num) => Ok((input, num)),
+        Err(_) => Err(nom::Err::Error(E::from_error_kind(
+            input,
+            nom::error::ErrorKind::MapRes,
+        ))),
+    }
 }
 
 // auto
 // start_span(5,5)
 // end_span(5,5)
-fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
+fn parse_grid_placement<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridPlacement, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = multispace0(input)?;
     let (input, ident) = take_while1(|b: u8| b != b'(' && b != b'"')(input)?;
     match ident {
@@ -813,7 +981,7 @@ fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
                 tag("("),
                 delimited(
                     multispace0,
-                    map(integer, |i| u16::try_from(i).unwrap_or_default()),
+                    map(parse_number, |i| u16::try_from(i).unwrap_or_default()),
                     multispace0,
                 ),
                 tag(")"),
@@ -826,7 +994,7 @@ fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
                 tag("("),
                 delimited(
                     multispace0,
-                    map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                    map(parse_number, |i| i16::try_from(i).unwrap_or_default()),
                     multispace0,
                 ),
                 tag(")"),
@@ -839,7 +1007,7 @@ fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
                 tag("("),
                 delimited(
                     multispace0,
-                    map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                    map(parse_number, |i| i16::try_from(i).unwrap_or_default()),
                     multispace0,
                 ),
                 tag(")"),
@@ -853,13 +1021,13 @@ fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
                 tuple((
                     delimited(
                         multispace0,
-                        map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                        map(parse_number, |i| i16::try_from(i).unwrap_or_default()),
                         multispace0,
                     ),
                     tag(","),
                     delimited(
                         multispace0,
-                        map(integer, |i| u16::try_from(i).unwrap_or_default()),
+                        map(parse_number, |i| u16::try_from(i).unwrap_or_default()),
                         multispace0,
                     ),
                 )),
@@ -874,13 +1042,13 @@ fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
                 tuple((
                     delimited(
                         multispace0,
-                        map(integer, |i| i16::try_from(i).unwrap_or_default()),
+                        map(parse_number, |i| i16::try_from(i).unwrap_or_default()),
                         multispace0,
                     ),
                     tag(","),
                     delimited(
                         multispace0,
-                        map(integer, |i| u16::try_from(i).unwrap_or_default()),
+                        map(parse_number, |i| u16::try_from(i).unwrap_or_default()),
                         multispace0,
                     ),
                 )),
@@ -896,7 +1064,10 @@ fn parse_grid_placement(input: &[u8]) -> IResult<&[u8], GridPlacement> {
 }
 
 /// 10px 10%
-fn parse_val(input: &[u8]) -> IResult<&[u8], Val> {
+fn parse_val<'a, E>(input: &'a [u8]) -> IResult<&[u8], Val, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     delimited(
         multispace0,
         alt((
@@ -913,7 +1084,10 @@ fn parse_val(input: &[u8]) -> IResult<&[u8], Val> {
     )(input)
 }
 
-fn parse_px(input: &[u8]) -> IResult<&[u8], f32> {
+fn parse_px<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     terminated(parse_float, tag("px"))(input)
 }
 
@@ -922,7 +1096,10 @@ fn parse_px(input: &[u8]) -> IResult<&[u8], f32> {
 // #000000
 // #FFF
 #[rustfmt::skip]
-fn parse_color(input: &[u8]) -> IResult<&[u8], Color> {
+fn parse_color<'a,E>(input: &'a [u8]) -> IResult<&[u8], Color,E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     delimited(
         multispace0,
         alt((
@@ -938,7 +1115,10 @@ fn parse_color(input: &[u8]) -> IResult<&[u8], Color> {
 }
 
 // rgba(1,1,1,1)
-fn parse_rgba_color(input: &[u8]) -> IResult<&[u8], Color> {
+fn parse_rgba_color<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = tag("rgba")(input)?;
 
     let (input, (r, _, g, _, b, _, a)) = delimited(
@@ -951,7 +1131,10 @@ fn parse_rgba_color(input: &[u8]) -> IResult<&[u8], Color> {
 }
 
 // rgb(1,1,1)
-fn parse_rgb_color(input: &[u8]) -> IResult<&[u8], Color> {
+fn parse_rgb_color<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = tag("rgb")(input)?;
 
     let (input, (r, _, g, _, b)) = delimited(
@@ -964,11 +1147,14 @@ fn parse_rgb_color(input: &[u8]) -> IResult<&[u8], Color> {
 }
 
 // #FFFFFFFF (with alpha)
-fn color_hex8_parser(input: &[u8]) -> IResult<&[u8], Color> {
+fn color_hex8_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = tag("#")(input)?;
 
     if input.len() != 8 {
-        return Err(nom::Err::Error(nom::error::make_error(
+        return Err(nom::Err::Error(E::from_error_kind(
             input,
             nom::error::ErrorKind::LengthValue,
         )));
@@ -982,11 +1168,14 @@ fn color_hex8_parser(input: &[u8]) -> IResult<&[u8], Color> {
 }
 
 // #FFFFFF
-fn color_hex6_parser(input: &[u8]) -> IResult<&[u8], Color> {
+fn color_hex6_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = tag("#")(input)?;
 
     if input.len() != 6 {
-        return Err(nom::Err::Error(nom::error::make_error(
+        return Err(nom::Err::Error(E::from_error_kind(
             input,
             nom::error::ErrorKind::LengthValue,
         )));
@@ -1000,11 +1189,14 @@ fn color_hex6_parser(input: &[u8]) -> IResult<&[u8], Color> {
 }
 
 // #FFFF (with alpha)
-fn color_hex4_parser(input: &[u8]) -> IResult<&[u8], Color> {
+fn color_hex4_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = tag("#")(input)?;
 
     if input.len() != 4 {
-        return Err(nom::Err::Error(nom::error::make_error(
+        return Err(nom::Err::Error(E::from_error_kind(
             input,
             nom::error::ErrorKind::LengthValue,
         )));
@@ -1019,7 +1211,10 @@ fn color_hex4_parser(input: &[u8]) -> IResult<&[u8], Color> {
 
 // short
 // #FFF
-fn color_hex3_parser(input: &[u8]) -> IResult<&[u8], Color> {
+fn color_hex3_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let (input, _) = tag("#")(input)?;
 
     if input.len() != 3 {
@@ -1037,15 +1232,19 @@ fn color_hex3_parser(input: &[u8]) -> IResult<&[u8], Color> {
 }
 
 /// FF
-fn hex_byte(input: &[u8]) -> IResult<&[u8], u8> {
-    let (input, val) = map_res(take_while_m_n(2, 2, is_hex_digit), from_hex_byte)(input)?;
-    Ok((input, val))
-    // map_res(take_while_m_n(2, 2, is_hex_digit), from_hex_byte)(input)
+fn hex_byte<'a, E>(input: &'a [u8]) -> IResult<&[u8], u8, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    map_parser(take_while_m_n(2, 2, is_hex_digit), from_hex_byte)(input)
 }
 
 /// F
-fn hex_nib(input: &[u8]) -> IResult<&[u8], u8> {
-    map_res(take_while_m_n(1, 1, is_hex_digit), from_hex_nib)(input)
+fn hex_nib<'a, E>(input: &'a [u8]) -> IResult<&[u8], u8, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    map_parser(take_while_m_n(1, 1, is_hex_digit), from_hex_nib)(input)
 }
 
 fn is_hex_digit(c: u8) -> bool {
@@ -1053,21 +1252,108 @@ fn is_hex_digit(c: u8) -> bool {
 }
 
 /// FF -> u8
-fn from_hex_byte(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
-    let str = std::str::from_utf8(input).expect("fix later");
-    u8::from_str_radix(format!("{}", str).as_str(), 16)
+fn from_hex_byte<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], u8, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
+    let (_, str) = parse_str(input)?;
+    match u8::from_str_radix(format!("{}", str).as_str(), 16) {
+        Ok(byte) => Ok(("".as_bytes(), byte)),
+        Err(_) => Err(nom::Err::Error(E::from_error_kind(
+            input,
+            nom::error::ErrorKind::MapRes,
+        ))),
+    }
 }
 
 /// F -> u8
-fn from_hex_nib(input: &[u8]) -> Result<u8, std::num::ParseIntError> {
+fn from_hex_nib<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], u8, E>
+where
+    E: nom::error::ParseError<&'a [u8]>,
+{
     let str = std::str::from_utf8(input).expect("fix later");
-    u8::from_str_radix(format!("{}{}", str, str).as_str(), 16)
+    match u8::from_str_radix(format!("{}{}", str, str).as_str(), 16) {
+        Ok(byte) => Ok(("".as_bytes(), byte)),
+        Err(_) => Err(nom::Err::Error(E::from_error_kind(
+            input,
+            nom::error::ErrorKind::MapRes,
+        ))),
+    }
+}
+
+pub fn convert_verbose_error(
+    input: &[u8],
+    err: nom::Err<nom::error::VerboseError<&[u8]>>,
+) -> String {
+    use nom::error::VerboseErrorKind;
+    use std::fmt::Write;
+
+    let mut result = String::new();
+
+    match err {
+        nom::Err::Failure(e) => {
+            for (i, (_sub, kind)) in e.errors.iter().enumerate() {
+                match kind {
+                    VerboseErrorKind::Context(ctx) => {
+                        write!(&mut result, "[FAILURE]:{}: {}\n", i, ctx).unwrap();
+                    }
+                    VerboseErrorKind::Char(c) => {
+                        write!(
+                            &mut result,
+                            "[FAILURE]:{}: expected `{}` got empty input \n",
+                            i, c
+                        )
+                        .unwrap();
+                    }
+                    VerboseErrorKind::Nom(error_kind) => {
+                        write!(
+                            &mut result,
+                            "{}: in `{:?}` got empty input \n",
+                            i, error_kind
+                        )
+                        .unwrap();
+                    }
+                }
+
+                let input_str = std::str::from_utf8(input).unwrap_or("[!not a string!]");
+                write!(&mut result, "in code: {}", input_str).unwrap();
+            }
+        }
+        nom::Err::Incomplete(needed) => {
+            write!(&mut result, "incomplete, not enough data {:?}\n", needed).unwrap();
+        }
+        nom::Err::Error(e) => {
+            for (i, (_sub, kind)) in e.errors.iter().enumerate() {
+                match kind {
+                    VerboseErrorKind::Context(ctx) => {
+                        write!(&mut result, "{}: {}\n", i, ctx).unwrap();
+                    }
+                    VerboseErrorKind::Char(c) => {
+                        write!(&mut result, "{}: expected `{}` got empty input \n", i, c).unwrap();
+                    }
+                    VerboseErrorKind::Nom(error_kind) => {
+                        write!(
+                            &mut result,
+                            "{}: in `{:?}` got empty input \n",
+                            i, error_kind
+                        )
+                        .unwrap();
+                    }
+                }
+
+                let input_str = std::str::from_utf8(input).unwrap_or("[!not a string!]");
+                write!(&mut result, "in code: `{}`", input_str).unwrap();
+            }
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::sprite::{BorderRect, ImageScaleMode, TextureSlicer};
+    use nom::error::VerboseError;
     use test_case::test_case;
 
     #[test_case("#FFFFFFFF", Color::WHITE)]
@@ -1077,22 +1363,9 @@ mod tests {
     #[test_case("rgb(1,1,1)", Color::WHITE)]
     #[test_case("rgba(1,1,1,1)", Color::WHITE)]
     fn test_color(input: &str, expected: Color) {
-        let result = parse_color(input.as_bytes());
+        let result = parse_color::<nom::error::Error<_>>(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
-
-    // #[test_case(r#"font_size="20""#, Attribute::Style(StyleAttr::FontSize(20.)))]
-    // #[test_case(r#"prop:myvar="test""#, Attribute::PropertyDefinition("myvar".into(), "test".into()))]
-    // #[test_case(r#"onenter="test_enter""#, Attribute::Action(Action::OnEnter(vec!["test_enter".to_string()])))]
-    // #[test_case(r#"onspawn="init_inventory""#, Attribute::Action(Action::OnSpawn(vec!["init_inventory".to_string()])))]
-    // #[test_case(r#"onpress="test,test_50,test o""#, Attribute::Action(Action::OnPress(vec!["test".to_string(),"test_50".to_string(), "test o".to_string()])))]
-    // #[test_case(r#"width="10px""#, Attribute::Style(StyleAttr::Width(Val::Px(10.))))]
-    // #[test_case(r#"height="{my_var}""#, Attribute::Uncompiled( AttrTokens{ key: "my_var".into(),prefix: None, ident: "height".into() }))]
-    // #[test_case(r#"font_size="{test_that}""#, Attribute::Uncompiled( AttrTokens{ key: "test_that".into(),prefix: None, ident: "font_size".into() }))]
-    // fn test_parse_attribute(input: &str, expected: Attribute) {
-    //     let result = parse_attribute(input.as_bytes());
-    //     assert_eq!(Ok(("".as_bytes(), expected)), result);
-    // }
 
     #[test_case("0", Val::Px(0.))]
     #[test_case("20vw", Val::Vw(20.))]
@@ -1102,7 +1375,7 @@ mod tests {
     #[test_case("20vmin", Val::VMin(20.))]
     #[test_case("20vmax", Val::VMax(20.))]
     fn test_value(input: &str, expected: Val) {
-        let result = parse_val(input.as_bytes());
+        let result = parse_val::<nom::error::Error<_>>(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
@@ -1112,15 +1385,23 @@ mod tests {
     #[test_case("span( 55  )", GridPlacement::span(55))]
     #[test_case("span(5)", GridPlacement::span(5))]
     fn test_grid_placement(input: &str, expected: GridPlacement) {
-        let result = parse_grid_placement(input.as_bytes());
-        assert_eq!(Ok(("".as_bytes(), expected)), result);
+        match parse_grid_placement::<VerboseError<_>>(&input.as_bytes()) {
+            Ok((rem, grid)) => {
+                assert_eq!(expected, grid);
+                assert_eq!(rem.len(), 0);
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        };
     }
 
     #[test_case("min max auto", vec![GridTrack::min_content(), GridTrack::max_content(), GridTrack::auto()])]
     #[test_case("50% auto   8fr   ", vec![GridTrack::percent(50.), GridTrack::auto(), GridTrack::fr(8.)])]
     #[test_case("50px       ", vec![GridTrack::px(50.)])]
     fn test_tracks(input: &str, expected: Vec<GridTrack>) {
-        let result = many0(parse_grid_track)(input.as_bytes());
+        let result = many0(parse_grid_track::<nom::error::Error<_>>)(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
@@ -1128,8 +1409,16 @@ mod tests {
     #[test_case("(1, auto)(5, 50fr)", vec![RepeatedGridTrack::auto(1), RepeatedGridTrack::fr(5,50.)])]
     #[test_case("(1, auto)", vec![RepeatedGridTrack::auto(1)])]
     fn test_repeat_tracks(input: &str, expected: Vec<RepeatedGridTrack>) {
-        let result = many0(parse_grid_track_repeated)(input.as_bytes());
-        assert_eq!(Ok(("".as_bytes(), expected)), result);
+        match many0(parse_grid_track_repeated::<nom::error::VerboseError<_>>)(input.as_bytes()) {
+            Ok((rem, grid)) => {
+                assert_eq!(expected, grid);
+                assert_eq!(rem.len(), 0);
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        }
     }
 
     #[test_case("20px", UiRect::all(Val::Px(20.)))]
@@ -1139,51 +1428,71 @@ mod tests {
         UiRect{ top:Val::Px(5.), right: Val::Px(10.), bottom: Val::Percent(5.), left: Val::Px(6.)}
     )]
     fn test_rect(input: &str, expected: UiRect) {
-        let result = parse_ui_rect(input.as_bytes());
+        let result = parse_ui_rect::<nom::error::Error<_>>(input.as_bytes());
         assert_eq!(Ok(("".as_bytes(), expected)), result);
     }
 
     #[test_case(
         "   \n<!-- hello world <button> test thah </button> fdsfsd-->\nok",
-        "ok"
+        "\nok"
     )]
-    #[test_case(r#"  <!-- hello <tag/> <""/>world -->    ok"#, "ok")]
-    #[test_case("   <!-- hello world -->    ok", "ok")]
+    #[test_case(r#"  <!-- hello <tag/> <""/>world -->ok"#, "ok")]
+    #[test_case("   <!-- hello world -->ok", "ok")]
     fn test_comments(input: &str, expected: &str) {
-        let (remaining, _trimmed) = trim_comments(&input.as_bytes()).unwrap();
-        assert_eq!(std::str::from_utf8(remaining).unwrap(), expected);
+        match trim_comments0::<VerboseError<_>>(&input.as_bytes()) {
+            Ok((rem, _)) => {
+                assert_eq!(expected, std::str::from_utf8(rem).unwrap());
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        };
     }
 
     #[test_case(r#"    pressed:background="fsdfsf"  pressed:background="fsdfsf"  <!-- test -->    pressed:background="fsdfsf" \n"#)]
     #[test_case(r#"pressed:background="fsdfsf"#)]
     fn test_parse_xml_attr(input: &str) {
-        let (_, _attr) = parse_xml_attr(input.as_bytes())
+        let (_, _attr) = parse_xml_attr::<nom::error::Error<_>>(input.as_bytes())
             .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
             .unwrap();
+
+        match parse_xml_attr::<VerboseError<_>>(&input.as_bytes()) {
+            Ok((_rem, attributes)) => {
+                dbg!(attributes);
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        };
 
         // dbg!(&attr);
     }
 
-    #[test_case(r#"<node pressed:background="fsdfsf" active="hello"><text p:hello="sdf">hello</text></node>"#)]
+    #[test_case(r#"<node pressed:background="rgb(1,1,1)" active="hello"><text p:hello="sdf">hello</text></node>"#)]
     #[test_case(r#"<slot/>"#)]
-    #[test_case(r#"<node pressed:background="fsdfsf" active="hello" />"#)]
+    #[test_case(r#"<node pressed:background="rgba(1,1,1,0)" active="hello" />"#)]
     #[test_case(r#"<property name="press"><property name="press"></property></property>"#)]
     #[test_case(
         r#"
-    <my_template>
-        <name>test</name>
+    <node>
         <property this="press">test</property>
         <property this="press">test</property>
         <node></node>
-    </my_template>
+    </node>
     "#
     )]
     fn test_parse_xml_node(input: &str) {
-        let (_, _xml) = parse_xml_node(input.as_bytes())
-            .map_err(|err| err.map_input(|i| std::str::from_utf8(i).unwrap()))
-            .unwrap();
-
-        // dbg!(&xml);
+        match parse_xml_node::<VerboseError<_>>(&input.as_bytes()) {
+            Ok((_rem, node)) => {
+                dbg!(node);
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        };
     }
 
     #[test_case("./assets/demo/menu.xml")]
@@ -1192,23 +1501,37 @@ mod tests {
     #[test_case("./assets/demo/card.xml")]
     fn test_parse_template_full(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
-        let _template = parse_template(input.as_bytes()).unwrap();
-        // dbg!(&template);
+        match parse_template::<nom::error::VerboseError<_>>(input.as_bytes()) {
+            Ok((_, node)) => {
+                dbg!(node);
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        };
     }
 
     #[test_case(r#"hover:background="{color}""#)]
+    #[test_case(r#"pressed:width="10%""#)]
+    #[test_case(r#"active:height="10vw""#)]
     fn parse_attribute_parts(input: &str) {
-        let (_, attr) = parse_xml_attr(input.as_bytes()).unwrap();
-        let first = &attr[0];
-        let (_, attribute) = attribute_from_parts(first.prefix, first.key, first.value).unwrap();
-        dbg!(attribute);
+        match parse_xml_attr::<nom::error::VerboseError<_>>(input.as_bytes()) {
+            Ok((rem, attrs)) => {
+                assert_eq!(rem, "".as_bytes());
+                dbg!(attrs);
+            }
+            Err(err) => {
+                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+                assert!(false, "");
+            }
+        }
     }
 
     #[test_case(r#"10px stretch stretch 1"#)]
     fn test_parse_nine_slice(input: &str) {
-        let (_, slice) = parse_image_slice(input.as_bytes()).unwrap();
-        dbg!(slice);
-
+        let (_, slice) = parse_image_slice::<nom::error::Error<_>>(input.as_bytes()).unwrap();
+        // dbg!(slice);
         // let t = TextureSlicer{
         //     border: BorderRect::(Val::Px(10.)),
         //     center_scale_mode: todo!(),
