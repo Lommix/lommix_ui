@@ -137,13 +137,13 @@ very crude as proof of concept.
 
 ```bash
 # basic menu demo
-cargo run --example ui
+cargo run -p example --bin ui
 
 # simple text inputs with a submit form
-cargo run --example input
+cargo run -p example --bin input
 
 # simple sliders
-cargo run --example slider
+cargo run -p example --bin slider
 ```
 
 ## Syntax
