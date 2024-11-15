@@ -77,20 +77,21 @@ You can now use the `include` node to import your component:
 ```
 
 Or even better, register it as a custom component in a startup system to use
-it in any other template!
+it in any other template! You can also bind systems to strings, which then can
+be used inside the templates!
 
 ```rust
 fn startup(
     server: Res<AssetServer>,
-    mut custom_comps: ResMut<ComponentBindings>,
+    mut html_comps: HtmlComponents,
+    mut html_funcs: HtmlFunctions,
 ) {
-    let button_template: Handle<HtmlTemplate> = server.load("my_button.xml");
-    custom_comps.register("my_button", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert(HtmlBundle {
-            handle: button_template.clone(),
-            ..default()
-        });
+    html_comps.register("my_button", server.load("my_button.xml"));
+    html_funcs.register("start_game", |In(entity): In<Entity>, mut state : ResMut<NextState<GameState>> |{
+        //any one shot system can be bound, as long as the input is an `Entity`
+        state.set(GameState::Play);
     });
+
 ```
 
 And now you have a new node!
@@ -123,11 +124,12 @@ fn setup(
     server: Res<AssetServer>,
 ) {
     cmd.spawn(Camera2dBundle::default());
-    cmd.spawn(HtmlBundle {
-        handle: server.load("menu.xml"),
-        state: TemplateState::new()
-            .with("title", "I'm injecting my values"))
-        ..default()
+    cmd.spawn((
+        HtmlBundle {
+            html: HmtlNode(server.load("menu.xml")),
+            ..default()
+        },
+        TemplateState::new().with("title", "I'm injecting my values"))
     });
 }
 ```

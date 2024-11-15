@@ -42,6 +42,7 @@ pub struct HtmlComponents<'w> {
 }
 
 impl<'w> HtmlComponents<'w> {
+    /// link any custom html node to your template
     pub fn register(&mut self, name: impl Into<String>, template: Handle<HtmlTemplate>) {
         self.comps.register(name, move |mut cmd| {
             cmd.insert(HtmlBundle {
@@ -51,6 +52,8 @@ impl<'w> HtmlComponents<'w> {
         });
     }
 
+    /// takes a closure with acces to `EntityCommands`
+    /// attach custom components on spawn
     pub fn register_with_spawn_fn<SF>(
         &mut self,
         name: impl Into<String>,
