@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, input::mouse::MouseWheel, prelude::*};
+use bevy::{input::mouse::MouseWheel, prelude::*};
 use bevy_html_ui::prelude::*;
 
 fn main() {
@@ -13,7 +13,7 @@ fn main() {
         .add_plugins((
             HtmlUiPlugin,
             HtmlAutoLoadPlugin::new(&["components"]),
-            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+            // bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         ))
         .add_systems(OnEnter(AutoLoadState::Finished), setup)
         .add_systems(
@@ -26,56 +26,48 @@ fn main() {
 fn setup(
     mut cmd: Commands,
     server: Res<AssetServer>,
-    mut function_bindings: ResMut<FunctionBindings>,
-    mut custom_comps: ResMut<ComponentBindings>,
+
+    mut html_funcs: HtmlFunctions,
+    mut html_comps: HtmlComponents,
 ) {
-    cmd.spawn(Camera2dBundle::default());
+    cmd.spawn(Camera2d);
+
     cmd.spawn(HtmlBundle {
-        handle: server.load("demo/menu.xml"),
+        html: HtmlNode(server.load("demo/menu.xml")),
         ..default()
     });
 
-    function_bindings.register("greet", cmd.register_one_shot_system(greet));
-    function_bindings.register("inventory", cmd.register_one_shot_system(init_inventory));
-    function_bindings.register("scrollable", cmd.register_one_shot_system(init_scrollable));
-    function_bindings.register("play_beep", cmd.register_one_shot_system(play_beep));
+    html_funcs.register("greet", greet);
+    html_funcs.register("inventory", init_inventory);
+    html_funcs.register("scrollable", init_scrollable);
+    html_funcs.register("play_beep", play_beep);
 
     // register custom node by hand
     let panel_handle: Handle<HtmlTemplate> = server.load("demo/panel.xml");
-    custom_comps.register("panel", move |mut entity_cmd: EntityCommands| {
-        entity_cmd.insert(HtmlBundle {
-            handle: panel_handle.clone(),
-            ..default()
-        });
+    html_comps.register("panel", panel_handle);
+
+    html_funcs.register("collapse", |In(entity), mut cmd: Commands| {
+        cmd.entity(entity).insert(Collapse(true));
     });
 
-    function_bindings.register(
-        "collapse",
-        cmd.register_one_shot_system(|In(entity), mut cmd: Commands| {
-            cmd.entity(entity).insert(Collapse(true));
-        }),
-    );
-
-    function_bindings.register(
+    html_funcs.register(
         "debug",
-        cmd.register_one_shot_system(
-            |In(entity),
-             mut cmd: Commands,
-             mut state: Query<&mut TemplateState>,
-             scopes: Query<&ScopeEntity>| {
-                let Ok(scope) = scopes.get(entity) else {
-                    return;
-                };
+        |In(entity),
+         mut cmd: Commands,
+         mut state: Query<&mut TemplateState>,
+         scopes: Query<&ScopeEntity>| {
+            let Ok(scope) = scopes.get(entity) else {
+                return;
+            };
 
-                let Ok(mut state) = state.get_mut(**scope) else {
-                    return;
-                };
+            let Ok(mut state) = state.get_mut(**scope) else {
+                return;
+            };
 
-                let rng = rand::random::<u32>();
-                state.set_prop("title", format!("{}", rng));
-                cmd.trigger_targets(CompileContextEvent, **scope);
-            },
-        ),
+            let rng = rand::random::<u32>();
+            state.set_prop("title", format!("{}", rng));
+            cmd.trigger_targets(CompileContextEvent, **scope);
+        },
     );
 }
 
@@ -142,7 +134,7 @@ fn update_scroll(
                 return;
             };
 
-            scroll.offset = scroll.offset + ev.y.signum() * scroll.speed * time.delta_seconds();
+            scroll.offset = scroll.offset + ev.y.signum() * scroll.speed * time.delta_secs();
             style.regular.style.top = Val::Px(scroll.offset);
         });
     });
@@ -151,8 +143,8 @@ fn update_scroll(
 #[derive(Component)]
 pub struct Puls(f32);
 
-fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elapsed: Local<f32>) {
-    *elapsed += time.delta_seconds();
+fn update_puls(mut query: Query<(&mut Node, &Puls)>, time: Res<Time>, mut elapsed: Local<f32>) {
+    *elapsed += time.delta_secs();
 
     query.iter_mut().for_each(|(mut style, rotatethis)| {
         style.width = Val::Percent((*elapsed * rotatethis.0).sin() * 5. + 90.);
@@ -163,13 +155,15 @@ fn update_puls(mut query: Query<(&mut Style, &Puls)>, time: Res<Time>, mut elaps
 fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetServer>) {
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..200 {
-            cmd.spawn(HtmlBundle {
-                handle: server.load("demo/card.xml"),
-                state: TemplateState::new()
+            cmd.spawn((
+                HtmlBundle {
+                    html: HtmlNode(server.load("demo/card.xml")),
+                    ..default()
+                },
+                TemplateState::new()
                     .with("title", &format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
-                ..default()
-            });
+            ));
         }
     });
 }
@@ -188,12 +182,10 @@ fn play_beep(
         return;
     };
 
+    let beep: Handle<AudioSource> = server.load(&path);
     cmd.spawn((
-        AudioBundle {
-            source: server.load(path.clone()),
-            settings: PlaybackSettings::ONCE,
-            ..default()
-        },
+        AudioPlayer(beep),
+        PlaybackSettings::ONCE,
         LifeTime::new(0.5),
     ));
 }

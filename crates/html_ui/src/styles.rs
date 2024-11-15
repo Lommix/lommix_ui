@@ -111,11 +111,12 @@ fn continues_interaction_checking(
 
 // @todo: split, event based updates
 fn update_node_style(
-    mut nodes: Query<(Entity, &mut Style, &NodeStyle, Option<&UiActive>)>,
+    mut nodes: Query<(Entity, &mut Node, &NodeStyle, Option<&UiActive>)>,
     mut bg: Query<&mut BackgroundColor>,
     mut bradius: Query<&mut BorderRadius>,
     mut bcolor: Query<&mut BorderColor>,
-    mut texts: Query<&mut Text>,
+    mut text_fonts: Query<&mut TextFont>,
+    mut text_colors: Query<&mut TextColor>,
     server: Res<AssetServer>,
     hover_timer: Query<&HoverTimer>,
     pressed_timer: Query<&PressedTimer>,
@@ -128,7 +129,8 @@ fn update_node_style(
             let bg = bg.get_mut(entity).ok();
             let bradius = bradius.get_mut(entity).ok();
             let bcolor = bcolor.get_mut(entity).ok();
-            let text = texts.get_mut(entity).ok();
+            let text_font = text_fonts.get_mut(entity).ok();
+            let text_color = text_colors.get_mut(entity).ok();
 
             node_styles.apply_style(
                 &mut style,
@@ -136,7 +138,8 @@ fn update_node_style(
                 bg,
                 bradius,
                 bcolor,
-                text,
+                text_color,
+                text_font,
                 &server,
                 hover_timer,
                 pressed_timer,
@@ -167,10 +170,10 @@ impl HoverTimer {
 #[derive(Debug, Reflect)]
 #[reflect]
 pub struct ComputedStyle {
-    pub style: Style,
+    pub style: Node,
     pub border_color: Color,
     pub border_radius: UiRect,
-    pub image_scale_mode: Option<ImageScaleMode>,
+    pub image_scale_mode: Option<NodeImageMode>,
     pub background: Color,
     pub font: Handle<Font>,
     pub font_size: f32,
@@ -183,7 +186,7 @@ pub struct ComputedStyle {
 impl Default for ComputedStyle {
     fn default() -> Self {
         Self {
-            style: Style::default(),
+            style: Node::default(),
             border_color: Color::NONE,
             border_radius: UiRect::default(),
             background: Color::NONE,
@@ -212,12 +215,13 @@ pub struct NodeStyle {
 impl NodeStyle {
     pub fn apply_style(
         &self,
-        style: &mut Style,
+        style: &mut Node,
         is_active: bool,
         mut bg: Option<Mut<BackgroundColor>>,
         mut bradius: Option<Mut<BorderRadius>>,
         mut bcolor: Option<Mut<BorderColor>>,
-        mut text: Option<Mut<Text>>,
+        mut text_color: Option<Mut<TextColor>>,
+        mut text_style: Option<Mut<TextFont>>,
         server: &AssetServer,
         hover_timer: Option<&HoverTimer>,
         pressed_timer: Option<&PressedTimer>,
@@ -236,12 +240,13 @@ impl NodeStyle {
             bradius.bottom_left = self.regular.border_radius.left;
         });
 
-        text.as_mut().map(|txt| {
-            txt.sections.iter_mut().for_each(|s| {
-                s.style.font_size = self.regular.font_size;
-                s.style.color = self.regular.font_color;
-                s.style.font = self.regular.font.clone();
-            });
+        text_style.as_mut().map(|txt_style| {
+            txt_style.font_size = self.regular.font_size;
+            txt_style.font = self.regular.font.clone();
+        });
+
+        text_color.as_mut().map(|txt_color| {
+            ***txt_color = self.regular.font_color;
         });
 
         hover_timer.map(|timer| {
@@ -261,7 +266,8 @@ impl NodeStyle {
                         &mut bg,
                         &mut bradius,
                         &mut bcolor,
-                        &mut text,
+                        &mut text_color,
+                        &mut text_style,
                         server,
                     );
                 }
@@ -285,7 +291,8 @@ impl NodeStyle {
                         &mut bg,
                         &mut bradius,
                         &mut bcolor,
-                        &mut text,
+                        &mut text_color,
+                        &mut text_style,
                         server,
                     );
                 }
@@ -302,7 +309,8 @@ impl NodeStyle {
                     &mut bg,
                     &mut bradius,
                     &mut bcolor,
-                    &mut text,
+                    &mut text_color,
+                    &mut text_style,
                     server,
                 );
             }
@@ -395,7 +403,6 @@ impl NodeStyle {
             StyleAttr::GridColumn(grid_placement) => {
                 self.regular.style.grid_column = grid_placement
             }
-            StyleAttr::Direction(direction) => self.regular.style.direction = direction,
             StyleAttr::FontSize(f) => self.regular.font_size = f,
             StyleAttr::FontColor(color) => self.regular.font_color = color,
             StyleAttr::Background(color) => self.regular.background = color,
@@ -412,11 +419,12 @@ fn apply_lerp_style(
     attr: &StyleAttr,
     ratio: f32,
     default: &ComputedStyle,
-    style: &mut Style,
+    style: &mut Node,
     bg: &mut Option<Mut<BackgroundColor>>,
     bradius: &mut Option<Mut<BorderRadius>>,
     bcolor: &mut Option<Mut<BorderColor>>,
-    text: &mut Option<Mut<Text>>,
+    text_color: &mut Option<Mut<TextColor>>,
+    text_style: &mut Option<Mut<TextFont>>,
     server: &AssetServer,
 ) {
     match attr {
@@ -491,30 +499,23 @@ fn apply_lerp_style(
         StyleAttr::GridAutoColumns(vec) => style.grid_auto_columns = vec.clone(),
         StyleAttr::GridRow(grid_placement) => style.grid_row = *grid_placement,
         StyleAttr::GridColumn(grid_placement) => style.grid_column = *grid_placement,
-        StyleAttr::Direction(direction) => style.direction = *direction,
         StyleAttr::Background(color) => {
             bg.as_mut()
                 .map(|bg| bg.0 = lerp_color(&default.background, color, ratio));
         }
         StyleAttr::FontColor(color) => {
-            text.as_mut().map(|txt| {
-                txt.sections.iter_mut().for_each(|sec| {
-                    sec.style.color = lerp_color(&default.font_color, color, ratio);
-                });
+            text_color.as_mut().map(|tc| {
+                ***tc = lerp_color(&default.font_color, color, ratio);
             });
         }
         StyleAttr::FontSize(s) => {
-            text.as_mut().map(|txt| {
-                txt.sections.iter_mut().for_each(|sec| {
-                    sec.style.font_size = default.font_size.lerp(*s, ratio);
-                });
+            text_style.as_mut().map(|txt| {
+                txt.font_size = default.font_size.lerp(*s, ratio);
             });
         }
         StyleAttr::Font(h) => {
-            text.as_mut().map(|txt| {
-                txt.sections.iter_mut().for_each(|sec| {
-                    sec.style.font = server.load(h);
-                });
+            text_style.as_mut().map(|txt| {
+                txt.font = server.load(h);
             });
         }
         _ => (),

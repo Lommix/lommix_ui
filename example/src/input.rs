@@ -1,5 +1,4 @@
 use bevy::{
-    ecs::event::ManualEventReader,
     input::{
         keyboard::{Key, KeyboardInput},
         mouse::MouseButtonInput,
@@ -16,18 +15,14 @@ pub fn main() {
         .run();
 }
 
-fn setup_scene(
-    mut cmd: Commands,
-    mut functions: ResMut<FunctionBindings>,
-    server: Res<AssetServer>,
-) {
-    cmd.spawn(Camera2dBundle::default());
+fn setup_scene(mut cmd: Commands, mut functions: HtmlFunctions, server: Res<AssetServer>) {
+    cmd.spawn(Camera2d);
     cmd.spawn(HtmlBundle {
-        handle: server.load("textinput/menu.xml"),
+        html: HtmlNode(server.load("textinput/menu.xml")),
         ..default()
     });
 
-    functions.register("submit", cmd.register_one_shot_system(on_submit));
+    functions.register("submit", on_submit);
 }
 
 // Example a simple submit form
@@ -63,7 +58,10 @@ pub struct TextInputPlugin;
 impl Plugin for TextInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup);
-        app.add_systems(Update, (focus, write_input, sync_display_text, unfocus));
+        app.add_systems(
+            Update,
+            (focus /* , write_input */, sync_display_text, unfocus),
+        );
     }
 }
 
@@ -73,14 +71,11 @@ pub struct TextInput(pub String);
 #[derive(Component)]
 pub struct Focused;
 
-fn setup(mut components: ResMut<ComponentBindings>, server: Res<AssetServer>) {
+fn setup(mut components: HtmlComponents, server: Res<AssetServer>) {
     let handle = server.load("textinput/textinput.xml");
-    components.register("input", move |mut cmd| {
+
+    components.register_with_spawn_fn("input", handle, |mut cmd| {
         cmd.insert((
-            HtmlBundle {
-                handle: handle.clone(),
-                ..default()
-            },
             // Directly adding the Textinput-Component, because the first node is the button holding
             // the input state. This saves us a `onspawn` binding
             TextInput::default(),
@@ -130,52 +125,52 @@ fn unfocus(
     });
 }
 
-fn write_input(
-    mut cmd: Commands,
-    key_events: Res<Events<KeyboardInput>>,
-    mut reader: Local<ManualEventReader<KeyboardInput>>,
-    mut text_inputs: Query<(Entity, &mut TextInput), With<Focused>>,
-) {
-    if text_inputs.is_empty() {
-        return;
-    }
-
-    if reader.clone().read(&key_events).next().is_none() {
-        return;
-    }
-
-    for input in reader.clone().read(&key_events) {
-        if !input.state.is_pressed() {
-            return;
-        }
-
-        match input.logical_key {
-            Key::Character(ref char) => {
-                text_inputs
-                    .iter_mut()
-                    .for_each(|(_, mut txt)| txt.0.push_str(char));
-            }
-            Key::Enter => {
-                text_inputs.iter().for_each(|(ent, _)| {
-                    cmd.entity(ent).remove::<UiActive>().remove::<Focused>();
-                });
-            }
-            Key::Backspace => {
-                text_inputs.iter_mut().for_each(|(_, mut txt)| {
-                    _ = txt.0.pop();
-                });
-            }
-            Key::Space => {
-                text_inputs
-                    .iter_mut()
-                    .for_each(|(_, mut txt)| txt.0.push_str(" "));
-            }
-            _ => (),
-        }
-    }
-
-    reader.clear(&key_events);
-}
+// fn write_input(
+//     mut cmd: Commands,
+//     key_events: Res<Events<KeyboardInput>>,
+//     mut reader: Local<ManualEventReader<KeyboardInput>>,
+//     mut text_inputs: Query<(Entity, &mut TextInput), With<Focused>>,
+// ) {
+//     if text_inputs.is_empty() {
+//         return;
+//     }
+//
+//     if reader.clone().read(&key_events).next().is_none() {
+//         return;
+//     }
+//
+//     for input in reader.clone().read(&key_events) {
+//         if !input.state.is_pressed() {
+//             return;
+//         }
+//
+//         match input.logical_key {
+//             Key::Character(ref char) => {
+//                 text_inputs
+//                     .iter_mut()
+//                     .for_each(|(_, mut txt)| txt.0.push_str(char));
+//             }
+//             Key::Enter => {
+//                 text_inputs.iter().for_each(|(ent, _)| {
+//                     cmd.entity(ent).remove::<UiActive>().remove::<Focused>();
+//                 });
+//             }
+//             Key::Backspace => {
+//                 text_inputs.iter_mut().for_each(|(_, mut txt)| {
+//                     _ = txt.0.pop();
+//                 });
+//             }
+//             Key::Space => {
+//                 text_inputs
+//                     .iter_mut()
+//                     .for_each(|(_, mut txt)| txt.0.push_str(" "));
+//             }
+//             _ => (),
+//         }
+//     }
+//
+//     reader.clear(&key_events);
+// }
 
 fn sync_display_text(
     text_inputs: Query<(&TextInput, &UiTarget), Changed<TextInput>>,
@@ -183,9 +178,7 @@ fn sync_display_text(
 ) {
     text_inputs.iter().for_each(|(input, target)| {
         _ = texts.get_mut(**target).map(|mut txt| {
-            txt.sections
-                .first_mut()
-                .map(|sec| sec.value.clone_from(&input.0));
+            **txt = input.0.clone();
         });
     });
 }

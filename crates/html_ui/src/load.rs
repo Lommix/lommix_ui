@@ -1,6 +1,6 @@
 use crate::{data::HtmlTemplate, error::ParseError, parse::parse_template};
 use bevy::{
-    asset::{AssetLoader, AsyncReadExt},
+    asset::{io::Reader, AssetLoader},
     prelude::*,
 };
 
@@ -19,11 +19,11 @@ impl AssetLoader for HtmlAssetLoader {
     type Settings = ();
     type Error = ParseError;
 
-    async fn load<'a>(
-        &'a self,
-        reader: &'a mut bevy::asset::io::Reader<'_>,
-        _settings: &'a Self::Settings,
-        _load_context: &'a mut bevy::asset::LoadContext<'_>,
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut bevy::asset::LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader

@@ -173,7 +173,6 @@ pub enum StyleAttr {
 
     // -----
     // font
-    Direction(Direction),
     FontSize(f32),
     Font(String),
     FontColor(Color),
@@ -196,6 +195,6 @@ pub enum StyleAttr {
     // image
     // scale mode
     // atlas
-    ImageScaleMode(ImageScaleMode),
+    ImageScaleMode(NodeImageMode),
     // ImageAtlas(TextureAtlas),
 }

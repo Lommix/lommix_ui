@@ -1,10 +1,13 @@
 use bevy::{
-    ecs::system::{lifetimeless::Read, EntityCommands, SystemId, SystemParam},
+    ecs::system::{EntityCommands, SystemId, SystemParam},
     prelude::*,
     utils::HashMap,
 };
 
-use crate::{build::HtmlBundle, data::HtmlTemplate};
+use crate::{
+    build::{HtmlBundle, HtmlNode},
+    data::HtmlTemplate,
+};
 
 pub struct BindingPlugin;
 impl Plugin for BindingPlugin {
@@ -26,9 +29,9 @@ pub struct HtmlFunctions<'w, 's> {
 impl<'w, 's> HtmlFunctions<'w, 's> {
     pub fn register<S, M>(&mut self, name: impl Into<String>, func: S)
     where
-        S: IntoSystem<Entity, (), M> + 'static,
+        S: IntoSystem<In<Entity>, (), M> + 'static,
     {
-        let id = self.cmd.register_one_shot_system(func);
+        let id = self.cmd.register_system(func);
         self.bindings.register(name, id);
     }
 }
@@ -42,7 +45,7 @@ impl<'w> HtmlComponents<'w> {
     pub fn register(&mut self, name: impl Into<String>, template: Handle<HtmlTemplate>) {
         self.comps.register(name, move |mut cmd| {
             cmd.insert(HtmlBundle {
-                handle: template.clone(),
+                html: HtmlNode(template.clone()),
                 ..default()
             });
         });
@@ -58,7 +61,7 @@ impl<'w> HtmlComponents<'w> {
     {
         self.comps.register(name, move |mut cmd| {
             cmd.insert(HtmlBundle {
-                handle: template.clone(),
+                html: HtmlNode(template.clone()),
                 ..default()
             });
 
@@ -109,10 +112,10 @@ impl ComponentBindings {
 /// FunctionBindings.register("start_game", system_id);
 /// `
 #[derive(Resource, Default, Deref, DerefMut)]
-pub struct FunctionBindings(HashMap<String, SystemId<Entity>>);
+pub struct FunctionBindings(HashMap<String, SystemId<In<Entity>>>);
 
 impl FunctionBindings {
-    pub fn register(&mut self, key: impl Into<String>, system_id: SystemId<Entity>) {
+    pub fn register(&mut self, key: impl Into<String>, system_id: SystemId<In<Entity>>) {
         let key: String = key.into();
         self.insert(key, system_id);
     }

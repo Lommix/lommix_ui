@@ -57,11 +57,9 @@ fn check_loading_state(
     mut next: ResMut<NextState<AutoLoadState>>,
     server: Res<AssetServer>,
 ) {
-    if config
-        .folders
-        .iter()
-        .all(|h| server.load_state(h) == LoadState::Loaded)
-    {
+    if config.folders.iter().all(|h| {
+        std::mem::discriminant(&server.load_state(h)) == std::mem::discriminant(&LoadState::Loaded)
+    }) {
         next.set(AutoLoadState::Finished);
     }
 }

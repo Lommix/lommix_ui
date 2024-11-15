@@ -14,8 +14,8 @@ impl Plugin for CompilePlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<CompileNodeEvent>();
         app.add_event::<CompileContextEvent>();
-        app.observe(compile_node);
-        app.observe(compile_context);
+        app.add_observer(compile_node);
+        app.add_observer(compile_context);
     }
 }
 
@@ -58,7 +58,7 @@ fn compile_node(
                         }
                         crate::data::Attribute::Path(path) => {
                             _ = images.get_mut(entity).map(|mut img| {
-                                img.texture = server.load(path);
+                                img.image = server.load(path);
                             });
                         }
                         rest => {
@@ -74,9 +74,7 @@ fn compile_node(
     }
 
     if let Ok((mut text, raw)) = uncompiled_texts.get_mut(entity) {
-        text.sections.iter_mut().for_each(|section| {
-            section.value = compile_content(raw, context);
-        });
+        **text = compile_content(raw, context);
     }
 }
 

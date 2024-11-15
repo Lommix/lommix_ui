@@ -1,32 +1,26 @@
 use crate::data::{Action, AttrTokens, Attribute, HtmlTemplate, StyleAttr, XNode};
 use crate::prelude::NodeType;
-use bevy::sprite::{BorderRect, ImageScaleMode, SliceScaleMode, TextureSlicer};
+use bevy::sprite::{BorderRect, SliceScaleMode, TextureSlicer};
 use bevy::ui::{
-    AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap, GridAutoFlow,
-    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Overflow, OverflowAxis,
-    PositionType, RepeatedGridTrack,
+    AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, GridAutoFlow,
+    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, NodeImageMode, Overflow,
+    OverflowAxis, PositionType, RepeatedGridTrack,
 };
 use bevy::utils::HashMap;
 use bevy::{
     color::Color,
     ui::{UiRect, Val},
 };
-use nom::bytes::complete::{is_not, take_until, take_while1};
-use nom::combinator::{map_parser, not, rest};
-use nom::multi::{many0, separated_list1};
-use nom::sequence::terminated;
-use nom::Parser;
-
-#[allow(unused)]
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while, take_while_m_n},
+    bytes::complete::{is_not, tag, take_until, take_while, take_while1, take_while_m_n},
     character::complete::multispace0,
-    combinator::{complete, map},
-    error::{context, convert_error, ContextError, ErrorKind, ParseError, VerboseError},
+    combinator::{complete, map, map_parser, not, rest},
+    error::{context, ContextError, ErrorKind, ParseError},
+    multi::{many0, separated_list1},
     number::complete::float,
-    sequence::{delimited, preceded, tuple},
-    IResult,
+    sequence::{delimited, preceded, terminated, tuple},
+    IResult, Parser,
 };
 
 struct XmlAttr<'a> {
@@ -117,7 +111,6 @@ where
         delimited(tag("<!--"), take_until("-->"), tag("-->")),
     )(input)
 }
-
 
 // try from
 fn from_raw_xml<'a, E>(mut xml: Xml<'a>) -> IResult<&[u8], XNode, E>
@@ -409,7 +402,6 @@ where
         b"position" => map(parse_position_type, StyleAttr::Position)(value)?,
         b"display" => map(parse_display, StyleAttr::Display)(value)?,
         b"overflow" => map(parse_overflow, StyleAttr::Overflow)(value)?,
-        b"direction" => map(parse_direction, StyleAttr::Direction)(value)?,
 
         // align & justify
         b"align_self" => map(parse_align_self, StyleAttr::AlignSelf)(value)?,
@@ -552,17 +544,6 @@ where
         map(tag("flex"), |_| Display::Flex),
         map(tag("block"), |_| Display::Block),
         map(tag("grid"), |_| Display::Grid),
-    ))(input)
-}
-
-fn parse_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], Direction, E>
-where
-    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
-{
-    alt((
-        map(tag("inherit"), |_| Direction::Inherit),
-        map(tag("left_to_right"), |_| Direction::LeftToRight),
-        map(tag("right_to_left"), |_| Direction::RightToLeft),
     ))(input)
 }
 
@@ -743,7 +724,7 @@ where
     take_while(|b: u8| b.is_ascii_alphabetic() || b == b'_')(input)
 }
 
-fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
+fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -751,7 +732,7 @@ where
 }
 
 // 10px tiled tiled 1
-fn parse_image_slice<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
+fn parse_image_slice<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -764,7 +745,7 @@ where
 
     Ok((
         input,
-        ImageScaleMode::Sliced(TextureSlicer {
+        NodeImageMode::Sliced(TextureSlicer {
             border: BorderRect::square(val),
             center_scale_mode: x,
             sides_scale_mode: y,
@@ -773,7 +754,7 @@ where
     ))
 }
 
-fn parse_image_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
+fn parse_image_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -785,7 +766,7 @@ where
 
     Ok((
         input,
-        ImageScaleMode::Tiled {
+        NodeImageMode::Tiled {
             tile_x: x,
             tile_y: y,
             stretch_value: s,

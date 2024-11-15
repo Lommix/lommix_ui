@@ -142,16 +142,18 @@ pub struct OnUiExit(pub Vec<String>);
 /// Spawns a ui template behind an asset.
 #[derive(Bundle, Default)]
 pub struct HtmlBundle {
-    pub handle: Handle<HtmlTemplate>,
-    pub node: NodeBundle,
+    pub html: HtmlNode,
     pub unbuild: UnbuildTag,
-    pub state: TemplateState,
 }
+
+#[derive(Component, Default, Deref, DerefMut)]
+#[require(Node, TemplateState)]
+pub struct HtmlNode(pub Handle<HtmlTemplate>);
 
 fn hotreload(
     mut cmd: Commands,
     mut events: EventReader<AssetEvent<HtmlTemplate>>,
-    templates: Query<(Entity, &Handle<HtmlTemplate>)>,
+    templates: Query<(Entity, &HtmlNode)>,
     sloted_nodes: Query<(Entity, &InsideSlot)>,
 ) {
     events.read().for_each(|ev| {
@@ -163,7 +165,7 @@ fn hotreload(
         };
         templates
             .iter()
-            .filter(|(_, handle)| handle.id() == *id)
+            .filter(|(_, html)| html.id() == *id)
             .for_each(|(entity, _)| {
                 let slots = sloted_nodes
                     .iter()
@@ -171,9 +173,8 @@ fn hotreload(
                     .collect::<Vec<_>>();
 
                 if slots.len() > 0 {
-                    let slot_holder = cmd.spawn_empty().push_children(&slots).id();
+                    let slot_holder = cmd.spawn_empty().add_children(&slots).id();
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
-                } else {
                 }
 
                 cmd.entity(entity)
@@ -254,7 +255,7 @@ impl IdLookUpTable {
 
 fn spawn_ui(
     mut cmd: Commands,
-    mut unbuild: Query<(Entity, &Handle<HtmlTemplate>, &mut TemplateState), With<UnbuildTag>>,
+    mut unbuild: Query<(Entity, &HtmlNode, &mut TemplateState), With<UnbuildTag>>,
     assets: Res<Assets<HtmlTemplate>>,
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
@@ -262,7 +263,7 @@ fn spawn_ui(
     unbuild
         .iter_mut()
         .for_each(|(root_entity, handle, mut state)| {
-            let Some(template) = assets.get(handle) else {
+            let Some(template) = assets.get(&**handle) else {
                 return;
             };
 
@@ -402,14 +403,20 @@ fn build_node(
             let path = node.src.clone().unwrap_or_default();
             let handle = server.load::<Image>(path);
 
-            if let Some(scale_mode) = style_attributes.regular.image_scale_mode.as_ref() {
-                cmd.entity(entity).insert(scale_mode.clone());
-            }
+            // if let Some(scale_mode) = style_attributes.regular.image_scale_mode.as_ref() {
+            //     // cmd.entity(entity).insert(scale_mode.clone());
+            // }
 
             cmd.entity(entity).insert((
                 Name::new("Image"),
-                ImageBundle {
-                    image: UiImage::new(handle),
+                UiImage {
+                    image: handle,
+                    image_mode: style_attributes
+                        .regular
+                        .image_scale_mode
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_default(),
                     ..default()
                 },
                 style_attributes,
@@ -436,29 +443,24 @@ fn build_node(
 
             cmd.entity(entity).insert((
                 Name::new("Text"),
-                TextBundle::from_section(
-                    content,
-                    TextStyle {
-                        font_size: 16., // default
-                        color: Color::WHITE,
-                        ..default()
-                    },
-                ),
+                Text(content),
+                TextFont {
+                    font_size: 16.,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
                 style_attributes,
             ));
         }
         NodeType::Button => {
-            cmd.entity(entity).insert((
-                Name::new("Button"),
-                ButtonBundle::default(),
-                style_attributes,
-            ));
+            cmd.entity(entity)
+                .insert((Name::new("Button"), Button, style_attributes));
         }
         NodeType::Include => {
             let path = node.src.clone().unwrap_or_default();
             let handle = server.load::<HtmlTemplate>(path);
             if node.children.len() > 0 {
-                let slot_holder = cmd.spawn(NodeBundle::default()).id();
+                let slot_holder = cmd.spawn(Node::default()).id();
                 node.children.iter().for_each(|child_node| {
                     let child = cmd.spawn_empty().id();
                     build_node(
@@ -480,14 +482,14 @@ fn build_node(
             }
 
             cmd.entity(entity)
-                .insert((handle, UnbuildTag, NodeBundle::default(), passed_state));
+                .insert((HtmlNode(handle), UnbuildTag, passed_state));
 
             return;
         }
         NodeType::Custom(custom_tag) => {
             custom_comps.try_spawn(custom_tag, entity, cmd);
             if node.children.len() > 0 {
-                let slot_holder = cmd.spawn(NodeBundle::default()).id();
+                let slot_holder = cmd.spawn(Node::default()).id();
                 node.children.iter().for_each(|child_node| {
                     let child = cmd.spawn_empty().id();
                     build_node(
@@ -513,10 +515,8 @@ fn build_node(
             return;
         }
         NodeType::Slot => {
-            cmd.entity(entity).insert((
-                SlotPlaceholder { owner: scope.get() },
-                NodeBundle::default(),
-            ));
+            cmd.entity(entity)
+                .insert((SlotPlaceholder { owner: scope.get() }, Node::default()));
             return;
         }
         NodeType::Property => {

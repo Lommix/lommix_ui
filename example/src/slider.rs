@@ -1,4 +1,4 @@
-use bevy::{input::mouse::MouseButtonInput, prelude::*};
+use bevy::prelude::*;
 use bevy_html_ui::prelude::*;
 
 pub fn main() {
@@ -16,10 +16,10 @@ pub fn main() {
 
 fn setup_scene(mut cmd: Commands, server: Res<AssetServer>) {
     // --
-    cmd.spawn(Camera2dBundle::default());
+    cmd.spawn(Camera2d::default());
     cmd.spawn((
         HtmlBundle {
-            handle: server.load("slider/menu.xml"),
+            html: HtmlNode(server.load("slider/menu.xml")),
             ..default()
         },
         Slider(0.),
@@ -35,16 +35,15 @@ impl Plugin for SliderPlugin {
 }
 
 fn setup_slider(
-    mut cmd: Commands,
     mut components: ResMut<ComponentBindings>,
-    mut functions: ResMut<FunctionBindings>,
+    mut html_functions: HtmlFunctions,
     server: Res<AssetServer>,
 ) {
     let handle = server.load("slider/slider.xml");
     components.register("slider", move |mut cmd| {
         cmd.insert((
             HtmlBundle {
-                handle: handle.clone(),
+                html: HtmlNode(handle.clone()),
                 ..default()
             },
             // add our state to the root, so way may easly have access in other templates logic by
@@ -53,12 +52,9 @@ fn setup_slider(
         ));
     });
 
-    functions.register(
-        "init_slider_btn",
-        cmd.register_one_shot_system(|In(entity), mut cmd: Commands| {
-            cmd.entity(entity).insert(SliderNob::Rested);
-        }),
-    );
+    html_functions.register("init_slider_btn", |In(entity), mut cmd: Commands| {
+        cmd.entity(entity).insert(SliderNob::Rested);
+    });
 }
 
 #[derive(Component)]
@@ -110,9 +106,7 @@ fn update_drag(
 
                 children.first().map(|child| {
                     _ = text.get_mut(*child).map(|mut txt| {
-                        txt.sections
-                            .iter_mut()
-                            .for_each(|s| s.value = format!("{:.0}", slide.0 * 100.));
+                        **txt = format!("{:.0}", slide.0 * 100.);
                     });
                 });
             });
