@@ -12,6 +12,7 @@ pub enum NodeType {
     Include,
     Slot,
     Template,
+    Property,
     Custom(String),
 }
 
@@ -22,6 +23,7 @@ pub struct XNode {
     pub target: Option<String>,
     pub watch: Option<String>,
     pub id: Option<String>,
+    pub name: Option<String>,
     pub uncompiled: Vec<AttrTokens>,
     pub tags: Vec<(String, String)>,
     pub defs: Vec<(String, String)>,
@@ -41,7 +43,8 @@ pub struct HtmlTemplate {
 #[derive(Debug, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
-    PropertyDefinition(String, String), // to remove
+    PropertyDefinition(String, String),
+    Name(String),
     Uncompiled(AttrTokens),
     Action(Action),
     Path(String),
@@ -102,16 +105,16 @@ impl Action {
     pub fn self_insert(self, mut cmd: EntityCommands) {
         match self {
             Action::OnPress(fn_id) => {
-                cmd.insert(crate::prelude::OnPress(fn_id));
+                cmd.insert(crate::prelude::OnUiPress(fn_id));
             }
             Action::OnEnter(fn_id) => {
-                cmd.insert(crate::prelude::OnEnter(fn_id));
+                cmd.insert(crate::prelude::OnUiEnter(fn_id));
             }
             Action::OnExit(fn_id) => {
-                cmd.insert(crate::prelude::OnExit(fn_id));
+                cmd.insert(crate::prelude::OnUiExit(fn_id));
             }
             Action::OnSpawn(fn_id) => {
-                cmd.insert(crate::prelude::OnSpawn(fn_id));
+                cmd.insert(crate::prelude::OnUiSpawn(fn_id));
             }
         }
     }

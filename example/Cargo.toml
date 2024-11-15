@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.14"
+bevy = { version = "0.14", features = ["file_watcher", "multi_threaded"] }
 bevy-inspector-egui = "0.27.0"
 bevy_html_ui = { path = "../crates/html_ui" }
 rand = "0.8.5"
@@ -20,4 +20,3 @@ path = "src/slider.rs"
 [[bin]]
 name = "ui"
 path = "src/ui.rs"
-

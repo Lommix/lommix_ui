@@ -1,8 +1,10 @@
 use bevy::{
-    ecs::system::{EntityCommands, SystemId},
+    ecs::system::{lifetimeless::Read, EntityCommands, SystemId, SystemParam},
     prelude::*,
     utils::HashMap,
 };
+
+use crate::{build::HtmlBundle, data::HtmlTemplate};
 
 pub struct BindingPlugin;
 impl Plugin for BindingPlugin {
@@ -14,6 +16,56 @@ impl Plugin for BindingPlugin {
 }
 
 pub type SpawnFunction = dyn Fn(EntityCommands) + Send + Sync + 'static;
+
+#[derive(SystemParam)]
+pub struct HtmlFunctions<'w, 's> {
+    bindings: ResMut<'w, FunctionBindings>,
+    cmd: Commands<'w, 's>,
+}
+
+impl<'w, 's> HtmlFunctions<'w, 's> {
+    pub fn register<S, M>(&mut self, name: impl Into<String>, func: S)
+    where
+        S: IntoSystem<Entity, (), M> + 'static,
+    {
+        let id = self.cmd.register_one_shot_system(func);
+        self.bindings.register(name, id);
+    }
+}
+
+#[derive(SystemParam)]
+pub struct HtmlComponents<'w> {
+    comps: ResMut<'w, ComponentBindings>,
+}
+
+impl<'w> HtmlComponents<'w> {
+    pub fn register(&mut self, name: impl Into<String>, template: Handle<HtmlTemplate>) {
+        self.comps.register(name, move |mut cmd| {
+            cmd.insert(HtmlBundle {
+                handle: template.clone(),
+                ..default()
+            });
+        });
+    }
+
+    pub fn register_with_spawn_fn<SF>(
+        &mut self,
+        name: impl Into<String>,
+        template: Handle<HtmlTemplate>,
+        func: SF,
+    ) where
+        SF: Fn(EntityCommands) + Send + Sync + 'static,
+    {
+        self.comps.register(name, move |mut cmd| {
+            cmd.insert(HtmlBundle {
+                handle: template.clone(),
+                ..default()
+            });
+
+            func(cmd);
+        });
+    }
+}
 
 /// # Register custom node tags
 ///
@@ -77,14 +129,14 @@ impl FunctionBindings {
 fn observe_on_spawn(
     mut cmd: Commands,
     function_bindings: Res<FunctionBindings>,
-    on_spawn: Query<(Entity, &crate::prelude::OnSpawn)>,
+    on_spawn: Query<(Entity, &crate::prelude::OnUiSpawn)>,
 ) {
     on_spawn.iter().for_each(|(entity, on_spawn)| {
         for spawn_fn in on_spawn.iter() {
             function_bindings.maybe_run(spawn_fn, entity, &mut cmd);
         }
 
-        cmd.entity(entity).remove::<crate::prelude::OnSpawn>();
+        cmd.entity(entity).remove::<crate::prelude::OnUiSpawn>();
     });
 }
 
@@ -93,28 +145,28 @@ fn observe_interactions(
     mut cmd: Commands,
     interactions: Query<(Entity, &Interaction), Changed<Interaction>>,
     function_bindings: Res<FunctionBindings>,
-    on_pressed : Query<&crate::prelude::OnPress>,
-    on_enter : Query<&crate::prelude::OnEnter>,
-    on_exit : Query<&crate::prelude::OnExit>,
+    on_pressed : Query<&crate::prelude::OnUiPress>,
+    on_enter : Query<&crate::prelude::OnUiEnter>,
+    on_exit : Query<&crate::prelude::OnUiExit>,
 ){
     interactions.iter().for_each(|(entity, interaction)|{
         match interaction {
             Interaction::Pressed => {
-                if let Ok(crate::prelude::OnPress(funcs)) = on_pressed.get(entity){
+                if let Ok(crate::prelude::OnUiPress(funcs)) = on_pressed.get(entity){
                     for fn_str in funcs.iter(){
                         function_bindings.maybe_run(fn_str, entity, &mut cmd);
                     }
                 }
             }
             Interaction::Hovered => {
-                if let Ok(crate::prelude::OnEnter(funcs)) = on_enter.get(entity){
+                if let Ok(crate::prelude::OnUiEnter(funcs)) = on_enter.get(entity){
                     for fn_str in funcs.iter(){
                         function_bindings.maybe_run(fn_str, entity, &mut cmd);
                     }
                 }
             },
             Interaction::None => {
-                if let Ok(crate::prelude::OnExit(funcs)) = on_exit.get(entity){
+                if let Ok(crate::prelude::OnUiExit(funcs)) = on_exit.get(entity){
                     for fn_str in funcs.iter(){
                         function_bindings.maybe_run(fn_str, entity, &mut cmd);
                     }

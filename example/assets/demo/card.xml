@@ -14,7 +14,6 @@
 				ease="sine"
 				id="btn"
 				background="#0000"
-				prop:title="Default Title"
 				border="2px"
 				border_color="{primary}"
 				border_radius="2px"

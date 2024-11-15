@@ -125,19 +125,19 @@ pub struct UnbuildTag;
 
 /// Eventlistener interaction transitions to Hover
 #[derive(Component, Deref, DerefMut)]
-pub struct OnPress(pub Vec<String>);
+pub struct OnUiPress(pub Vec<String>);
 
 /// Eventlistener on spawning node
 #[derive(Component, DerefMut, Deref)]
-pub struct OnSpawn(pub Vec<String>);
+pub struct OnUiSpawn(pub Vec<String>);
 
 /// Eventlistener for interaction transitions to Hover
 #[derive(Component, DerefMut, Deref)]
-pub struct OnEnter(pub Vec<String>);
+pub struct OnUiEnter(pub Vec<String>);
 
 /// Eventlistener for interaction transitions to None
 #[derive(Component, Deref, DerefMut)]
-pub struct OnExit(pub Vec<String>);
+pub struct OnUiExit(pub Vec<String>);
 
 /// Spawns a ui template behind an asset.
 #[derive(Bundle, Default)]
@@ -519,6 +519,9 @@ fn build_node(
             ));
             return;
         }
+        NodeType::Property => {
+            // does not render
+        }
     };
 
     for child_node in node.children.iter() {
@@ -541,7 +544,7 @@ fn build_node(
     }
 }
 
-//@todo:dirty af
+//@todo:dirty AF
 pub fn is_templated(input: &str) -> bool {
     let parts: Result<(&str, (&str, &str)), nom::Err<nom::error::Error<&str>>> = tuple((
         take_until("{"),

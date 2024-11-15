@@ -16,11 +16,14 @@ use nom::combinator::{map_parser, not, rest};
 use nom::multi::{many0, separated_list1};
 use nom::sequence::terminated;
 use nom::Parser;
+
+#[allow(unused)]
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
     character::complete::multispace0,
     combinator::{complete, map},
+    error::{context, convert_error, ContextError, ErrorKind, ParseError, VerboseError},
     number::complete::float,
     sequence::{delimited, preceded, tuple},
     IResult,
@@ -46,7 +49,7 @@ impl std::fmt::Debug for XmlAttr<'_> {
 
 pub(crate) fn parse_template<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], HtmlTemplate, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     trim_comments0(input)?;
     let (input, _xml_header) = alt((
@@ -100,14 +103,14 @@ where
 
 fn trim_comments0<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<&[u8]>, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     many0(parse_comment::<E>)(input)
 }
 
 fn parse_comment<'a, E>(input: &'a [u8]) -> IResult<&[u8], &[u8], E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     preceded(
         multispace0,
@@ -115,10 +118,11 @@ where
     )(input)
 }
 
+
 // try from
 fn from_raw_xml<'a, E>(mut xml: Xml<'a>) -> IResult<&[u8], XNode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (_, node_type) = parse_node_type(xml.name)?;
 
@@ -135,12 +139,25 @@ where
     let mut id = None;
     let mut target = None;
     let mut watch = None;
+    let mut name = None;
 
     for attr in xml.attributes.iter() {
-        let (_input, attr) = attribute_from_parts(attr.prefix, attr.key, attr.value)?;
-        match attr {
+        let (_input, compiled_attr) = attribute_from_parts(attr.prefix, attr.key, attr.value)?;
+        match compiled_attr {
             Attribute::Style(style_attr) => styles.push(style_attr),
-            Attribute::PropertyDefinition(key, val) => defs.push((key, val)),
+            Attribute::PropertyDefinition(key, val) => {
+                match node_type {
+                    NodeType::Include | NodeType::Custom(_) | NodeType::Property => {
+                        defs.push((key, val))
+                    }
+                    _ => {
+                        // prop defs are not allowed, unless include or custom
+                        let err = E::from_error_kind(attr.key, ErrorKind::Verify);
+                        return Err(nom::Err::Error(E::add_context(attr.key, "Is not a valid attribute, custom values (properties) are only allowed on includes/custom nodes. Did you misspell a style?", err)));
+                    }
+                }
+            }
+            Attribute::Name(s) => name = Some(s),
             Attribute::Uncompiled(attr_tokens) => uncompiled.push(attr_tokens),
             Attribute::Action(action) => event_listener.push(action),
             Attribute::Path(path) => src = Some(path),
@@ -166,6 +183,7 @@ where
             styles,
             target,
             watch,
+            name,
             uncompiled,
             id,
             tags,
@@ -202,7 +220,7 @@ impl std::fmt::Debug for Xml<'_> {
 
 fn parse_xml_node<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Xml<'a>, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = trim_comments0(input)?;
     let (input, _) = multispace0(input)?;
@@ -262,7 +280,7 @@ where
 
 fn parse_xml_end<'a, E>(input: &'a [u8]) -> IResult<&[u8], (Option<&[u8]>, &[u8]), E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, (_, prefix, end_tag, _)) =
         tuple((tag("</"), parse_prefix0, take_snake, tag(">")))(input)?;
@@ -272,7 +290,7 @@ where
 
 fn parse_xml_attr<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<XmlAttr>, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     many0(map(
         tuple((
@@ -284,20 +302,9 @@ where
     ))(input)
 }
 
-// fn trim_comments(input: &[u8]) -> IResult<&[u8], &[u8]> {
-//     let (input, trimmed) = nom::character::complete::multispace0(input)?;
-//     let o: Result<(&[u8], Vec<&[u8]>), nom::Err<nom::error::Error<&[u8]>>> = many0(terminated(
-//         delimited(tag("<!--"), take_until("-->"), tag("-->")),
-//         multispace0,
-//     ))(input);
-//
-//     o.map(|(r, _)| (r, "".as_bytes()))
-//         .or_else(|_| Ok((input, trimmed)))
-// }
-
 fn parse_node_type<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], NodeType, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("node"), |_| NodeType::Node),
@@ -338,7 +345,7 @@ pub(crate) fn attribute_from_parts<'a, E>(
     value: &'a [u8],
 ) -> IResult<&'a [u8], Attribute, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     if let Some(attr) = parse_prop_var(prefix, key, value) {
         return Ok((b"", attr));
@@ -380,6 +387,7 @@ where
             Err(_) => {
                 let (_, value) = as_string(value)?;
                 let (_, key) = as_string(any)?;
+                // @todo: this is bad an prevents miss spelling
                 Attribute::PropertyDefinition(key, value)
             }
         },
@@ -395,7 +403,7 @@ fn parse_style<'a, E>(
     value: &'a [u8],
 ) -> IResult<&'a [u8], StyleAttr,E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, style) = match ident {
         b"position" => map(parse_position_type, StyleAttr::Position)(value)?,
@@ -455,10 +463,11 @@ where
         b"background" => map(parse_color, StyleAttr::Background)(value)?,
         b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
         _ => {
-            return Err(nom::Err::Error(nom::error::make_error(
+            let err = E::from_error_kind(
                 ident,
-                nom::error::ErrorKind::NoneOf,
-            )))
+                ErrorKind::NoneOf,
+            );
+            return Err(nom::Err::Error(E::add_context(ident, "not a valid style or attribute", err)));
         }
     };
 
@@ -536,7 +545,7 @@ where
 
 fn parse_display<'a, E>(input: &'a [u8]) -> IResult<&[u8], Display, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("none"), |_| Display::None),
@@ -548,7 +557,7 @@ where
 
 fn parse_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], Direction, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("inherit"), |_| Direction::Inherit),
@@ -559,7 +568,7 @@ where
 
 fn parse_overflow<'a, E>(input: &'a [u8]) -> IResult<&[u8], Overflow, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, (x, _, y)) = tuple((parse_overflow_axis, multispace0, parse_overflow_axis))(input)?;
     Ok((input, Overflow { x, y }))
@@ -567,7 +576,7 @@ where
 
 fn parse_overflow_axis<'a, E>(input: &'a [u8]) -> IResult<&[u8], OverflowAxis, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("visible"), |_| OverflowAxis::Visible),
@@ -578,7 +587,7 @@ where
 
 fn parse_align_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignItems, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("default"), |_| AlignItems::Default),
@@ -594,7 +603,7 @@ where
 
 fn parse_align_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignContent, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("center"), |_| AlignContent::Center),
@@ -611,7 +620,7 @@ where
 
 fn parse_align_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignSelf, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("auto"), |_| AlignSelf::Auto),
@@ -626,7 +635,7 @@ where
 
 fn parse_justify_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyItems, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("default"), |_| JustifyItems::Default),
@@ -640,7 +649,7 @@ where
 
 fn parse_justify_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyContent, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("center"), |_| JustifyContent::Center),
@@ -657,7 +666,7 @@ where
 
 fn parse_justify_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifySelf, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("auto"), |_| JustifySelf::Auto),
@@ -671,7 +680,7 @@ where
 
 fn parse_flex_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexDirection, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("row"), |_| FlexDirection::Row),
@@ -684,7 +693,7 @@ where
 
 fn parse_flex_wrap<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexWrap, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((
         map(tag("wrap"), |_| FlexWrap::Wrap),
@@ -695,14 +704,14 @@ where
 
 fn as_string<'a, E>(input: &'a [u8]) -> IResult<&[u8], String, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map(rest, |v| String::from_utf8_lossy(v).to_string())(input)
 }
 
 fn as_string_list<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<String>, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map(
         separated_list1(tag(","), take_while1(|b: u8| b != b',' && b != b'"')),
@@ -718,7 +727,7 @@ where
 // parse xml prefix
 fn parse_prefix0<'a, E>(input: &'a [u8]) -> IResult<&[u8], Option<&[u8]>, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     match terminated(take_snake::<E>, tag(":"))(input) {
         Ok((input, prefix)) => Ok((input, Some(prefix))),
@@ -729,14 +738,14 @@ where
 // parses snake case identifier
 fn take_snake<'a, E>(input: &'a [u8]) -> IResult<&[u8], &[u8], E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     take_while(|b: u8| b.is_ascii_alphabetic() || b == b'_')(input)
 }
 
 fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((parse_image_tile, parse_image_slice))(input)
 }
@@ -744,7 +753,7 @@ where
 // 10px tiled tiled 1
 fn parse_image_slice<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, (val, x, y, s)) = tuple((
         preceded(multispace0, parse_px),
@@ -766,7 +775,7 @@ where
 
 fn parse_image_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], ImageScaleMode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, (x, y, s)) = tuple((
         preceded(multispace0, parse_bool),
@@ -786,7 +795,7 @@ where
 
 fn parse_bool<'a, E>(input: &'a [u8]) -> IResult<&[u8], bool, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((map(tag("true"), |_| true), map(tag("false"), |_| false)))(input)
 }
@@ -795,21 +804,21 @@ where
 // tile(1)
 fn parse_slice_scale<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((parse_stretch, parse_tile))(input)
 }
 
 fn parse_stretch<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map(tag("stretch"), |_| SliceScaleMode::Stretch)(input)
 }
 
 fn parse_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map(
         tuple((tag("tile"), delimited(tag("("), parse_float, tag(")")))),
@@ -823,43 +832,46 @@ where
 /// 10px 10px 10px 10px rect
 fn parse_ui_rect<'a, E>(input: &'a [u8]) -> IResult<&[u8], UiRect, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        // 10px 10px 10px 10px
-        complete(map(
-            tuple((
-                preceded(multispace0, parse_val),
-                preceded(multispace0, parse_val),
-                preceded(multispace0, parse_val),
-                preceded(multispace0, parse_val),
+    context(
+        "is not a valid `UiRect`",
+        alt((
+            // 10px 10px 10px 10px
+            complete(map(
+                tuple((
+                    preceded(multispace0, parse_val),
+                    preceded(multispace0, parse_val),
+                    preceded(multispace0, parse_val),
+                    preceded(multispace0, parse_val),
+                )),
+                |(top, right, bottom, left)| UiRect {
+                    left,
+                    right,
+                    top,
+                    bottom,
+                },
             )),
-            |(top, right, bottom, left)| UiRect {
-                left,
-                right,
-                top,
-                bottom,
-            },
-        )),
-        // 10px 10px
-        complete(map(
-            tuple((
-                preceded(multispace0, parse_val),
-                preceded(multispace0, parse_val),
+            // 10px 10px
+            complete(map(
+                tuple((
+                    preceded(multispace0, parse_val),
+                    preceded(multispace0, parse_val),
+                )),
+                |(x, y)| UiRect::axes(x, y),
             )),
-            |(x, y)| UiRect::axes(x, y),
+            // 10px
+            complete(map(preceded(multispace0, parse_val), |all| {
+                UiRect::all(all)
+            })),
         )),
-        // 10px
-        complete(map(preceded(multispace0, parse_val), |all| {
-            UiRect::all(all)
-        })),
-    ))(input)
+    )(input)
 }
 
 // grid_template_rows="auto 10% 10%"
 fn parse_grid_track<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridTrack, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, track) = delimited(
         multispace0,
@@ -887,7 +899,7 @@ where
 #[rustfmt::skip]
 fn parse_grid_track_repeated<'a,E>(input: &'a [u8]) -> IResult<&[u8], RepeatedGridTrack,E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
 
     let (input, (_,repeat,_, value ,_)) = tuple((
@@ -919,7 +931,7 @@ where
 
 fn parse_auto_flow<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridAutoFlow, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     delimited(
         multispace0,
@@ -935,7 +947,7 @@ where
 
 fn parse_str<'a, E>(input: &'a [u8]) -> IResult<&[u8], &str, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     match std::str::from_utf8(input) {
         Ok(str) => Ok(("".as_bytes(), str)),
@@ -948,7 +960,7 @@ where
 
 fn parse_number<'a, E>(input: &'a [u8]) -> IResult<&[u8], i64, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, num_bytes) =
         take_while(|u: u8| u.is_ascii_alphanumeric() || u == b'-' || u == b'+')(input)?;
@@ -969,7 +981,7 @@ where
 // end_span(5,5)
 fn parse_grid_placement<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridPlacement, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = multispace0(input)?;
     let (input, ident) = take_while1(|b: u8| b != b'(' && b != b'"')(input)?;
@@ -1066,27 +1078,30 @@ where
 /// 10px 10%
 fn parse_val<'a, E>(input: &'a [u8]) -> IResult<&[u8], Val, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    delimited(
-        multispace0,
-        alt((
-            map(tag("auto"), |_| Val::Auto),
-            map(tag("0"), |_| Val::Px(0.)),
-            map(tuple((float, tag("px"))), |(val, _)| Val::Px(val)),
-            map(tuple((float, tag("%"))), |(val, _)| Val::Percent(val)),
-            map(tuple((float, tag("vw"))), |(val, _)| Val::Vw(val)),
-            map(tuple((float, tag("vh"))), |(val, _)| Val::Vh(val)),
-            map(tuple((float, tag("vmin"))), |(val, _)| Val::VMin(val)),
-            map(tuple((float, tag("vmax"))), |(val, _)| Val::VMax(val)),
-        )),
-        multispace0,
+    context(
+        "cannot be parsed as `Val`, expected number + `px`/`%`/`vw`/`vh`/`vmin`/`vmax`",
+        delimited(
+            multispace0,
+            alt((
+                map(tag("auto"), |_| Val::Auto),
+                map(tag("0"), |_| Val::Px(0.)),
+                map(tuple((float, tag("px"))), |(val, _)| Val::Px(val)),
+                map(tuple((float, tag("%"))), |(val, _)| Val::Percent(val)),
+                map(tuple((float, tag("vw"))), |(val, _)| Val::Vw(val)),
+                map(tuple((float, tag("vh"))), |(val, _)| Val::Vh(val)),
+                map(tuple((float, tag("vmin"))), |(val, _)| Val::VMin(val)),
+                map(tuple((float, tag("vmax"))), |(val, _)| Val::VMax(val)),
+            )),
+            multispace0,
+        ),
     )(input)
 }
 
 fn parse_px<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     terminated(parse_float, tag("px"))(input)
 }
@@ -1098,8 +1113,9 @@ where
 #[rustfmt::skip]
 fn parse_color<'a,E>(input: &'a [u8]) -> IResult<&[u8], Color,E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
+    context("is not a valid color",
     delimited(
         multispace0,
         alt((
@@ -1111,13 +1127,13 @@ where
             color_hex3_parser,
         )),
         multispace0,
-    )(input)
+    ))(input)
 }
 
 // rgba(1,1,1,1)
 fn parse_rgba_color<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = tag("rgba")(input)?;
 
@@ -1133,7 +1149,7 @@ where
 // rgb(1,1,1)
 fn parse_rgb_color<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = tag("rgb")(input)?;
 
@@ -1149,7 +1165,7 @@ where
 // #FFFFFFFF (with alpha)
 fn color_hex8_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = tag("#")(input)?;
 
@@ -1170,7 +1186,7 @@ where
 // #FFFFFF
 fn color_hex6_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = tag("#")(input)?;
 
@@ -1191,7 +1207,7 @@ where
 // #FFFF (with alpha)
 fn color_hex4_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = tag("#")(input)?;
 
@@ -1213,7 +1229,7 @@ where
 // #FFF
 fn color_hex3_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, _) = tag("#")(input)?;
 
@@ -1234,7 +1250,7 @@ where
 /// FF
 fn hex_byte<'a, E>(input: &'a [u8]) -> IResult<&[u8], u8, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map_parser(take_while_m_n(2, 2, is_hex_digit), from_hex_byte)(input)
 }
@@ -1242,7 +1258,7 @@ where
 /// F
 fn hex_nib<'a, E>(input: &'a [u8]) -> IResult<&[u8], u8, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map_parser(take_while_m_n(1, 1, is_hex_digit), from_hex_nib)(input)
 }
@@ -1254,7 +1270,7 @@ fn is_hex_digit(c: u8) -> bool {
 /// FF -> u8
 fn from_hex_byte<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], u8, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (_, str) = parse_str(input)?;
     match u8::from_str_radix(format!("{}", str).as_str(), 16) {
@@ -1269,7 +1285,7 @@ where
 /// F -> u8
 fn from_hex_nib<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], u8, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let str = std::str::from_utf8(input).expect("fix later");
     match u8::from_str_radix(format!("{}{}", str, str).as_str(), 16) {
@@ -1495,10 +1511,10 @@ mod tests {
         };
     }
 
-    #[test_case("./assets/demo/menu.xml")]
-    #[test_case("./assets/demo/panel.xml")]
-    #[test_case("./assets/demo/button.xml")]
-    #[test_case("./assets/demo/card.xml")]
+    #[test_case("../../example/assets/demo/menu.xml")]
+    #[test_case("../../example/assets/demo/panel.xml")]
+    #[test_case("../../example/assets/demo/button.xml")]
+    #[test_case("../../example/assets/demo/card.xml")]
     fn test_parse_template_full(file_path: &str) {
         let input = std::fs::read_to_string(file_path).unwrap();
         match parse_template::<nom::error::VerboseError<_>>(input.as_bytes()) {

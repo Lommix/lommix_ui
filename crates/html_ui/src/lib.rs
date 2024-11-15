@@ -1,5 +1,6 @@
-use bevy::prelude::*;
+use bevy::app::{App, Plugin};
 
+mod auto;
 mod bindings;
 mod build;
 mod compile;
@@ -10,9 +11,10 @@ mod parse;
 mod styles;
 
 pub mod prelude {
-    pub use crate::bindings::{ComponentBindings, FunctionBindings};
+    pub use crate::auto::{AutoLoadState, HtmlAutoLoadPlugin};
+    pub use crate::bindings::{ComponentBindings, FunctionBindings, HtmlComponents, HtmlFunctions};
     pub use crate::build::{
-        HtmlBundle, OnEnter, OnExit, OnPress, OnSpawn, ScopeEntity, Tag, Tags, TemplateState, UiId,
+        HtmlBundle, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, ScopeEntity, Tag, Tags, TemplateState, UiId,
         UiTarget, UiWatch, UnbuildTag,
     };
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};

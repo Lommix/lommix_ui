@@ -10,9 +10,12 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::default())
-        .add_plugins(HtmlUiPlugin)
-        .add_systems(Startup, setup)
+        .add_plugins((
+            HtmlUiPlugin,
+            HtmlAutoLoadPlugin::new(&["components"]),
+            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+        ))
+        .add_systems(OnEnter(AutoLoadState::Finished), setup)
         .add_systems(
             Update,
             (update_puls, update_collapse, update_scroll, cleaner),
