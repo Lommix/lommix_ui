@@ -20,7 +20,7 @@ pub mod prelude {
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};
     pub use crate::data::{Action, Attribute, HtmlTemplate, NodeType, StyleAttr};
     pub use crate::error::ParseError;
-    pub use crate::styles::{HoverTimer, InteractionTimer, NodeStyle, PressedTimer, UiActive};
+    pub use crate::styles::{HoverTimer, InteractionTimer, HtmlStyle, PressedTimer, UiActive};
     pub use crate::HtmlUiPlugin;
 }
 

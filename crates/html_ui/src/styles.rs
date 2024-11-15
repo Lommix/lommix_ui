@@ -1,6 +1,8 @@
 use crate::{build::InteractionObverser, data::StyleAttr};
-use bevy::prelude::*;
-use interpolation::Ease;
+use bevy::{
+    ecs::{query::QueryEntityError, system::SystemParam},
+    prelude::*,
+};
 use std::time::Duration;
 
 pub struct TransitionPlugin;
@@ -10,7 +12,7 @@ impl Plugin for TransitionPlugin {
         app.register_type::<PressedTimer>();
         app.register_type::<HoverTimer>();
         app.register_type::<ComputedStyle>();
-        app.register_type::<NodeStyle>();
+        app.register_type::<HtmlStyle>();
     }
 }
 
@@ -49,10 +51,8 @@ impl InteractionTimer {
     }
 }
 
-// @mvp
-// something is off with interactions of transforming nodes
 fn continues_interaction_checking(
-    interactions: Query<(Entity, &Interaction), With<NodeStyle>>,
+    interactions: Query<(Entity, &Interaction), With<HtmlStyle>>,
     mut hovers: Query<&mut HoverTimer>,
     mut presseds: Query<&mut PressedTimer>,
     observer: Query<&InteractionObverser>,
@@ -109,42 +109,203 @@ fn continues_interaction_checking(
     });
 }
 
-// @todo: split, event based updates
-fn update_node_style(
-    mut nodes: Query<(Entity, &mut Node, &NodeStyle, Option<&UiActive>)>,
-    mut bg: Query<&mut BackgroundColor>,
-    mut bradius: Query<&mut BorderRadius>,
-    mut bcolor: Query<&mut BorderColor>,
-    mut text_fonts: Query<&mut TextFont>,
-    mut text_colors: Query<&mut TextColor>,
-    server: Res<AssetServer>,
-    hover_timer: Query<&HoverTimer>,
-    pressed_timer: Query<&PressedTimer>,
-) {
-    nodes
-        .iter_mut()
-        .for_each(|(entity, mut style, node_styles, active_state)| {
-            let pressed_timer = pressed_timer.get(entity).ok();
-            let hover_timer = hover_timer.get(entity).ok();
-            let bg = bg.get_mut(entity).ok();
-            let bradius = bradius.get_mut(entity).ok();
-            let bcolor = bcolor.get_mut(entity).ok();
-            let text_font = text_fonts.get_mut(entity).ok();
-            let text_color = text_colors.get_mut(entity).ok();
+#[derive(SystemParam)]
+pub struct UiStyleQuery<'w, 's> {
+    pub server: Res<'w, AssetServer>,
+    pub node: Query<'w, 's, &'static mut Node>,
+    pub text_fonts: Query<'w, 's, &'static mut TextFont>,
+    pub text_colors: Query<'w, 's, &'static mut TextColor>,
+    pub background: Query<'w, 's, &'static mut BackgroundColor>,
+    pub border_radius: Query<'w, 's, &'static mut BorderRadius>,
+    pub border_color: Query<'w, 's, &'static mut BorderColor>,
+}
 
-            node_styles.apply_style(
-                &mut style,
-                active_state.is_some(),
-                bg,
-                bradius,
-                bcolor,
-                text_color,
-                text_font,
-                &server,
-                hover_timer,
-                pressed_timer,
-            );
+impl<'w, 's> UiStyleQuery<'w, 's> {
+    pub fn apply_computed(&mut self, entity: Entity, computed: &ComputedStyle) {
+        _ = self.node.get_mut(entity).map(|mut node| {
+            node.clone_from(&computed.node);
         });
+
+        _ = self.text_fonts.get_mut(entity).map(|mut font| {
+            font.font_size = computed.font_size;
+            font.font = computed.font.clone();
+        });
+
+        _ = self.text_colors.get_mut(entity).map(|mut color| {
+            **color = computed.font_color;
+        });
+
+        _ = self.background.get_mut(entity).map(|mut background| {
+            background.0 = computed.background;
+        });
+
+        _ = self.border_radius.get_mut(entity).map(|mut radius| {
+            radius.top_left = computed.border_radius.top;
+            radius.top_right = computed.border_radius.right;
+            radius.bottom_right = computed.border_radius.bottom;
+            radius.bottom_left = computed.border_radius.left;
+        });
+
+        _ = self.border_color.get_mut(entity).map(|mut color| {
+            color.0 = computed.border_color;
+        });
+    }
+
+    pub fn apply_interpolated<'a>(
+        &mut self,
+        entity: Entity,
+        ratio: f32,
+        computed: &ComputedStyle,
+        attr: &StyleAttr,
+    ) -> Result<(), QueryEntityError> {
+        let mut style = self.node.get_mut(entity)?;
+        match attr {
+            StyleAttr::Display(display) => style.display = *display,
+            StyleAttr::Position(position_type) => style.position_type = *position_type,
+            StyleAttr::Overflow(overflow) => style.overflow = *overflow,
+            StyleAttr::Left(val) => style.left = lerp_val(&computed.node.left, val, ratio),
+            StyleAttr::Right(val) => style.right = lerp_val(&computed.node.right, val, ratio),
+            StyleAttr::Top(val) => style.top = lerp_val(&computed.node.top, val, ratio),
+            StyleAttr::Bottom(val) => style.bottom = lerp_val(&computed.node.bottom, val, ratio),
+            StyleAttr::Width(val) => style.width = lerp_val(&computed.node.width, val, ratio),
+            StyleAttr::Height(val) => style.height = lerp_val(&computed.node.height, val, ratio),
+            StyleAttr::MinWidth(val) => {
+                style.min_width = lerp_val(&computed.node.min_width, val, ratio)
+            }
+            StyleAttr::MinHeight(val) => {
+                style.min_height = lerp_val(&computed.node.min_height, val, ratio)
+            }
+            StyleAttr::MaxWidth(val) => {
+                style.max_width = lerp_val(&computed.node.max_width, val, ratio)
+            }
+            StyleAttr::MaxHeight(val) => {
+                style.max_height = lerp_val(&computed.node.max_height, val, ratio)
+            }
+            StyleAttr::AspectRatio(f) => {
+                style.aspect_ratio = computed.node.aspect_ratio.map(|a| a.lerp(*f, ratio))
+            }
+            StyleAttr::AlignItems(align_items) => style.align_items = *align_items,
+            StyleAttr::JustifyItems(justify_items) => style.justify_items = *justify_items,
+            StyleAttr::AlignSelf(align_self) => style.align_self = *align_self,
+            StyleAttr::JustifySelf(justify_self) => style.justify_self = *justify_self,
+            StyleAttr::AlignContent(align_content) => style.align_content = *align_content,
+            StyleAttr::JustifyContent(justify_content) => style.justify_content = *justify_content,
+            StyleAttr::Margin(ui_rect) => {
+                style.margin = lerp_rect(&computed.node.margin, ui_rect, ratio)
+            }
+            StyleAttr::Padding(ui_rect) => {
+                style.padding = lerp_rect(&computed.node.padding, ui_rect, ratio)
+            }
+            StyleAttr::Border(ui_rect) => {
+                style.border = lerp_rect(&computed.node.border, ui_rect, ratio)
+            }
+            StyleAttr::BorderColor(color) => {
+                _ = self
+                    .border_color
+                    .get_mut(entity)
+                    .map(|mut bcolor| bcolor.0 = lerp_color(&computed.border_color, color, ratio));
+            }
+            StyleAttr::BorderRadius(ui_rect) => {
+                _ = self.border_radius.get_mut(entity).map(|mut bradius| {
+                    bradius.top_left = lerp_val(&computed.border_radius.top, &ui_rect.top, ratio);
+                    bradius.top_right =
+                        lerp_val(&computed.border_radius.right, &ui_rect.right, ratio);
+                    bradius.bottom_right =
+                        lerp_val(&computed.border_radius.bottom, &ui_rect.bottom, ratio);
+                    bradius.bottom_left =
+                        lerp_val(&computed.border_radius.left, &ui_rect.left, ratio);
+                });
+            }
+            StyleAttr::FlexDirection(flex_direction) => style.flex_direction = *flex_direction,
+            StyleAttr::FlexWrap(flex_wrap) => style.flex_wrap = *flex_wrap,
+            StyleAttr::FlexGrow(g) => style.flex_grow = computed.node.flex_grow.lerp(*g, ratio),
+            StyleAttr::FlexShrink(s) => {
+                style.flex_shrink = computed.node.flex_shrink.lerp(*s, ratio)
+            }
+            StyleAttr::FlexBasis(val) => {
+                style.flex_basis = lerp_val(&computed.node.flex_basis, val, ratio)
+            }
+            StyleAttr::RowGap(val) => style.row_gap = lerp_val(&computed.node.row_gap, val, ratio),
+            StyleAttr::ColumnGap(val) => {
+                style.column_gap = lerp_val(&computed.node.max_height, val, ratio)
+            }
+            StyleAttr::GridAutoFlow(grid_auto_flow) => style.grid_auto_flow = *grid_auto_flow,
+            StyleAttr::GridTemplateRows(vec) => style.grid_template_rows = vec.clone(),
+            StyleAttr::GridTemplateColumns(vec) => style.grid_template_columns = vec.clone(),
+            StyleAttr::GridAutoRows(vec) => style.grid_auto_rows = vec.clone(),
+            StyleAttr::GridAutoColumns(vec) => style.grid_auto_columns = vec.clone(),
+            StyleAttr::GridRow(grid_placement) => style.grid_row = *grid_placement,
+            StyleAttr::GridColumn(grid_placement) => style.grid_column = *grid_placement,
+            StyleAttr::Background(color) => {
+                _ = self
+                    .background
+                    .get_mut(entity)
+                    .map(|mut bg| bg.0 = lerp_color(&computed.background, color, ratio));
+            }
+            StyleAttr::FontColor(color) => {
+                _ = self.text_colors.get_mut(entity).map(|mut tc| {
+                    **tc = lerp_color(&computed.font_color, color, ratio);
+                });
+            }
+            StyleAttr::FontSize(s) => {
+                _ = self.text_fonts.get_mut(entity).map(|mut txt| {
+                    txt.font_size = computed.font_size.lerp(*s, ratio);
+                });
+            }
+            StyleAttr::Font(h) => {
+                _ = self.text_fonts.get_mut(entity).map(|mut txt| {
+                    txt.font = self.server.load(h);
+                });
+            }
+            _ => (),
+            // StyleAttr::Active(style_attr) => todo!(),
+            // StyleAttr::Hover(style_attr) => todo!(),
+            // StyleAttr::Pressed(style_attr) => todo!(),
+            // StyleAttr::Delay(_) => todo!(),
+        }
+
+        Ok(())
+    }
+}
+
+fn update_node_style(
+    nodes: Query<(Entity, &HtmlStyle, Has<UiActive>)>,
+    mut ui_style: UiStyleQuery,
+    hover_timer: Query<&HoverTimer>,
+    press_timer: Query<&PressedTimer>,
+) {
+    for (entity, html_style, is_active) in nodes.iter() {
+        ui_style.apply_computed(entity, &html_style.computed);
+
+        let hover_ratio = hover_timer
+            .get(entity)
+            .map(|t| t.fraction())
+            .unwrap_or_default();
+
+        for hover_style in html_style.hover.iter() {
+            ui_style
+                .apply_interpolated(entity, hover_ratio, &html_style.computed, hover_style)
+                .expect("node has no style, impossible");
+        }
+
+        let press_ratio = press_timer
+            .get(entity)
+            .map(|t| t.fraction())
+            .unwrap_or_default();
+
+        for press_style in html_style.pressed.iter() {
+            ui_style
+                .apply_interpolated(entity, press_ratio, &html_style.computed, press_style)
+                .expect("node has no style, impossible");
+        }
+
+        let active_ratio = is_active.then_some(1.).unwrap_or_default();
+        for active_style in html_style.active.iter() {
+            ui_style
+                .apply_interpolated(entity, active_ratio, &html_style.computed, active_style)
+                .expect("node has no style, impossible");
+        }
+    }
 }
 
 #[derive(Component, Reflect, Default, Deref, DerefMut)]
@@ -170,7 +331,7 @@ impl HoverTimer {
 #[derive(Debug, Reflect)]
 #[reflect]
 pub struct ComputedStyle {
-    pub style: Node,
+    pub node: Node,
     pub border_color: Color,
     pub border_radius: UiRect,
     pub image_scale_mode: Option<NodeImageMode>,
@@ -186,7 +347,7 @@ pub struct ComputedStyle {
 impl Default for ComputedStyle {
     fn default() -> Self {
         Self {
-            style: Node::default(),
+            node: Node::default(),
             border_color: Color::NONE,
             border_radius: UiRect::default(),
             background: Color::NONE,
@@ -200,10 +361,12 @@ impl Default for ComputedStyle {
     }
 }
 
+// ----------------
+
 #[derive(Component, Default, Debug, Reflect)]
 #[reflect]
-pub struct NodeStyle {
-    pub regular: ComputedStyle,
+pub struct HtmlStyle {
+    pub computed: ComputedStyle,
     #[reflect(ignore)]
     pub hover: Vec<StyleAttr>,
     #[reflect(ignore)]
@@ -212,111 +375,17 @@ pub struct NodeStyle {
     pub active: Vec<StyleAttr>,
 }
 
-impl NodeStyle {
-    pub fn apply_style(
-        &self,
-        style: &mut Node,
-        is_active: bool,
-        mut bg: Option<Mut<BackgroundColor>>,
-        mut bradius: Option<Mut<BorderRadius>>,
-        mut bcolor: Option<Mut<BorderColor>>,
-        mut text_color: Option<Mut<TextColor>>,
-        mut text_style: Option<Mut<TextFont>>,
-        server: &AssetServer,
-        hover_timer: Option<&HoverTimer>,
-        pressed_timer: Option<&PressedTimer>,
-    ) {
-        style.clone_from(&self.regular.style);
-        bg.as_mut().map(|bg| bg.0 = self.regular.background);
-
-        bcolor
-            .as_mut()
-            .map(|bcolor| bcolor.0 = self.regular.border_color);
-
-        bradius.as_mut().map(|bradius| {
-            bradius.top_left = self.regular.border_radius.top;
-            bradius.top_right = self.regular.border_radius.right;
-            bradius.bottom_right = self.regular.border_radius.bottom;
-            bradius.bottom_left = self.regular.border_radius.left;
-        });
-
-        text_style.as_mut().map(|txt_style| {
-            txt_style.font_size = self.regular.font_size;
-            txt_style.font = self.regular.font.clone();
-        });
-
-        text_color.as_mut().map(|txt_color| {
-            ***txt_color = self.regular.font_color;
-        });
-
-        hover_timer.map(|timer| {
-            if timer.fraction() > 0.01 {
-                let ratio = self
-                    .regular
-                    .easing
-                    .map(|ez| timer.fraction().calc(ez))
-                    .unwrap_or(timer.fraction());
-
-                for attr in self.hover.iter() {
-                    apply_lerp_style(
-                        attr,
-                        ratio,
-                        &self.regular,
-                        style,
-                        &mut bg,
-                        &mut bradius,
-                        &mut bcolor,
-                        &mut text_color,
-                        &mut text_style,
-                        server,
-                    );
-                }
-            }
-        });
-
-        pressed_timer.map(|timer| {
-            if timer.fraction() > 0.01 {
-                let ratio = self
-                    .regular
-                    .easing
-                    .map(|ez| timer.fraction().calc(ez))
-                    .unwrap_or(timer.fraction());
-
-                for attr in self.pressed.iter() {
-                    apply_lerp_style(
-                        attr,
-                        ratio,
-                        &self.regular,
-                        style,
-                        &mut bg,
-                        &mut bradius,
-                        &mut bcolor,
-                        &mut text_color,
-                        &mut text_style,
-                        server,
-                    );
-                }
-            }
-        });
-
-        if is_active {
-            for attr in self.active.iter() {
-                apply_lerp_style(
-                    attr,
-                    1., //@todo: fade-in/out?
-                    &self.regular,
-                    style,
-                    &mut bg,
-                    &mut bradius,
-                    &mut bcolor,
-                    &mut text_color,
-                    &mut text_style,
-                    server,
-                );
-            }
+impl From<Vec<StyleAttr>> for HtmlStyle {
+    fn from(mut styles: Vec<StyleAttr>) -> Self {
+        let mut out = HtmlStyle::default();
+        for style in styles.drain(..) {
+            out.add_style_attr(style);
         }
+        out
     }
+}
 
+impl HtmlStyle {
     pub fn add_style_attr(&mut self, attr: StyleAttr) {
         match attr {
             StyleAttr::Hover(style) => {
@@ -352,187 +421,66 @@ impl NodeStyle {
                     None => self.active.push(style),
                 }
             }
-            StyleAttr::Display(display) => self.regular.style.display = display,
-            StyleAttr::Position(position_type) => self.regular.style.position_type = position_type,
-            StyleAttr::Overflow(overflow) => self.regular.style.overflow = overflow,
-            StyleAttr::Left(val) => self.regular.style.left = val,
-            StyleAttr::Right(val) => self.regular.style.right = val,
-            StyleAttr::Top(val) => self.regular.style.top = val,
-            StyleAttr::Bottom(val) => self.regular.style.bottom = val,
-            StyleAttr::Width(val) => self.regular.style.width = val,
-            StyleAttr::Height(val) => self.regular.style.height = val,
-            StyleAttr::MinWidth(val) => self.regular.style.min_width = val,
-            StyleAttr::MinHeight(val) => self.regular.style.min_height = val,
-            StyleAttr::MaxWidth(val) => self.regular.style.max_width = val,
-            StyleAttr::MaxHeight(val) => self.regular.style.min_height = val,
-            StyleAttr::AspectRatio(f) => self.regular.style.aspect_ratio = Some(f),
-            StyleAttr::AlignItems(align_items) => self.regular.style.align_items = align_items,
+            StyleAttr::Display(display) => self.computed.node.display = display,
+            StyleAttr::Position(position_type) => self.computed.node.position_type = position_type,
+            StyleAttr::Overflow(overflow) => self.computed.node.overflow = overflow,
+            StyleAttr::Left(val) => self.computed.node.left = val,
+            StyleAttr::Right(val) => self.computed.node.right = val,
+            StyleAttr::Top(val) => self.computed.node.top = val,
+            StyleAttr::Bottom(val) => self.computed.node.bottom = val,
+            StyleAttr::Width(val) => self.computed.node.width = val,
+            StyleAttr::Height(val) => self.computed.node.height = val,
+            StyleAttr::MinWidth(val) => self.computed.node.min_width = val,
+            StyleAttr::MinHeight(val) => self.computed.node.min_height = val,
+            StyleAttr::MaxWidth(val) => self.computed.node.max_width = val,
+            StyleAttr::MaxHeight(val) => self.computed.node.min_height = val,
+            StyleAttr::AspectRatio(f) => self.computed.node.aspect_ratio = Some(f),
+            StyleAttr::AlignItems(align_items) => self.computed.node.align_items = align_items,
             StyleAttr::JustifyItems(justify_items) => {
-                self.regular.style.justify_items = justify_items
+                self.computed.node.justify_items = justify_items
             }
-            StyleAttr::AlignSelf(align_self) => self.regular.style.align_self = align_self,
-            StyleAttr::JustifySelf(justify_self) => self.regular.style.justify_self = justify_self,
+            StyleAttr::AlignSelf(align_self) => self.computed.node.align_self = align_self,
+            StyleAttr::JustifySelf(justify_self) => self.computed.node.justify_self = justify_self,
             StyleAttr::AlignContent(align_content) => {
-                self.regular.style.align_content = align_content
+                self.computed.node.align_content = align_content
             }
             StyleAttr::JustifyContent(justify_content) => {
-                self.regular.style.justify_content = justify_content
+                self.computed.node.justify_content = justify_content
             }
-            StyleAttr::Margin(ui_rect) => self.regular.style.margin = ui_rect,
-            StyleAttr::Padding(ui_rect) => self.regular.style.padding = ui_rect,
-            StyleAttr::Border(ui_rect) => self.regular.style.border = ui_rect,
-            StyleAttr::BorderColor(color) => self.regular.border_color = color,
-            StyleAttr::BorderRadius(ui_rect) => self.regular.border_radius = ui_rect,
+            StyleAttr::Margin(ui_rect) => self.computed.node.margin = ui_rect,
+            StyleAttr::Padding(ui_rect) => self.computed.node.padding = ui_rect,
+            StyleAttr::Border(ui_rect) => self.computed.node.border = ui_rect,
+            StyleAttr::BorderColor(color) => self.computed.border_color = color,
+            StyleAttr::BorderRadius(ui_rect) => self.computed.border_radius = ui_rect,
             StyleAttr::FlexDirection(flex_direction) => {
-                self.regular.style.flex_direction = flex_direction
+                self.computed.node.flex_direction = flex_direction
             }
-            StyleAttr::FlexWrap(flex_wrap) => self.regular.style.flex_wrap = flex_wrap,
-            StyleAttr::FlexGrow(f) => self.regular.style.flex_grow = f,
-            StyleAttr::FlexShrink(f) => self.regular.style.flex_shrink = f,
-            StyleAttr::FlexBasis(val) => self.regular.style.flex_basis = val,
-            StyleAttr::RowGap(val) => self.regular.style.row_gap = val,
-            StyleAttr::ColumnGap(val) => self.regular.style.column_gap = val,
+            StyleAttr::FlexWrap(flex_wrap) => self.computed.node.flex_wrap = flex_wrap,
+            StyleAttr::FlexGrow(f) => self.computed.node.flex_grow = f,
+            StyleAttr::FlexShrink(f) => self.computed.node.flex_shrink = f,
+            StyleAttr::FlexBasis(val) => self.computed.node.flex_basis = val,
+            StyleAttr::RowGap(val) => self.computed.node.row_gap = val,
+            StyleAttr::ColumnGap(val) => self.computed.node.column_gap = val,
             StyleAttr::GridAutoFlow(grid_auto_flow) => {
-                self.regular.style.grid_auto_flow = grid_auto_flow
+                self.computed.node.grid_auto_flow = grid_auto_flow
             }
-            StyleAttr::GridTemplateRows(vec) => self.regular.style.grid_template_rows = vec,
-            StyleAttr::GridTemplateColumns(vec) => self.regular.style.grid_template_columns = vec,
-            StyleAttr::GridAutoRows(vec) => self.regular.style.grid_auto_rows = vec,
-            StyleAttr::GridAutoColumns(vec) => self.regular.style.grid_auto_columns = vec,
-            StyleAttr::GridRow(grid_placement) => self.regular.style.grid_row = grid_placement,
+            StyleAttr::GridTemplateRows(vec) => self.computed.node.grid_template_rows = vec,
+            StyleAttr::GridTemplateColumns(vec) => self.computed.node.grid_template_columns = vec,
+            StyleAttr::GridAutoRows(vec) => self.computed.node.grid_auto_rows = vec,
+            StyleAttr::GridAutoColumns(vec) => self.computed.node.grid_auto_columns = vec,
+            StyleAttr::GridRow(grid_placement) => self.computed.node.grid_row = grid_placement,
             StyleAttr::GridColumn(grid_placement) => {
-                self.regular.style.grid_column = grid_placement
+                self.computed.node.grid_column = grid_placement
             }
-            StyleAttr::FontSize(f) => self.regular.font_size = f,
-            StyleAttr::FontColor(color) => self.regular.font_color = color,
-            StyleAttr::Background(color) => self.regular.background = color,
-            StyleAttr::Delay(f) => self.regular.delay = f,
-            StyleAttr::Easing(ease) => self.regular.easing = Some(ease),
-            StyleAttr::ImageScaleMode(mode) => self.regular.image_scale_mode = Some(mode),
+            StyleAttr::FontSize(f) => self.computed.font_size = f,
+            StyleAttr::FontColor(color) => self.computed.font_color = color,
+            StyleAttr::Background(color) => self.computed.background = color,
+            StyleAttr::Delay(f) => self.computed.delay = f,
+            StyleAttr::Easing(ease) => self.computed.easing = Some(ease),
+            StyleAttr::ImageScaleMode(mode) => self.computed.image_scale_mode = Some(mode),
             // StyleAttr::Font(font) => self.regular.font = server
             _ => (),
         };
-    }
-}
-
-fn apply_lerp_style(
-    attr: &StyleAttr,
-    ratio: f32,
-    default: &ComputedStyle,
-    style: &mut Node,
-    bg: &mut Option<Mut<BackgroundColor>>,
-    bradius: &mut Option<Mut<BorderRadius>>,
-    bcolor: &mut Option<Mut<BorderColor>>,
-    text_color: &mut Option<Mut<TextColor>>,
-    text_style: &mut Option<Mut<TextFont>>,
-    server: &AssetServer,
-) {
-    match attr {
-        StyleAttr::Display(display) => style.display = *display,
-        StyleAttr::Position(position_type) => style.position_type = *position_type,
-        StyleAttr::Overflow(overflow) => style.overflow = *overflow,
-        StyleAttr::Left(val) => style.left = lerp_val(&default.style.left, val, ratio),
-        StyleAttr::Right(val) => style.right = lerp_val(&default.style.right, val, ratio),
-        StyleAttr::Top(val) => style.top = lerp_val(&default.style.top, val, ratio),
-        StyleAttr::Bottom(val) => style.bottom = lerp_val(&default.style.bottom, val, ratio),
-        StyleAttr::Width(val) => style.width = lerp_val(&default.style.width, val, ratio),
-        StyleAttr::Height(val) => style.height = lerp_val(&default.style.height, val, ratio),
-        StyleAttr::MinWidth(val) => {
-            style.min_width = lerp_val(&default.style.min_width, val, ratio)
-        }
-        StyleAttr::MinHeight(val) => {
-            style.min_height = lerp_val(&default.style.min_height, val, ratio)
-        }
-        StyleAttr::MaxWidth(val) => {
-            style.max_width = lerp_val(&default.style.max_width, val, ratio)
-        }
-        StyleAttr::MaxHeight(val) => {
-            style.max_height = lerp_val(&default.style.max_height, val, ratio)
-        }
-        StyleAttr::AspectRatio(f) => {
-            style.aspect_ratio = default.style.aspect_ratio.map(|a| a.lerp(*f, ratio))
-        }
-        StyleAttr::AlignItems(align_items) => style.align_items = *align_items,
-        StyleAttr::JustifyItems(justify_items) => style.justify_items = *justify_items,
-        StyleAttr::AlignSelf(align_self) => style.align_self = *align_self,
-        StyleAttr::JustifySelf(justify_self) => style.justify_self = *justify_self,
-        StyleAttr::AlignContent(align_content) => style.align_content = *align_content,
-        StyleAttr::JustifyContent(justify_content) => style.justify_content = *justify_content,
-        StyleAttr::Margin(ui_rect) => {
-            style.margin = lerp_rect(&default.style.margin, ui_rect, ratio)
-        }
-        StyleAttr::Padding(ui_rect) => {
-            style.padding = lerp_rect(&default.style.padding, ui_rect, ratio)
-        }
-        StyleAttr::Border(ui_rect) => {
-            style.border = lerp_rect(&default.style.border, ui_rect, ratio)
-        }
-        StyleAttr::BorderColor(color) => {
-            bcolor
-                .as_mut()
-                .map(|bcolor| bcolor.0 = lerp_color(&default.border_color, color, ratio));
-        }
-        StyleAttr::BorderRadius(ui_rect) => {
-            bradius.as_mut().map(|bradius| {
-                bradius.top_left = lerp_val(&default.border_radius.top, &ui_rect.top, ratio);
-                bradius.top_right = lerp_val(&default.border_radius.right, &ui_rect.right, ratio);
-                bradius.bottom_right =
-                    lerp_val(&default.border_radius.bottom, &ui_rect.bottom, ratio);
-                bradius.bottom_left = lerp_val(&default.border_radius.left, &ui_rect.left, ratio);
-            });
-        }
-        StyleAttr::FlexDirection(flex_direction) => style.flex_direction = *flex_direction,
-        StyleAttr::FlexWrap(flex_wrap) => style.flex_wrap = *flex_wrap,
-        StyleAttr::FlexGrow(g) => style.flex_grow = default.style.flex_grow.lerp(*g, ratio),
-        StyleAttr::FlexShrink(s) => style.flex_shrink = default.style.flex_shrink.lerp(*s, ratio),
-        StyleAttr::FlexBasis(val) => {
-            style.flex_basis = lerp_val(&default.style.flex_basis, val, ratio)
-        }
-        StyleAttr::RowGap(val) => style.row_gap = lerp_val(&default.style.row_gap, val, ratio),
-        StyleAttr::ColumnGap(val) => {
-            style.column_gap = lerp_val(&default.style.max_height, val, ratio)
-        }
-        StyleAttr::GridAutoFlow(grid_auto_flow) => style.grid_auto_flow = *grid_auto_flow,
-        StyleAttr::GridTemplateRows(vec) => style.grid_template_rows = vec.clone(),
-        StyleAttr::GridTemplateColumns(vec) => style.grid_template_columns = vec.clone(),
-        StyleAttr::GridAutoRows(vec) => style.grid_auto_rows = vec.clone(),
-        StyleAttr::GridAutoColumns(vec) => style.grid_auto_columns = vec.clone(),
-        StyleAttr::GridRow(grid_placement) => style.grid_row = *grid_placement,
-        StyleAttr::GridColumn(grid_placement) => style.grid_column = *grid_placement,
-        StyleAttr::Background(color) => {
-            bg.as_mut()
-                .map(|bg| bg.0 = lerp_color(&default.background, color, ratio));
-        }
-        StyleAttr::FontColor(color) => {
-            text_color.as_mut().map(|tc| {
-                ***tc = lerp_color(&default.font_color, color, ratio);
-            });
-        }
-        StyleAttr::FontSize(s) => {
-            text_style.as_mut().map(|txt| {
-                txt.font_size = default.font_size.lerp(*s, ratio);
-            });
-        }
-        StyleAttr::Font(h) => {
-            text_style.as_mut().map(|txt| {
-                txt.font = server.load(h);
-            });
-        }
-        _ => (),
-        // StyleAttr::Active(style_attr) => todo!(),
-        // StyleAttr::Hover(style_attr) => todo!(),
-        // StyleAttr::Pressed(style_attr) => todo!(),
-        // StyleAttr::Delay(_) => todo!(),
-    }
-}
-
-impl From<Vec<StyleAttr>> for NodeStyle {
-    fn from(mut styles: Vec<StyleAttr>) -> Self {
-        let mut out = NodeStyle::default();
-        for style in styles.drain(..) {
-            out.add_style_attr(style);
-        }
-        out
     }
 }
 

@@ -4,7 +4,7 @@ use crate::{
     compile::{compile_content, CompileContextEvent},
     data::{AttrTokens, HtmlTemplate, NodeType, XNode},
     prelude::ComponentBindings,
-    styles::{HoverTimer, NodeStyle, PressedTimer},
+    styles::{HoverTimer, HtmlStyle, PressedTimer},
 };
 use bevy::{prelude::*, utils::HashMap};
 use nom::{
@@ -347,13 +347,13 @@ fn build_node(
         state_subscriber.push(entity);
     }
 
-    let style_attributes = NodeStyle::from(node.styles.clone());
+    let style_attributes = HtmlStyle::from(node.styles.clone());
     cmd.entity(entity)
         .insert(PressedTimer::new(Duration::from_secs_f32(
-            style_attributes.regular.delay.max(0.01),
+            style_attributes.computed.delay.max(0.01),
         )))
         .insert(HoverTimer::new(Duration::from_secs_f32(
-            style_attributes.regular.delay.max(0.01),
+            style_attributes.computed.delay.max(0.01),
         )));
 
     let passed_state =
@@ -403,16 +403,12 @@ fn build_node(
             let path = node.src.clone().unwrap_or_default();
             let handle = server.load::<Image>(path);
 
-            // if let Some(scale_mode) = style_attributes.regular.image_scale_mode.as_ref() {
-            //     // cmd.entity(entity).insert(scale_mode.clone());
-            // }
-
             cmd.entity(entity).insert((
                 Name::new("Image"),
                 UiImage {
                     image: handle,
                     image_mode: style_attributes
-                        .regular
+                        .computed
                         .image_scale_mode
                         .as_ref()
                         .cloned()

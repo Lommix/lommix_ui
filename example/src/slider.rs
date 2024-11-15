@@ -82,7 +82,7 @@ fn update_state(mut sliders: Query<(&Interaction, &mut SliderNob), Changed<Inter
 fn update_drag(
     mut events: EventReader<bevy::input::mouse::MouseMotion>,
     mut sliders: Query<(&mut Slider, &TemplateState)>,
-    mut nobs: Query<(&mut NodeStyle, &Children, &UiTarget, &SliderNob)>,
+    mut nobs: Query<(&mut HtmlStyle, &Children, &UiTarget, &SliderNob)>,
     mut text: Query<&mut Text>,
 ) {
     events.read().for_each(|event| {
@@ -98,7 +98,7 @@ fn update_drag(
                 };
 
                 slide.0 = (slide.0 + event.delta.x / 200.).clamp(0., 1.);
-                node_style.regular.style.left = Val::Px(slide.0 * 200.);
+                node_style.computed.node.left = Val::Px(slide.0 * 200.);
 
                 // update nob text
                 // we cheat here, because we know by design, that the text is

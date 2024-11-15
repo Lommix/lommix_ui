@@ -1,6 +1,6 @@
 use crate::{
     build::{RawContent, ScopeEntity, StateSubscriber, TemplateExpresions, TemplateState},
-    styles::NodeStyle,
+    styles::HtmlStyle,
 };
 use bevy::prelude::*;
 use nom::{
@@ -24,7 +24,7 @@ pub struct CompileNodeEvent;
 fn compile_node(
     trigger: Trigger<CompileNodeEvent>,
     mut cmd: Commands,
-    mut nodes: Query<(&mut NodeStyle, &ScopeEntity)>,
+    mut nodes: Query<(&mut HtmlStyle, &ScopeEntity)>,
     mut uncompiled_texts: Query<(&mut Text, &RawContent)>,
     mut images: Query<&mut UiImage>,
     expressions: Query<&TemplateExpresions>,

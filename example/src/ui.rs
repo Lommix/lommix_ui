@@ -42,9 +42,8 @@ fn setup(
     html_funcs.register("scrollable", init_scrollable);
     html_funcs.register("play_beep", play_beep);
 
-    // register custom node by hand
-    let panel_handle: Handle<HtmlTemplate> = server.load("demo/panel.xml");
-    html_comps.register("panel", panel_handle);
+    // register custom node by passing a template handle
+    html_comps.register("panel", server.load("demo/panel.xml"));
 
     html_funcs.register("collapse", |In(entity), mut cmd: Commands| {
         cmd.entity(entity).insert(Collapse(true));
@@ -76,7 +75,7 @@ pub struct Collapse(pub bool);
 
 fn update_collapse(
     mut interactions: Query<(&Interaction, &UiTarget, &mut Collapse), Changed<Interaction>>,
-    mut style: Query<&mut NodeStyle>,
+    mut style: Query<&mut HtmlStyle>,
 ) {
     interactions
         .iter_mut()
@@ -97,7 +96,7 @@ fn update_collapse(
             };
 
             if let Ok(mut style) = style.get_mut(**target) {
-                style.regular.style.display = display;
+                style.computed.node.display = display;
             }
         });
 }
@@ -124,7 +123,7 @@ fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>
 fn update_scroll(
     mut events: EventReader<MouseWheel>,
     mut scrollables: Query<(&mut Scrollable, &UiTarget, &Interaction)>,
-    mut targets: Query<&mut NodeStyle>,
+    mut targets: Query<&mut HtmlStyle>,
     time: Res<Time>,
 ) {
     // whatever
@@ -135,7 +134,7 @@ fn update_scroll(
             };
 
             scroll.offset = scroll.offset + ev.y.signum() * scroll.speed * time.delta_secs();
-            style.regular.style.top = Val::Px(scroll.offset);
+            style.computed.node.top = Val::Px(scroll.offset);
         });
     });
 }
