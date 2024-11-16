@@ -1,5 +1,5 @@
 use crate::{
-    build::{RawContent, ScopeEntity, StateSubscriber, TemplateExpresions, TemplateState},
+    build::{RawContent, TemplateScope, StateSubscriber, TemplateExpresions, TemplateProperties},
     styles::HtmlStyle,
 };
 use bevy::prelude::*;
@@ -24,11 +24,11 @@ pub struct CompileNodeEvent;
 fn compile_node(
     trigger: Trigger<CompileNodeEvent>,
     mut cmd: Commands,
-    mut nodes: Query<(&mut HtmlStyle, &ScopeEntity)>,
+    mut nodes: Query<(&mut HtmlStyle, &TemplateScope)>,
     mut uncompiled_texts: Query<(&mut Text, &RawContent)>,
     mut images: Query<&mut UiImage>,
     expressions: Query<&TemplateExpresions>,
-    contexts: Query<&TemplateState>,
+    contexts: Query<&TemplateProperties>,
     server: Res<AssetServer>,
 ) {
     let entity = trigger.entity();
@@ -83,9 +83,9 @@ pub struct CompileContextEvent;
 
 fn compile_context(
     trigger: Trigger<CompileContextEvent>,
-    expressions: Query<(&TemplateExpresions, Option<&ScopeEntity>)>,
+    expressions: Query<(&TemplateExpresions, Option<&TemplateScope>)>,
     subscriber: Query<&StateSubscriber>,
-    mut context: Query<&mut TemplateState>,
+    mut context: Query<&mut TemplateProperties>,
     mut cmd: Commands,
 ) {
     let entity = trigger.entity();
@@ -133,7 +133,7 @@ fn compile_context(
     }
 }
 
-pub(crate) fn compile_content(input: &str, defs: &TemplateState) -> String {
+pub(crate) fn compile_content(input: &str, defs: &TemplateProperties) -> String {
     let mut compiled = String::new();
 
     let parts: Result<(&str, (&str, &str)), nom::Err<nom::error::Error<&str>>> = tuple((

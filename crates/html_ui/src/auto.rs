@@ -48,7 +48,7 @@ impl Plugin for HtmlAutoLoadPlugin {
             Update,
             check_loading_state.run_if(in_state(AutoLoadState::Loading)),
         );
-        app.add_systems(First, watch_autolaod_dirs);
+        app.add_systems(First, watch_autoload_dirs);
     }
 }
 
@@ -64,7 +64,7 @@ fn check_loading_state(
     }
 }
 
-fn watch_autolaod_dirs(
+fn watch_autoload_dirs(
     mut events: EventReader<AssetEvent<LoadedFolder>>,
     config: Res<HtmlAutoLoadPlugin>,
     mut comps: HtmlComponents,
@@ -96,8 +96,9 @@ fn watch_autolaod_dirs(
                         continue;
                     };
 
+
                     comps.register(name.to_string(), template);
-                    info!("registered component `{name}`");
+                    info!("registered HTML-component `{name}`");
                 }
                 Err(_) => {}
             }

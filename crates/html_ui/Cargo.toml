@@ -19,6 +19,8 @@ bevy = { version = "0.15.0-rc.3", default-features = false, features = [
   "bevy_ui",
   "bevy_asset",
   "bevy_text",
+  "file_watcher",
+  "multi_threaded",
 ] }
 interpolation = "0.3.0"
 thiserror = "1.0.63"

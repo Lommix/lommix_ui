@@ -14,16 +14,18 @@ pub mod prelude {
     pub use crate::auto::{AutoLoadState, HtmlAutoLoadPlugin};
     pub use crate::bindings::{ComponentBindings, FunctionBindings, HtmlComponents, HtmlFunctions};
     pub use crate::build::{
-        HtmlBundle, HtmlNode, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, ScopeEntity, Tag, Tags,
-        TemplateState, UiId, UiTarget, UiWatch, UnbuildTag,
+        HtmlNode, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, Tag, Tags, TemplateProperties,
+        TemplateScope, UiId, UiTarget, UiWatch,
     };
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};
     pub use crate::data::{Action, Attribute, HtmlTemplate, NodeType, StyleAttr};
     pub use crate::error::ParseError;
-    pub use crate::styles::{HoverTimer, InteractionTimer, HtmlStyle, PressedTimer, UiActive};
+    pub use crate::styles::{HoverTimer, HtmlStyle, InteractionTimer, PressedTimer, UiActive};
     pub use crate::HtmlUiPlugin;
 }
 
+/// Xhui
+/// Xml/Html Ui for Bevy
 #[derive(Default)]
 pub struct HtmlUiPlugin;
 

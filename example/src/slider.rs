@@ -17,13 +17,7 @@ pub fn main() {
 fn setup_scene(mut cmd: Commands, server: Res<AssetServer>) {
     // --
     cmd.spawn(Camera2d::default());
-    cmd.spawn((
-        HtmlBundle {
-            html: HtmlNode(server.load("slider/menu.xml")),
-            ..default()
-        },
-        Slider(0.),
-    ));
+    cmd.spawn((HtmlNode(server.load("slider/menu.xml")), Slider(0.)));
 }
 
 pub struct SliderPlugin;
@@ -42,10 +36,7 @@ fn setup_slider(
     let handle = server.load("slider/slider.xml");
     components.register("slider", move |mut cmd| {
         cmd.insert((
-            HtmlBundle {
-                html: HtmlNode(handle.clone()),
-                ..default()
-            },
+            HtmlNode(handle.clone()),
             // add our state to the root, so way may easly have access in other templates logic by
             // just adding a `id` tag to the custom component.
             Slider(0.),
@@ -81,7 +72,7 @@ fn update_state(mut sliders: Query<(&Interaction, &mut SliderNob), Changed<Inter
 
 fn update_drag(
     mut events: EventReader<bevy::input::mouse::MouseMotion>,
-    mut sliders: Query<(&mut Slider, &TemplateState)>,
+    mut sliders: Query<(&mut Slider, &TemplateProperties)>,
     mut nobs: Query<(&mut HtmlStyle, &Children, &UiTarget, &SliderNob)>,
     mut text: Query<&mut Text>,
 ) {

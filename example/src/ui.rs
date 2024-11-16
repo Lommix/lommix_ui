@@ -3,14 +3,8 @@ use bevy_html_ui::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Effortless Ui".into(),
-                ..default()
-            }),
-            ..default()
-        }))
         .add_plugins((
+            DefaultPlugins,
             HtmlUiPlugin,
             HtmlAutoLoadPlugin::new(&["components"]),
             // bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
@@ -31,11 +25,7 @@ fn setup(
     mut html_comps: HtmlComponents,
 ) {
     cmd.spawn(Camera2d);
-
-    cmd.spawn(HtmlBundle {
-        html: HtmlNode(server.load("demo/menu.xml")),
-        ..default()
-    });
+    cmd.spawn(HtmlNode(server.load("demo/menu.xml")));
 
     html_funcs.register("greet", greet);
     html_funcs.register("inventory", init_inventory);
@@ -45,6 +35,7 @@ fn setup(
     // register custom node by passing a template handle
     html_comps.register("panel", server.load("demo/panel.xml"));
 
+    // register a custom event system, identified by a string
     html_funcs.register("collapse", |In(entity), mut cmd: Commands| {
         cmd.entity(entity).insert(Collapse(true));
     });
@@ -53,8 +44,8 @@ fn setup(
         "debug",
         |In(entity),
          mut cmd: Commands,
-         mut state: Query<&mut TemplateState>,
-         scopes: Query<&ScopeEntity>| {
+         mut state: Query<&mut TemplateProperties>,
+         scopes: Query<&TemplateScope>| {
             let Ok(scope) = scopes.get(entity) else {
                 return;
             };
@@ -155,11 +146,8 @@ fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetSe
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..200 {
             cmd.spawn((
-                HtmlBundle {
-                    html: HtmlNode(server.load("demo/card.xml")),
-                    ..default()
-                },
-                TemplateState::new()
+                HtmlNode(server.load("demo/card.xml")),
+                TemplateProperties::new()
                     .with("title", &format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
             ));

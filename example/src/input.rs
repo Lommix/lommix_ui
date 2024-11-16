@@ -17,11 +17,7 @@ pub fn main() {
 
 fn setup_scene(mut cmd: Commands, mut functions: HtmlFunctions, server: Res<AssetServer>) {
     cmd.spawn(Camera2d);
-    cmd.spawn(HtmlBundle {
-        html: HtmlNode(server.load("textinput/menu.xml")),
-        ..default()
-    });
-
+    cmd.spawn(HtmlNode(server.load("textinput/menu.xml")));
     functions.register("submit", on_submit);
 }
 

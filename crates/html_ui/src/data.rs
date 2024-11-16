@@ -33,6 +33,16 @@ pub struct XNode {
     pub children: Vec<XNode>,
 }
 
+impl XNode {
+    pub fn find_node(&self, hash: u64) -> &XNode {
+        Self::find(&self, hash)
+    }
+
+    fn find(curent: &XNode, hash: u64) -> &XNode {
+        todo!()
+    }
+}
+
 #[derive(Debug, Asset, TypePath)]
 pub struct HtmlTemplate {
     pub name: Option<String>,
@@ -63,7 +73,7 @@ pub struct AttrTokens {
 }
 
 impl AttrTokens {
-    pub fn compile(&self, props: &TemplateState) -> Option<Attribute> {
+    pub fn compile(&self, props: &TemplateProperties) -> Option<Attribute> {
         let Some(prop_val) = props.get_prop(&self.key) else {
             warn!("failed to parse property, key not found `{}`", self.key);
             return None;

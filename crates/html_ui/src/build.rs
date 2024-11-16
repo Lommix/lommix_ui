@@ -19,31 +19,39 @@ impl Plugin for BuildPlugin {
         app.add_systems(Update, (hotreload, spawn_ui, move_children_to_slot).chain());
         app.register_type::<StateSubscriber>();
         app.register_type::<TemplateExpresions>();
-        app.register_type::<TemplateState>();
-        app.register_type::<ScopeEntity>();
+        app.register_type::<TemplateProperties>();
+        app.register_type::<TemplateScope>();
     }
 }
 
+/// Holds the reference to the template root enttiy,
+/// which owns the template state
 #[derive(Component, Clone, Deref, DerefMut, Copy, Reflect)]
 #[reflect]
-pub struct ScopeEntity(Entity);
-impl ScopeEntity {
+pub struct TemplateScope(Entity);
+impl TemplateScope {
     pub fn get(&self) -> Entity {
         return **self;
     }
 }
 
+/// The property definition of a template,
+/// this component can be found on the template root
+/// entity, use `TemplateScope` (exists on all nodes, part of a template)
+/// to get access to the root.
 #[derive(Component, Debug, Clone, Default, Reflect)]
 #[reflect]
-pub struct TemplateState {
+pub struct TemplateProperties {
     pub props: HashMap<String, String>,
 }
 
+/// enties that inherit the interaction state.
+/// you could say, they are subscribed.
 #[derive(Component, Clone, Default, Deref, DerefMut, Reflect)]
 #[reflect]
-pub struct StateSubscriber(Vec<Entity>);
+pub struct StateSubscriber(pub Vec<Entity>);
 
-impl TemplateState {
+impl TemplateProperties {
     pub fn try_set_prop(&mut self, key: &str, value: String) {
         _ = self.props.try_insert(key.to_string(), value);
     }
@@ -121,7 +129,7 @@ pub struct UiTarget(pub Entity);
 pub struct UiWatch(pub Entity);
 
 #[derive(Component, Default)]
-pub struct UnbuildTag;
+pub struct FullyBuild;
 
 /// Eventlistener interaction transitions to Hover
 #[derive(Component, Deref, DerefMut)]
@@ -139,15 +147,8 @@ pub struct OnUiEnter(pub Vec<String>);
 #[derive(Component, Deref, DerefMut)]
 pub struct OnUiExit(pub Vec<String>);
 
-/// Spawns a ui template behind an asset.
-#[derive(Bundle, Default)]
-pub struct HtmlBundle {
-    pub html: HtmlNode,
-    pub unbuild: UnbuildTag,
-}
-
 #[derive(Component, Default, Deref, DerefMut)]
-#[require(Node, TemplateState)]
+#[require(Node, TemplateProperties)]
 pub struct HtmlNode(pub Handle<HtmlTemplate>);
 
 fn hotreload(
@@ -163,6 +164,12 @@ fn hotreload(
                 return;
             }
         };
+
+        info!(
+            " ----------------------- reloaded! ---------------------------\n{:#?}",
+            ev
+        );
+
         templates
             .iter()
             .filter(|(_, html)| html.id() == *id)
@@ -177,10 +184,11 @@ fn hotreload(
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
                 }
 
+                info!("rebuild!");
+
                 cmd.entity(entity)
                     .despawn_descendants()
-                    .retain::<KeepComps>()
-                    .insert(UnbuildTag);
+                    .retain::<KeepComps>();
             });
     });
 }
@@ -189,11 +197,11 @@ fn hotreload(
 struct KeepComps {
     pub parent: Parent,
     pub children: Children,
-    pub ui: HtmlBundle,
+    pub ui: HtmlNode,
     pub unsloed: UnslotedChildren,
     pub slot: SlotPlaceholder,
     pub inside: InsideSlot,
-    pub scope: ScopeEntity,
+    pub scope: TemplateScope,
 }
 
 fn move_children_to_slot(
@@ -255,7 +263,7 @@ impl IdLookUpTable {
 
 fn spawn_ui(
     mut cmd: Commands,
-    mut unbuild: Query<(Entity, &HtmlNode, &mut TemplateState), With<UnbuildTag>>,
+    mut unbuild: Query<(Entity, &HtmlNode, &mut TemplateProperties), Without<FullyBuild>>,
     assets: Res<Assets<HtmlTemplate>>,
     server: Res<AssetServer>,
     custom_comps: Res<ComponentBindings>,
@@ -269,7 +277,7 @@ fn spawn_ui(
 
             let mut subscriber = StateSubscriber::default();
             let mut id_table = IdLookUpTable::default();
-            let scope = ScopeEntity(root_entity);
+            let scope = TemplateScope(root_entity);
 
             template.properties.iter().for_each(|(key, val)| {
                 _ = state.try_set_prop(key, val.clone());
@@ -312,9 +320,7 @@ fn spawn_ui(
                 }
             });
 
-            cmd.entity(root_entity)
-                .insert(subscriber)
-                .remove::<UnbuildTag>();
+            cmd.entity(root_entity).insert((subscriber, FullyBuild));
 
             cmd.trigger_targets(CompileContextEvent, root_entity);
         });
@@ -325,14 +331,14 @@ fn spawn_ui(
 fn build_node(
     depth: u32,
     entity: Entity,
-    scope: ScopeEntity,
+    scope: TemplateScope,
     node: &XNode,
     cmd: &mut Commands,
     assets: &Assets<HtmlTemplate>,
     server: &AssetServer,
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
-    state: &mut TemplateState,
+    state: &mut TemplateProperties,
     state_subscriber: &mut StateSubscriber,
 ) {
     // first node is the state holder
@@ -360,7 +366,7 @@ fn build_node(
         node.defs
             .iter()
             .cloned()
-            .fold(TemplateState::default(), |mut m, (key, value)| {
+            .fold(TemplateProperties::default(), |mut m, (key, value)| {
                 // info!("passing {key}:{value} on type {:?}", &node.node_type);
                 m.props.insert(key, value);
                 m
@@ -477,8 +483,7 @@ fn build_node(
                 cmd.entity(entity).insert((UnslotedChildren(slot_holder),));
             }
 
-            cmd.entity(entity)
-                .insert((HtmlNode(handle), UnbuildTag, passed_state));
+            cmd.entity(entity).insert((HtmlNode(handle), passed_state));
 
             return;
         }
@@ -507,7 +512,7 @@ fn build_node(
                 cmd.entity(entity).insert((UnslotedChildren(slot_holder),));
             }
 
-            cmd.entity(entity).insert((passed_state, UnbuildTag));
+            cmd.entity(entity).insert(passed_state);
             return;
         }
         NodeType::Slot => {

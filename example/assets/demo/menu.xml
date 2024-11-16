@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		  xsi:noNamespaceSchemaLocation="../schema.xsd">
+		  xsi:noNamespaceSchemaLocation="../../../schema.xsd">
 
 	<property name="title">Effortless Ui</property>
 	<property name="author">Lommix</property>
@@ -77,5 +77,4 @@
 			</panel>
 		</panel>
 	</node>
-
 </template>

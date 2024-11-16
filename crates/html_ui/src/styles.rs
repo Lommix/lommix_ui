@@ -13,6 +13,7 @@ impl Plugin for TransitionPlugin {
         app.register_type::<HoverTimer>();
         app.register_type::<ComputedStyle>();
         app.register_type::<HtmlStyle>();
+        app.register_type::<InteractionTimer>();
     }
 }
 

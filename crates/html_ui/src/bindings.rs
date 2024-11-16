@@ -1,12 +1,8 @@
+use crate::{build::HtmlNode, data::HtmlTemplate};
 use bevy::{
     ecs::system::{EntityCommands, SystemId, SystemParam},
     prelude::*,
     utils::HashMap,
-};
-
-use crate::{
-    build::{HtmlBundle, HtmlNode},
-    data::HtmlTemplate,
 };
 
 pub struct BindingPlugin;
@@ -45,10 +41,7 @@ impl<'w> HtmlComponents<'w> {
     /// link any custom html node to your template
     pub fn register(&mut self, name: impl Into<String>, template: Handle<HtmlTemplate>) {
         self.comps.register(name, move |mut cmd| {
-            cmd.insert(HtmlBundle {
-                html: HtmlNode(template.clone()),
-                ..default()
-            });
+            cmd.insert(HtmlNode(template.clone()));
         });
     }
 
@@ -63,11 +56,7 @@ impl<'w> HtmlComponents<'w> {
         SF: Fn(EntityCommands) + Send + Sync + 'static,
     {
         self.comps.register(name, move |mut cmd| {
-            cmd.insert(HtmlBundle {
-                html: HtmlNode(template.clone()),
-                ..default()
-            });
-
+            cmd.insert(HtmlNode(template.clone()));
             func(cmd);
         });
     }

@@ -436,7 +436,7 @@ where
         b"font" => map(as_string, StyleAttr::Font)(value)?,
         b"font_color" => map(parse_color, StyleAttr::FontColor)(value)?,
         b"font_size" => map(parse_float, StyleAttr::FontSize)(value)?,
-        b"delay" => map(parse_float, StyleAttr::Delay)(value)?,
+        b"delay" => map(parse_delay, StyleAttr::Delay)(value)?,
         b"ease" => map(parse_easing, StyleAttr::Easing)(value)?,
         b"max_height" => map(parse_val, StyleAttr::MaxHeight)(value)?,
         b"max_width" => map(parse_val, StyleAttr::MaxWidth)(value)?,
@@ -1085,6 +1085,19 @@ where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     terminated(parse_float, tag("px"))(input)
+}
+
+// 100ms
+// 3s
+fn parse_delay<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    alt((
+        map(terminated(parse_float, tag("s")), |v| v),
+        map(terminated(parse_float, tag("ms")), |v| v / 1000.),
+        map(parse_float, |v| v),
+    ))(input)
 }
 
 // rgb(1,1,1)
