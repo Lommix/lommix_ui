@@ -335,7 +335,7 @@ pub struct ComputedStyle {
     pub node: Node,
     pub border_color: Color,
     pub border_radius: UiRect,
-    pub image_scale_mode: Option<NodeImageMode>,
+    pub image_mode: Option<NodeImageMode>,
     pub background: Color,
     pub font: Handle<Font>,
     pub font_size: f32,
@@ -352,7 +352,7 @@ impl Default for ComputedStyle {
             border_color: Color::NONE,
             border_radius: UiRect::default(),
             background: Color::NONE,
-            image_scale_mode: None,
+            image_mode: None,
             font: Handle::default(),
             font_size: 12.,
             font_color: Color::WHITE,
@@ -478,7 +478,7 @@ impl HtmlStyle {
             StyleAttr::Background(color) => self.computed.background = color,
             StyleAttr::Delay(f) => self.computed.delay = f,
             StyleAttr::Easing(ease) => self.computed.easing = Some(ease),
-            StyleAttr::ImageScaleMode(mode) => self.computed.image_scale_mode = Some(mode),
+            StyleAttr::ImageScaleMode(mode) => self.computed.image_mode = Some(mode),
             // StyleAttr::Font(font) => self.regular.font = server
             _ => (),
         };

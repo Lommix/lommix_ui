@@ -43,7 +43,7 @@
 						ease="bounce_out"
 						border_radius="4px"
 						padding="10px"
-						onpress="debug">
+						on_press="debug">
 					<text font_size="25">Change Title</text>
 				</button>
 			</panel>
@@ -57,7 +57,7 @@
 						<text>Inventory</text>
 						<text>[ scroll ]</text>
 					</node>
-					<button onspawn="scrollable"
+					<button on_spawn="scrollable"
 							tag:scroll_speed="1000"
 							target="inventory"
 							width="420px"
@@ -65,7 +65,7 @@
 							overflow="hidden hidden"
 							align_content="center"
 							justify_content="center">
-						<node onspawn="inventory"
+						<node on_spawn="inventory"
 							  id="inventory"
 							  display="grid"
 							  grid_template_columns="(6, auto)"

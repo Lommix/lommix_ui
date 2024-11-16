@@ -80,7 +80,7 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
-		<xs:attribute name="image_scale_mode">
+		<xs:attribute name="image_mode">
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
 				<xs:appinfo>

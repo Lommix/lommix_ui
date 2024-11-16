@@ -153,8 +153,6 @@ fn hotreload(
                     cmd.entity(entity).insert(UnslotedChildren(slot_holder));
                 }
 
-                info!("rebuild!");
-
                 cmd.entity(entity)
                     .despawn_descendants()
                     .retain::<KeepComps>();
@@ -237,6 +235,10 @@ fn spawn_ui(
                 cmd.trigger_targets(CompileContextEvent, root_entity);
             } else {
                 warn!("template has no root node!");
+            }
+
+            if template.root.len() > 1 {
+                warn!("templates currently only support one root node, ignoring the rest");
             }
         });
 }
@@ -326,6 +328,47 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
             self.cmd.entity(entity).insert(TemplateScope(self.scope));
         }
 
+        // ----------------------
+        //register prop listner
+        if node.uncompiled.len() > 0 {
+            self.cmd.entity(entity).insert(TemplateExpresions(
+                node.uncompiled.iter().cloned().collect(),
+            ));
+            self.subscriber.push(entity);
+        }
+
+        // ----------------------
+        //tags
+        if node.tags.len() > 0 {
+            self.cmd.entity(entity).insert(Tags(node.tags.clone()));
+        }
+
+        // ----------------------
+        // connections
+        if let Some(id) = &node.id {
+            self.ids.insert(id.clone(), entity);
+        }
+        if let Some(target) = &node.target {
+            self.targets.insert(entity, target.clone());
+        }
+
+        if let Some(watch) = &node.watch {
+            match self.watch.get_mut(watch) {
+                Some(list) => {
+                    list.push(entity);
+                }
+                None => {
+                    self.watch.insert(watch.clone(), vec![entity]);
+                }
+            };
+        }
+
+        // ----------------------
+        // events
+        node.event_listener.iter().for_each(|listener| {
+            listener.clone().self_insert(self.cmd.entity(entity));
+        });
+
         match &node.node_type {
             // --------------------------------
             // div node
@@ -344,7 +387,7 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                             .unwrap_or_default(),
                         image_mode: styles
                             .computed
-                            .image_scale_mode
+                            .image_mode
                             .as_ref()
                             .cloned()
                             .unwrap_or_default(),
@@ -444,43 +487,6 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                 return;
             }
         };
-
-        //register prop listner
-        if node.uncompiled.len() > 0 {
-            self.cmd.entity(entity).insert(TemplateExpresions(
-                node.uncompiled.iter().cloned().collect(),
-            ));
-            self.subscriber.push(entity);
-        }
-
-        //tags
-        if node.tags.len() > 0 {
-            self.cmd.entity(entity).insert(Tags(node.tags.clone()));
-        }
-
-        // ----------------------
-        // connections
-
-        if let Some(id) = &node.id {
-            self.ids.insert(id.clone(), entity);
-        }
-        if let Some(target) = &node.target {
-            self.targets.insert(entity, target.clone());
-        }
-
-        if let Some(watch) = &node.watch {
-            match self.watch.get_mut(watch) {
-                Some(list) => {
-                    list.push(entity);
-                }
-                None => {
-                    self.watch.insert(watch.clone(), vec![entity]);
-                }
-            };
-        }
-        node.event_listener.iter().for_each(|listener| {
-            listener.clone().self_insert(self.cmd.entity(entity));
-        });
 
         for child in node.children.iter() {
             let child_entity = self.cmd.spawn_empty().id();

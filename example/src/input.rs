@@ -1,9 +1,8 @@
 use bevy::{
-    input::{
+    ecs::event::EventCursor, input::{
         keyboard::{Key, KeyboardInput},
         mouse::MouseButtonInput,
-    },
-    prelude::*,
+    }, prelude::*
 };
 use bevy_html_ui::prelude::*;
 
@@ -12,6 +11,7 @@ pub fn main() {
         .add_plugins((DefaultPlugins, HtmlUiPlugin::default()))
         .add_plugins(TextInputPlugin)
         .add_systems(Startup, setup_scene)
+        .add_systems(Update, write_input)
         .run();
 }
 
@@ -29,6 +29,8 @@ fn on_submit(
     targets: Query<&UiTarget>,
     children: Query<&Children>,
 ) {
+    info!("submit");
+
     let Ok(form_target) = targets.get(entity) else {
         warn!("no parent of inputs nodes as target provided for `{entity}`");
         return;
@@ -121,52 +123,52 @@ fn unfocus(
     });
 }
 
-// fn write_input(
-//     mut cmd: Commands,
-//     key_events: Res<Events<KeyboardInput>>,
-//     mut reader: Local<ManualEventReader<KeyboardInput>>,
-//     mut text_inputs: Query<(Entity, &mut TextInput), With<Focused>>,
-// ) {
-//     if text_inputs.is_empty() {
-//         return;
-//     }
-//
-//     if reader.clone().read(&key_events).next().is_none() {
-//         return;
-//     }
-//
-//     for input in reader.clone().read(&key_events) {
-//         if !input.state.is_pressed() {
-//             return;
-//         }
-//
-//         match input.logical_key {
-//             Key::Character(ref char) => {
-//                 text_inputs
-//                     .iter_mut()
-//                     .for_each(|(_, mut txt)| txt.0.push_str(char));
-//             }
-//             Key::Enter => {
-//                 text_inputs.iter().for_each(|(ent, _)| {
-//                     cmd.entity(ent).remove::<UiActive>().remove::<Focused>();
-//                 });
-//             }
-//             Key::Backspace => {
-//                 text_inputs.iter_mut().for_each(|(_, mut txt)| {
-//                     _ = txt.0.pop();
-//                 });
-//             }
-//             Key::Space => {
-//                 text_inputs
-//                     .iter_mut()
-//                     .for_each(|(_, mut txt)| txt.0.push_str(" "));
-//             }
-//             _ => (),
-//         }
-//     }
-//
-//     reader.clear(&key_events);
-// }
+fn write_input(
+    mut cmd: Commands,
+    key_events: Res<Events<KeyboardInput>>,
+    mut reader: Local<EventCursor<KeyboardInput>>,
+    mut text_inputs: Query<(Entity, &mut TextInput), With<Focused>>,
+) {
+    if text_inputs.is_empty() {
+        return;
+    }
+
+    if reader.clone().read(&key_events).next().is_none() {
+        return;
+    }
+
+    for input in reader.clone().read(&key_events) {
+        if !input.state.is_pressed() {
+            return;
+        }
+
+        match input.logical_key {
+            Key::Character(ref char) => {
+                text_inputs
+                    .iter_mut()
+                    .for_each(|(_, mut txt)| txt.0.push_str(char));
+            }
+            Key::Enter => {
+                text_inputs.iter().for_each(|(ent, _)| {
+                    cmd.entity(ent).remove::<UiActive>().remove::<Focused>();
+                });
+            }
+            Key::Backspace => {
+                text_inputs.iter_mut().for_each(|(_, mut txt)| {
+                    _ = txt.0.pop();
+                });
+            }
+            Key::Space => {
+                text_inputs
+                    .iter_mut()
+                    .for_each(|(_, mut txt)| txt.0.push_str(" "));
+            }
+            _ => (),
+        }
+    }
+
+    reader.clear(&key_events);
+}
 
 fn sync_display_text(
     text_inputs: Query<(&TextInput, &UiTarget), Changed<TextInput>>,

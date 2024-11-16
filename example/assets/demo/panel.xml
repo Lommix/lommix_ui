@@ -23,7 +23,7 @@
 					background="#FFF"
 					hover:background="#008"
 					align_items="center"
-					onspawn="collapse"
+					on_spawn="collapse"
 					target="to_collapse">
 				<text font_color="#055"
 					  watch="header"

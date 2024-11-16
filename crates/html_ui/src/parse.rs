@@ -335,16 +335,16 @@ where
         b"id" => Attribute::Id(as_string(value).map(|(_, hash)| hash)?),
         b"target" => Attribute::Target(as_string(value).map(|(_, hash)| hash)?),
         b"src" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
-        b"onexit" => Attribute::Action(Action::OnExit(
+        b"on_exit" => Attribute::Action(Action::OnExit(
             as_string_list(value).map(|(_, string)| string)?,
         )),
-        b"onenter" => Attribute::Action(Action::OnEnter(
+        b"on_enter" => Attribute::Action(Action::OnEnter(
             as_string_list(value).map(|(_, string)| string)?,
         )),
-        b"onpress" => Attribute::Action(Action::OnPress(
+        b"on_press" => Attribute::Action(Action::OnPress(
             as_string_list(value).map(|(_, string)| string)?,
         )),
-        b"onspawn" => Attribute::Action(Action::OnSpawn(
+        b"on_spawn" => Attribute::Action(Action::OnSpawn(
             as_string_list(value).map(|(_, string)| string)?,
         )),
         any => match parse_style::<E>(prefix, any, value) {
@@ -402,7 +402,7 @@ where
         b"grid_column" => map(parse_grid_placement, |v| StyleAttr::GridColumn(v))(value)?,
 
         //slices
-        b"image_scale_mode" => map(parse_image_scale_mode, |v| StyleAttr::ImageScaleMode(v))(value)?,
+        b"image_mode" => map(parse_image_scale_mode, |v| StyleAttr::ImageScaleMode(v))(value)?,
 
         // values
         b"font" => map(as_string, StyleAttr::Font)(value)?,

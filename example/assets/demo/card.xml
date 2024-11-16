@@ -18,8 +18,8 @@
 				border_color="{primary}"
 				border_radius="2px"
 				hover:border="4px"
-				onpress="greet"
-				onenter="play_beep"
+				on_press="greet"
+				on_enter="play_beep"
 				tag:source="pop.ogg"
 				height="64px"
 				width="64px">

@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
-	<node padding="50px"
-		  margin="10px"
-		  border="2px"
-		  border_radius="15px"
-		  flex_direction="column"
-		  row_gap="5px"
-		  background="#222"
-		  border_color="#FFF">
+	<img padding="50px"
+		 margin="10px"
+		 src="ui_panel.png"
+		 image_mode="10px tile(1) tile(1) 4"
+		 flex_direction="column"
+		 row_gap="5px">
 
 		<text font_size="32"
 			  padding="10px">Simple Text Input</text>
@@ -30,11 +28,12 @@
 		</node>
 
 		<button id="login_btn"
-				onpress="submit"
+				on_press="submit"
 				target="input_form"
 				background="#000"
 				border_color="#FFF"
 				hover:border_color="#80A"
+				hover:background="#FFF"
 				border="2px"
 				margin="20px 0 0 0"
 				justify_content="center"
@@ -44,7 +43,8 @@
 				  hover:font_size="48"
 				  delay="0.2"
 				  ease="cubic_out"
+				  hover:font_color="#000"
 				  watch="login_btn">Submit</text>
 		</button>
-	</node>
+	</img>
 </template>

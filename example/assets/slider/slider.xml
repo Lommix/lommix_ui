@@ -15,7 +15,7 @@
 				height="30px"
 				width="30px"
 				position="absolute"
-				onspawn="init_slider_btn"
+				on_spawn="init_slider_btn"
 				left="0"
 				top="-14px"
 				background="#000"

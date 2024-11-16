@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		  xsi:noNamespaceSchemaLocation="../schema.xsd">
+		  xsi:noNamespaceSchemaLocation="../../../schema.xsd">
 
 	<property name="press"></property>
 	<property name="primary">#000</property>
@@ -11,14 +11,14 @@
 			background="{primary}"
 			height="80px"
 			width="100%"
-			onpress="{press}"
+			on_press="{press}"
 			border="2px"
 			border_color="{secondary}"
 			hover:border_color="{primary}"
 			border_radius="5px"
 			justify_content="center"
 			align_items="center"
-			onenter="play_beep"
+			on_enter="play_beep"
 			tag:source="pop.ogg">
 		<slot/>
 	</button>

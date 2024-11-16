@@ -46,6 +46,15 @@ fn setup_slider(
     html_functions.register("init_slider_btn", |In(entity), mut cmd: Commands| {
         cmd.entity(entity).insert(SliderNob::Rested);
     });
+
+    html_functions.register("greet", |In(_)| {
+        info!("I am here");
+    });
+
+    html_functions.register("hello", |In(_)| {
+        info!("hello");
+    });
+
 }
 
 #[derive(Component)]
