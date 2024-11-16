@@ -27,8 +27,8 @@ pub struct XNode {
     pub id: Option<String>,
     pub name: Option<String>,
     pub uncompiled: Vec<AttrTokens>,
-    pub tags: Vec<(String, String)>,
-    pub defs: Vec<(String, String)>,
+    pub tags: HashMap<String, String>,
+    pub defs: HashMap<String, String>,
     pub event_listener: Vec<Action>,
     pub content: Option<String>,
     pub node_type: NodeType,
@@ -76,7 +76,7 @@ pub struct AttrTokens {
 
 impl AttrTokens {
     pub fn compile(&self, props: &TemplateProperties) -> Option<Attribute> {
-        let Some(prop_val) = props.get_prop(&self.key) else {
+        let Some(prop_val) = props.get(&self.key) else {
             warn!("failed to parse property, key not found `{}`", self.key);
             return None;
         };

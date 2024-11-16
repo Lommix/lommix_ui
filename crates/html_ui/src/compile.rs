@@ -117,9 +117,9 @@ fn compile_context(
                 }
             }
             _ = context.get_mut(entity).map(|mut context| {
-                compiled_defintions
-                    .drain(..)
-                    .for_each(|(key, value)| context.set_prop(key.as_str(), value));
+                compiled_defintions.drain(..).for_each(|(key, value)| {
+                    context.insert(key, value);
+                });
             });
         };
     };
@@ -150,7 +150,7 @@ pub(crate) fn compile_content(input: &str, defs: &TemplateProperties) -> String 
 
     compiled.push_str(literal);
 
-    if let Some(value) = defs.get_prop(key.trim_end()) {
+    if let Some(value) = defs.get(key.trim_end()) {
         compiled.push_str(value);
     }
 

@@ -55,7 +55,7 @@ fn setup(
             };
 
             let rng = rand::random::<u32>();
-            state.set_prop("title", format!("{}", rng));
+            state.insert("title".to_string(), format!("{}", rng));
             cmd.trigger_targets(CompileContextEvent, **scope);
         },
     );
@@ -103,7 +103,7 @@ fn init_scrollable(In(entity): In<Entity>, mut cmd: Commands, tags: Query<&Tags>
         .get(entity)
         .ok()
         .and_then(|tags| {
-            tags.get_tag("scroll_speed")
+            tags.get("scroll_speed")
                 .and_then(|fstr| fstr.parse::<f32>().ok())
         })
         .unwrap_or(10.);
@@ -147,7 +147,7 @@ fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetSe
         for i in 0..200 {
             cmd.spawn((
                 HtmlNode(server.load("demo/card.xml")),
-                TemplateProperties::new()
+                TemplateProperties::default()
                     .with("title", &format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),
             ));
@@ -164,7 +164,7 @@ fn play_beep(
     let Some(path) = tags
         .get(entity)
         .ok()
-        .and_then(|t| t.get_tag("source").map(|s| s.to_string()))
+        .and_then(|t| t.get("source").map(|s| s.to_string()))
     else {
         return;
     };

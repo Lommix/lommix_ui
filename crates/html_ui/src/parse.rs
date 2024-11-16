@@ -131,7 +131,7 @@ where
             Attribute::PropertyDefinition(key, val) => {
                 match xnode.node_type {
                     NodeType::Include | NodeType::Custom(_) | NodeType::Property => {
-                        xnode.defs.push((key, val))
+                        xnode.defs.insert(key, val);
                     }
                     _ => {
                         // prop defs are not allowed, unless include or custom
@@ -146,7 +146,9 @@ where
             Attribute::Path(path) => xnode.src = Some(path),
             Attribute::Target(tar) => xnode.target = Some(tar),
             Attribute::Id(i) => xnode.id = Some(i),
-            Attribute::Tag(key, val) => xnode.tags.push((key, val)),
+            Attribute::Tag(key, val) => {
+                xnode.tags.insert(key, val);
+            }
             Attribute::Watch(watch_id) => xnode.watch = Some(watch_id),
         }
     }
