@@ -1,5 +1,8 @@
 use crate::{
-    build::{RawContent, TemplateScope, StateSubscriber, TemplateExpresions, TemplateProperties},
+    build::{
+        RawContent, TemplateExpresions, TemplateProperties, TemplatePropertySubscriber,
+        TemplateScope,
+    },
     styles::HtmlStyle,
 };
 use bevy::prelude::*;
@@ -84,12 +87,11 @@ pub struct CompileContextEvent;
 fn compile_context(
     trigger: Trigger<CompileContextEvent>,
     expressions: Query<(&TemplateExpresions, Option<&TemplateScope>)>,
-    subscriber: Query<&StateSubscriber>,
+    subscriber: Query<&TemplatePropertySubscriber>,
     mut context: Query<&mut TemplateProperties>,
     mut cmd: Commands,
 ) {
     let entity = trigger.entity();
-
     if let Ok((expressions, scope)) = expressions.get(entity) {
         // compile
         if let Some(parent_context) = scope.map(|s| context.get(**s).ok()).flatten() {

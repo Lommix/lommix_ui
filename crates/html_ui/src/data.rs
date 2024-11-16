@@ -3,8 +3,9 @@ use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum NodeType {
+    #[default]
     Node,
     Image,
     Text,
@@ -16,8 +17,9 @@ pub enum NodeType {
     Custom(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct XNode {
+    pub uuid: u64,
     pub src: Option<String>,
     pub styles: Vec<StyleAttr>,
     pub target: Option<String>,

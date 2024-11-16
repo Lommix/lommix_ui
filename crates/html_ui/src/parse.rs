@@ -117,31 +117,21 @@ fn from_raw_xml<'a, E>(mut xml: Xml<'a>) -> IResult<&[u8], XNode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
+    let mut xnode = XNode::default();
     let (_, node_type) = parse_node_type(xml.name)?;
-
-    let content = xml
+    xnode.node_type = node_type;
+    xnode.content = xml
         .value
         .map(|bytes| String::from_utf8_lossy(bytes).to_string());
-
-    let mut styles = vec![];
-    let mut defs = vec![];
-    let mut event_listener = vec![];
-    let mut uncompiled = vec![];
-    let mut tags = vec![];
-    let mut src = None;
-    let mut id = None;
-    let mut target = None;
-    let mut watch = None;
-    let mut name = None;
 
     for attr in xml.attributes.iter() {
         let (_input, compiled_attr) = attribute_from_parts(attr.prefix, attr.key, attr.value)?;
         match compiled_attr {
-            Attribute::Style(style_attr) => styles.push(style_attr),
+            Attribute::Style(style_attr) => xnode.styles.push(style_attr),
             Attribute::PropertyDefinition(key, val) => {
-                match node_type {
+                match xnode.node_type {
                     NodeType::Include | NodeType::Custom(_) | NodeType::Property => {
-                        defs.push((key, val))
+                        xnode.defs.push((key, val))
                     }
                     _ => {
                         // prop defs are not allowed, unless include or custom
@@ -150,43 +140,23 @@ where
                     }
                 }
             }
-            Attribute::Name(s) => name = Some(s),
-            Attribute::Uncompiled(attr_tokens) => uncompiled.push(attr_tokens),
-            Attribute::Action(action) => event_listener.push(action),
-            Attribute::Path(path) => src = Some(path),
-            Attribute::Target(tar) => target = Some(tar),
-            Attribute::Id(i) => id = Some(i),
-            Attribute::Tag(key, val) => tags.push((key, val)),
-            Attribute::Watch(watch_id) => watch = Some(watch_id),
+            Attribute::Name(s) => xnode.name = Some(s),
+            Attribute::Uncompiled(attr_tokens) => xnode.uncompiled.push(attr_tokens),
+            Attribute::Action(action) => xnode.event_listener.push(action),
+            Attribute::Path(path) => xnode.src = Some(path),
+            Attribute::Target(tar) => xnode.target = Some(tar),
+            Attribute::Id(i) => xnode.id = Some(i),
+            Attribute::Tag(key, val) => xnode.tags.push((key, val)),
+            Attribute::Watch(watch_id) => xnode.watch = Some(watch_id),
         }
     }
 
-    // dbg!(&src);
-
-    let mut children = vec![];
     for child in xml.children.drain(..) {
         let (_, node) = from_raw_xml(child)?;
-        children.push(node);
+        xnode.children.push(node);
     }
 
-    Ok((
-        "".as_bytes(),
-        XNode {
-            src,
-            styles,
-            target,
-            watch,
-            name,
-            uncompiled,
-            id,
-            tags,
-            defs,
-            event_listener,
-            content,
-            node_type,
-            children,
-        },
-    ))
+    Ok(("".as_bytes(), xnode))
 }
 
 struct Xml<'a> {

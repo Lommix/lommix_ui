@@ -6,7 +6,7 @@ use crate::{
     prelude::ComponentBindings,
     styles::{HoverTimer, HtmlStyle, PressedTimer},
 };
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{ecs::system::SystemParam, prelude::*, utils::HashMap};
 use nom::{
     bytes::complete::{is_not, tag, take_until},
     character::complete::multispace0,
@@ -17,7 +17,7 @@ pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (hotreload, spawn_ui, move_children_to_slot).chain());
-        app.register_type::<StateSubscriber>();
+        app.register_type::<TemplatePropertySubscriber>();
         app.register_type::<TemplateExpresions>();
         app.register_type::<TemplateProperties>();
         app.register_type::<TemplateScope>();
@@ -45,11 +45,11 @@ pub struct TemplateProperties {
     pub props: HashMap<String, String>,
 }
 
-/// enties that inherit the interaction state.
-/// you could say, they are subscribed.
+/// Entites that need to be notified, when the
+/// template properties change.
 #[derive(Component, Clone, Default, Deref, DerefMut, Reflect)]
 #[reflect]
-pub struct StateSubscriber(pub Vec<Entity>);
+pub struct TemplatePropertySubscriber(pub Vec<Entity>);
 
 impl TemplateProperties {
     pub fn try_set_prop(&mut self, key: &str, value: String) {
@@ -275,55 +275,306 @@ fn spawn_ui(
                 return;
             };
 
-            let mut subscriber = StateSubscriber::default();
-            let mut id_table = IdLookUpTable::default();
-            let scope = TemplateScope(root_entity);
+            // let mut subscriber = TemplatePropertySubscriber::default();
+            // let mut id_table = IdLookUpTable::default();
+            // let scope = TemplateScope(root_entity);
+            //
+            // template.properties.iter().for_each(|(key, val)| {
+            //     _ = state.try_set_prop(key, val.clone());
+            // });
+            //
+            // build_node(
+            //     0,
+            //     root_entity,
+            //     scope,
+            //     &template.root[0],
+            //     &mut cmd,
+            //     &assets,
+            //     &server,
+            //     &custom_comps,
+            //     &mut id_table,
+            //     &mut state,
+            //     &mut subscriber,
+            // );
+            //
+            // id_table.ids.iter().for_each(|(id_string, entity)| {
+            //     cmd.entity(*entity).insert(UiId(id_string.clone()));
+            // });
+            //
+            // id_table.targets.iter().for_each(|(entity, target_id)| {
+            //     match id_table.ids.get(target_id) {
+            //         Some(tar) => {
+            //             cmd.entity(*entity).insert(UiTarget(*tar));
+            //         }
+            //         None => warn!("target `{target_id}` not found for entity {entity}"),
+            //     }
+            // });
+            //
+            // id_table.watch.iter().for_each(|(target_str, obs_list)| {
+            //     match id_table.ids.get(target_str) {
+            //         Some(to_observe) => {
+            //             cmd.entity(*to_observe)
+            //                 .insert(InteractionObverser(obs_list.clone()));
+            //         }
+            //         None => warn!("undefined watch target `{target_str}`"),
+            //     }
+            // });
+            //
+            // cmd.entity(root_entity).insert((subscriber, FullyBuild));
+            // cmd.trigger_targets(CompileContextEvent, root_entity);
 
             template.properties.iter().for_each(|(key, val)| {
                 _ = state.try_set_prop(key, val.clone());
             });
 
-            build_node(
-                0,
-                root_entity,
-                scope,
-                &template.root[0],
-                &mut cmd,
-                &assets,
-                &server,
-                &custom_comps,
-                &mut id_table,
-                &mut state,
-                &mut subscriber,
-            );
+            let mut builder =
+                TemplateBuilder::new(root_entity, cmd.reborrow(), &server, &custom_comps, &state);
 
-            id_table.ids.iter().for_each(|(id_string, entity)| {
-                cmd.entity(*entity).insert(UiId(id_string.clone()));
-            });
-
-            id_table.targets.iter().for_each(|(entity, target_id)| {
-                match id_table.ids.get(target_id) {
-                    Some(tar) => {
-                        cmd.entity(*entity).insert(UiTarget(*tar));
-                    }
-                    None => warn!("target `{target_id}` not found for entity {entity}"),
-                }
-            });
-
-            id_table.watch.iter().for_each(|(target_str, obs_list)| {
-                match id_table.ids.get(target_str) {
-                    Some(to_observe) => {
-                        cmd.entity(*to_observe)
-                            .insert(InteractionObverser(obs_list.clone()));
-                    }
-                    None => warn!("undefined watch target `{target_str}`"),
-                }
-            });
-
-            cmd.entity(root_entity).insert((subscriber, FullyBuild));
-
+            builder.build_tree(&template.root[0]);
+            builder.build_relation();
             cmd.trigger_targets(CompileContextEvent, root_entity);
         });
+}
+
+struct TemplateBuilder<'w, 's> {
+    cmd: Commands<'w, 's>,
+    server: &'w AssetServer,
+    scope: Entity,
+    comps: &'w ComponentBindings,
+    properties: &'s TemplateProperties,
+    subscriber: TemplatePropertySubscriber,
+    ids: HashMap<String, Entity>,
+    targets: HashMap<Entity, String>,
+    watch: HashMap<String, Vec<Entity>>,
+}
+
+impl<'w, 's> TemplateBuilder<'w, 's> {
+    pub fn new(
+        scope: Entity,
+        cmd: Commands<'w, 's>,
+        server: &'w AssetServer,
+        comps: &'w ComponentBindings,
+        props: &'s TemplateProperties,
+    ) -> Self {
+        Self {
+            cmd,
+            scope,
+            server,
+            comps,
+            subscriber: Default::default(),
+            ids: Default::default(),
+            targets: Default::default(),
+            watch: Default::default(),
+            properties: &props,
+        }
+    }
+
+    pub fn build_relation(mut self) {
+        self.ids.iter().for_each(|(id_string, entity)| {
+            self.cmd.entity(*entity).insert(UiId(id_string.clone()));
+        });
+
+        self.targets
+            .iter()
+            .for_each(|(entity, target_id)| match self.ids.get(target_id) {
+                Some(tar) => {
+                    self.cmd.entity(*entity).insert(UiTarget(*tar));
+                }
+                None => warn!("target `{target_id}` not found for entity {entity}"),
+            });
+
+        self.watch
+            .iter()
+            .for_each(|(target_str, obs_list)| match self.ids.get(target_str) {
+                Some(to_observe) => {
+                    self.cmd
+                        .entity(*to_observe)
+                        .insert(InteractionObverser(obs_list.clone()));
+                }
+                None => warn!("undefined watch target `{target_str}`"),
+            });
+
+        self.cmd
+            .entity(self.scope)
+            .insert((std::mem::take(&mut self.subscriber), FullyBuild));
+    }
+
+    pub fn build_tree(&mut self, root: &XNode) {
+        // not building the root
+        self.build_node(self.scope, root);
+    }
+
+    fn build_node(&mut self, entity: Entity, node: &XNode) {
+        let styles = HtmlStyle::from(node.styles.clone());
+
+        // ----------------------
+        // timers
+        self.cmd
+            .entity(entity)
+            .insert(PressedTimer::new(Duration::from_secs_f32(
+                styles.computed.delay.max(0.01),
+            )))
+            .insert(HoverTimer::new(Duration::from_secs_f32(
+                styles.computed.delay.max(0.01),
+            )));
+
+        if entity != self.scope {
+            self.cmd.entity(entity).insert(TemplateScope(self.scope));
+        }
+
+        match &node.node_type {
+            // --------------------------------
+            // div node
+            NodeType::Node => {
+                self.cmd.entity(entity).insert((Node::default(), styles));
+            }
+            // --------------------------------
+            // spawn image
+            NodeType::Image => {
+                self.cmd.entity(entity).insert((
+                    UiImage {
+                        image: node
+                            .src
+                            .as_ref()
+                            .map(|path| self.server.load(path))
+                            .unwrap_or_default(),
+                        image_mode: styles
+                            .computed
+                            .image_scale_mode
+                            .as_ref()
+                            .cloned()
+                            .unwrap_or_default(),
+                        ..default()
+                    },
+                    styles,
+                ));
+            }
+            // --------------------------------
+            // spawn image
+            NodeType::Text => {
+                let content = node
+                    .content
+                    .as_ref()
+                    .map(|str| compile_content(str, &self.properties))
+                    .unwrap_or_default();
+
+                self.cmd.entity(entity).insert((Text(content), styles));
+            }
+            // --------------------------------
+            // spawn button
+            NodeType::Button => {
+                self.cmd.entity(entity).insert((Button, styles));
+            }
+            // --------------------------------
+            // spawn include
+            NodeType::Include => {
+                // mark children
+                let template: Handle<HtmlTemplate> = node
+                    .src
+                    .as_ref()
+                    .map(|path| self.server.load(path))
+                    .unwrap_or_default();
+
+                let entity = self
+                    .cmd
+                    .entity(entity)
+                    .insert((Node::default(), HtmlNode(template)))
+                    .id();
+
+                if node.children.len() > 0 {
+                    let slot_holder = self.cmd.spawn(Node::default()).id();
+                    for child_node in node.children.iter() {
+                        let child_entity = self.cmd.spawn_empty().id();
+                        self.build_node(child_entity, child_node);
+                        self.cmd.entity(slot_holder).add_child(child_entity);
+                    }
+                    self.cmd
+                        .entity(entity)
+                        .insert(UnslotedChildren(slot_holder));
+                }
+                return;
+            }
+            NodeType::Custom(custom) => {
+                // mark children
+                self.comps.try_spawn(custom, entity, &mut self.cmd);
+                if node.children.len() > 0 {
+                    let slot_holder = self.cmd.spawn(Node::default()).id();
+                    for child_node in node.children.iter() {
+                        let child_entity = self.cmd.spawn_empty().id();
+                        self.build_node(child_entity, child_node);
+                        self.cmd.entity(slot_holder).add_child(child_entity);
+                    }
+                    self.cmd
+                        .entity(entity)
+                        .insert(UnslotedChildren(slot_holder));
+                }
+                return;
+            }
+            // --------------------------------
+            // spawn slot
+            NodeType::Slot => {
+                self.cmd
+                    .entity(entity)
+                    .insert((Node::default(), SlotPlaceholder { owner: self.scope }));
+            }
+            // --------------------------------
+            // don't render
+            NodeType::Template | NodeType::Property => {
+                return;
+            }
+        };
+
+        //register prop listner
+        if node.uncompiled.len() > 0 {
+            self.cmd.entity(entity).insert(TemplateExpresions(
+                node.uncompiled.iter().cloned().collect(),
+            ));
+            self.subscriber.push(entity);
+        }
+
+        //tags
+        if node.tags.len() > 0 {
+            self.cmd.entity(entity).insert(Tags(
+                node.tags
+                    .iter()
+                    .cloned()
+                    .map(|(key, value)| Tag { key, value })
+                    .collect(),
+            ));
+        }
+
+        // ----------------------
+        // connections
+
+        if let Some(id) = &node.id {
+            self.ids.insert(id.clone(), entity);
+        }
+        if let Some(target) = &node.target {
+            self.targets.insert(entity, target.clone());
+        }
+
+        if let Some(watch) = &node.watch {
+            match self.watch.get_mut(watch) {
+                Some(list) => {
+                    list.push(entity);
+                }
+                None => {
+                    self.watch.insert(watch.clone(), vec![entity]);
+                }
+            };
+        }
+        node.event_listener.iter().for_each(|listener| {
+            listener.clone().self_insert(self.cmd.entity(entity));
+        });
+
+        // prop state passing
+
+        for child in node.children.iter() {
+            let child_entity = self.cmd.spawn_empty().id();
+            self.build_node(child_entity, child);
+            self.cmd.entity(entity).add_child(child_entity);
+        }
+    }
 }
 
 /// big recursive boy
@@ -339,7 +590,7 @@ fn build_node(
     custom_comps: &ComponentBindings,
     id_table: &mut IdLookUpTable,
     state: &mut TemplateProperties,
-    state_subscriber: &mut StateSubscriber,
+    state_subscriber: &mut TemplatePropertySubscriber,
 ) {
     // first node is the state holder
     if depth > 0 {
@@ -402,7 +653,7 @@ fn build_node(
         NodeType::Template => todo!(),
         NodeType::Node => {
             cmd.entity(entity)
-                .insert((Name::new("Div"), NodeBundle::default(), style_attributes));
+                .insert((Name::new("Div"), Node::default(), style_attributes));
         }
         NodeType::Image => {
             //compile if is passed down

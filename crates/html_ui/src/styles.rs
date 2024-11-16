@@ -76,7 +76,7 @@ fn continues_interaction_checking(
                         ptimer.forward(time.delta());
                         htimer.forward(time.delta());
                     } else {
-                        warn!("non interacting node obsering `{sub}`")
+                        // warn!("non interacting node obsering `{sub}`")
                     }
                 });
             }
@@ -89,7 +89,7 @@ fn continues_interaction_checking(
                         ptimer.backward(time.delta());
                         htimer.forward(time.delta());
                     } else {
-                        warn!("non interacting node obsering `{sub}`")
+                        // warn!("non interacting node obsering `{sub}`")
                     }
                 });
             }
@@ -102,7 +102,7 @@ fn continues_interaction_checking(
                         ptimer.backward(time.delta());
                         htimer.backward(time.delta());
                     } else {
-                        warn!("non interacting node obsering `{sub}`")
+                        // warn!("non interacting node obsering `{sub}`")
                     }
                 });
             }
