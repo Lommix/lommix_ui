@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::{
     compile::{compile_content, CompileContextEvent},
     data::{AttrTokens, HtmlTemplate, NodeType, XNode},
@@ -12,6 +10,7 @@ use nom::{
     character::complete::multispace0,
     sequence::{delimited, preceded, tuple},
 };
+use std::time::Duration;
 
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
@@ -21,11 +20,20 @@ impl Plugin for BuildPlugin {
         app.register_type::<TemplateExpresions>();
         app.register_type::<TemplateProperties>();
         app.register_type::<TemplateScope>();
+        app.register_type::<OnUiExit>();
+        app.register_type::<OnUiEnter>();
+        app.register_type::<OnUiPress>();
+        app.register_type::<OnUiSpawn>();
+        app.register_type::<UiTarget>();
+        app.register_type::<UiId>();
+        app.register_type::<SlotPlaceholder>();
+        app.register_type::<UnslotedChildren>();
+        app.register_type::<HtmlNode>();
     }
 }
 
-/// Holds the reference to the template root enttiy,
-/// which owns the template state
+/// Holds the reference to the template root entity,
+/// which owns the template properties
 #[derive(Component, Clone, Deref, DerefMut, Copy, Reflect)]
 #[reflect]
 pub struct TemplateScope(Entity);
@@ -62,18 +70,26 @@ pub struct SlotPlaceholder {
     owner: Entity,
 }
 
+/// ref to unresolved nodes that
+/// need to move to the `<slot/>`
+/// when the template is loaded.
 #[derive(Component, Reflect)]
 #[reflect]
 pub struct UnslotedChildren(Entity);
 
+/// entities subscribed to the owner interaction
+/// component
 #[derive(Component, DerefMut, Deref)]
 pub struct InteractionObverser(Vec<Entity>);
 
-// map to vtable one day
+/// unresolved expresssion that can be compiled
+/// to a solid attribute
 #[derive(Component, Reflect, Deref, DerefMut)]
 #[reflect]
 pub struct TemplateExpresions(Vec<AttrTokens>);
 
+/// Any attribute prefixed with `tag:my_tag="my_value"`
+/// will be availble here.
 #[derive(Component, Deref, DerefMut)]
 pub struct Tags(HashMap<String, String>);
 
@@ -82,47 +98,49 @@ pub struct Tags(HashMap<String, String>);
 #[derive(Component, Deref, DerefMut)]
 pub struct RawContent(String);
 
-#[derive(Component)]
-pub struct Tag {
-    pub key: String,
-    pub value: String,
-}
-
 /// the entities owned uid hashed as u64
-#[derive(Component, Default, Hash, Deref, DerefMut)]
+#[derive(Component, Default, Hash, Deref, DerefMut, Reflect)]
+#[reflect]
 pub struct UiId(String);
 
 /// the entity behind `id` in `target="id"`
-#[derive(Component, DerefMut, Deref)]
+#[derive(Component, DerefMut, Deref, Reflect)]
+#[reflect]
 pub struct UiTarget(pub Entity);
 
 /// watch interaction of another entity
-#[derive(Component, DerefMut, Deref)]
+#[derive(Component, DerefMut, Deref, Reflect)]
+#[reflect]
 pub struct UiWatch(pub Entity);
 
 #[derive(Component, Default)]
 pub struct FullyBuild;
 
-/// Eventlistener interaction transitions to Hover
-#[derive(Component, Deref, DerefMut)]
+/// Eventlistener interaction transition to Hover
+#[derive(Component, Deref, DerefMut, Reflect)]
+#[reflect]
 pub struct OnUiPress(pub Vec<String>);
 
 /// Eventlistener on spawning node
-#[derive(Component, DerefMut, Deref)]
+#[derive(Component, DerefMut, Deref, Reflect)]
+#[reflect]
 pub struct OnUiSpawn(pub Vec<String>);
 
-/// Eventlistener for interaction transitions to Hover
-#[derive(Component, DerefMut, Deref)]
+/// Eventlistener for interaction transition to Hover
+#[derive(Component, DerefMut, Deref, Reflect)]
+#[reflect]
 pub struct OnUiEnter(pub Vec<String>);
 
-/// Eventlistener for interaction transitions to None
-#[derive(Component, Deref, DerefMut)]
+/// Eventlistener for interaction transition to None
+#[derive(Component, Deref, DerefMut, Reflect)]
+#[reflect]
 pub struct OnUiExit(pub Vec<String>);
 
-/// # Html Ui Node
+/// Html Ui Node
 /// pass it a handle, it will spawn an UI.
-#[derive(Component, Default, Deref, DerefMut)]
+#[derive(Component, Default, Deref, DerefMut, Reflect)]
 #[require(Node, TemplateProperties)]
+#[reflect]
 pub struct HtmlNode(pub Handle<HtmlTemplate>);
 
 fn hotreload(

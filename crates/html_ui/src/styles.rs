@@ -11,12 +11,14 @@ impl Plugin for TransitionPlugin {
         app.add_systems(Update, (continues_interaction_checking, update_node_style));
         app.register_type::<PressedTimer>();
         app.register_type::<HoverTimer>();
+        app.register_type::<InteractionTimer>();
         app.register_type::<ComputedStyle>();
         app.register_type::<HtmlStyle>();
-        app.register_type::<InteractionTimer>();
     }
 }
 
+/// interpolation timer for
+/// transitions
 #[derive(Component, Default, Reflect)]
 #[reflect]
 pub struct InteractionTimer {
@@ -24,6 +26,8 @@ pub struct InteractionTimer {
     max: Duration,
 }
 
+/// add this component to enable
+/// all active styles
 #[derive(Component)]
 pub struct UiActive;
 
@@ -76,7 +80,7 @@ fn continues_interaction_checking(
                         ptimer.forward(time.delta());
                         htimer.forward(time.delta());
                     } else {
-                        // warn!("non interacting node obsering `{sub}`")
+                        warn!("non interacting node obsering `{sub}`")
                     }
                 });
             }
@@ -89,7 +93,7 @@ fn continues_interaction_checking(
                         ptimer.backward(time.delta());
                         htimer.forward(time.delta());
                     } else {
-                        // warn!("non interacting node obsering `{sub}`")
+                        warn!("non interacting node obsering `{sub}`")
                     }
                 });
             }
@@ -102,7 +106,7 @@ fn continues_interaction_checking(
                         ptimer.backward(time.delta());
                         htimer.backward(time.delta());
                     } else {
-                        // warn!("non interacting node obsering `{sub}`")
+                        warn!("non interacting node obsering `{sub}`")
                     }
                 });
             }
@@ -152,7 +156,7 @@ impl<'w, 's> UiStyleQuery<'w, 's> {
         });
     }
 
-    pub fn apply_interpolated<'a>(
+    pub fn apply_interpolated(
         &mut self,
         entity: Entity,
         ratio: f32,
@@ -259,10 +263,6 @@ impl<'w, 's> UiStyleQuery<'w, 's> {
                 });
             }
             _ => (),
-            // StyleAttr::Active(style_attr) => todo!(),
-            // StyleAttr::Hover(style_attr) => todo!(),
-            // StyleAttr::Pressed(style_attr) => todo!(),
-            // StyleAttr::Delay(_) => todo!(),
         }
 
         Ok(())
@@ -362,8 +362,8 @@ impl Default for ComputedStyle {
     }
 }
 
-// ----------------
-
+/// this components holds all relevant style
+/// attributes.
 #[derive(Component, Default, Debug, Reflect)]
 #[reflect]
 pub struct HtmlStyle {

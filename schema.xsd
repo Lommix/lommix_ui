@@ -156,7 +156,7 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
-		<xs:attribute name="onexit">
+		<xs:attribute name="on_exit">
 
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
@@ -166,7 +166,7 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
-		<xs:attribute name="onenter">
+		<xs:attribute name="on_enter">
 
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
@@ -176,8 +176,7 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
-		<xs:attribute name="onpress">
-
+		<xs:attribute name="on_press">
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
 				<xs:appinfo>
@@ -186,8 +185,7 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
-		<xs:attribute name="onspawn">
-
+		<xs:attribute name="on_spawn">
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
 				<xs:appinfo>
@@ -197,7 +195,6 @@
 			</xs:annotation>
 		</xs:attribute>
 		<xs:attribute name="position">
-
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
 				<xs:appinfo>
@@ -206,7 +203,6 @@
 				</xs:appinfo>
 			</xs:annotation>
 		</xs:attribute>
-
 		<xs:attribute name="overflow">
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
@@ -217,7 +213,6 @@
 			</xs:annotation>
 		</xs:attribute>
 		<xs:attribute name="direction">
-
 			<xs:annotation>
 				<xs:documentation></xs:documentation>
 				<xs:appinfo>
