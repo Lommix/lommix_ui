@@ -10,8 +10,7 @@
 		  padding="40px">
 
 		<!-- this is a user defined node `panel` that maps to include a another template -->
-		<panel primary="#AAF"
-			   title="{title}">
+		<panel primary="#AAF">
 			<img align_self="center"
 				 height="200px"
 				 src="bevy_bird_dark.png"/>

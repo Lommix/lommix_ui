@@ -43,17 +43,23 @@ impl<'a> VerboseHtmlError<'a> {
                     let line_num = get_line_num(&source, input);
                     write!(
                         &mut out,
-                        "\n{}:[line:{}] of kind {:?}",
+                        "\n{}[{}] of kind {:?}",
                         "[HTML ERROR]".red(),
-                        line_num,
+                        line_num.green(),
                         error_kind.red()
                     );
                 }
                 HtmlError::Ctx(input, ctx) => {
                     let (before, after, line_num) = get_line_parts_and_num(&source, input);
 
-                    write!(&mut out, "\n{} `{}`", "[HTML ERROR]".red(), ctx.red());
-                    write!(&mut out, "\n[at `{}`][line:{}]:", file, line_num);
+                    write!(
+                        &mut out,
+                        "\n{}[{}] `{}`",
+                        "[HTML ERROR]".red(),
+                        line_num.green(),
+                        ctx.red()
+                    );
+                    write!(&mut out, "\n[in `{}` at line {}]:", file, line_num.green());
                     write!(
                         &mut out,
                         "\n{}{}{}\n",
@@ -70,8 +76,27 @@ impl<'a> VerboseHtmlError<'a> {
             "\n{}\n",
             "------------------------------------".green()
         );
-
         out
+    }
+}
+
+impl<'a> nom::error::ParseError<&'a [u8]> for VerboseHtmlError<'a> {
+    fn from_error_kind(input: &'a [u8], kind: nom::error::ErrorKind) -> Self {
+        Self {
+            trace: vec![HtmlError::Tag(input, kind)],
+        }
+    }
+
+    fn append(input: &'a [u8], kind: nom::error::ErrorKind, mut other: Self) -> Self {
+        other.trace.push(HtmlError::Tag(input, kind));
+        other
+    }
+}
+
+impl<'a> nom::error::ContextError<&'a [u8]> for VerboseHtmlError<'a> {
+    fn add_context(input: &'a [u8], ctx: &'static str, mut other: Self) -> Self {
+        other.trace.push(HtmlError::Ctx(input, ctx));
+        other
     }
 }
 
@@ -111,24 +136,4 @@ fn get_line_parts_and_num<'a>(source: &'a [u8], slice: &'a [u8]) -> (&'a [u8], &
         + 1;
 
     (first, second, line_number)
-}
-
-impl<'a> nom::error::ParseError<&'a [u8]> for VerboseHtmlError<'a> {
-    fn from_error_kind(input: &'a [u8], kind: nom::error::ErrorKind) -> Self {
-        Self {
-            trace: vec![HtmlError::Tag(input, kind)],
-        }
-    }
-
-    fn append(input: &'a [u8], kind: nom::error::ErrorKind, mut other: Self) -> Self {
-        other.trace.push(HtmlError::Tag(input, kind));
-        other
-    }
-}
-
-impl<'a> nom::error::ContextError<&'a [u8]> for VerboseHtmlError<'a> {
-    fn add_context(input: &'a [u8], ctx: &'static str, mut other: Self) -> Self {
-        other.trace.push(HtmlError::Ctx(input, ctx));
-        other
-    }
 }

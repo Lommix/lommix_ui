@@ -113,7 +113,9 @@ fn compile_context(
                           // crate::data::Attribute::Watch(_) => todo!(),
                           // crate::data::Attribute::Tag(_, _) => todo!(),
                     },
-                    None => todo!(),
+                    None => {
+                        error!("{:#?}", expr);
+                    }
                 }
             }
             _ = context.get_mut(entity).map(|mut context| {

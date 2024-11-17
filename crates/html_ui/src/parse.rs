@@ -126,20 +126,30 @@ where
         .map(|bytes| String::from_utf8_lossy(bytes).to_string());
 
     for attr in xml.attributes.iter() {
-        let (_input, compiled_attr) = attribute_from_parts(attr.prefix, attr.key, attr.value)?;
+        let (_input, compiled_attr) = match xnode.node_type {
+            NodeType::Include | NodeType::Custom(_) => {
+                match attribute_from_parts::<E>(attr.prefix, attr.key, attr.value) {
+                    Ok(attr) => attr,
+                    Err(_) => as_prop(attr.key, attr.value)?,
+                }
+            }
+            _ => attribute_from_parts(attr.prefix, attr.key, attr.value)?,
+        };
+
         match compiled_attr {
             Attribute::Style(style_attr) => xnode.styles.push(style_attr),
             Attribute::PropertyDefinition(key, val) => {
-                match xnode.node_type {
-                    NodeType::Include | NodeType::Custom(_) | NodeType::Property => {
-                        xnode.defs.insert(key, val);
-                    }
-                    _ => {
-                        // prop defs are not allowed, unless include or custom
-                        let err = E::from_error_kind(attr.key, ErrorKind::Verify);
-                        return Err(nom::Err::Error(E::add_context(attr.key, "Is not a valid attribute, custom values (properties) are only allowed on includes/custom nodes. Did you misspell a style?", err)));
-                    }
-                }
+                xnode.defs.insert(key, val);
+                // match xnode.node_type {
+                //     NodeType::Include | NodeType::Custom(_) | NodeType::Property => {
+                //         ;
+                //     }
+                //     _ => {
+                //         // prop defs are not allowed, unless include or custom
+                //         let err = E::from_error_kind(attr.key, ErrorKind::Verify);
+                //         return Err(nom::Err::Error(E::add_context(attr.key, "Is not a valid attribute, custom values (properties) are only allowed on includes/custom nodes. Did you misspell a style?", err)));
+                //     }
+                // }
             }
             Attribute::Name(s) => xnode.name = Some(s),
             Attribute::Uncompiled(attr_tokens) => xnode.uncompiled.push(attr_tokens),
@@ -287,7 +297,7 @@ where
     ))(input)
 }
 
-fn parse_prop_var<'a>(
+fn parse_uncompiled<'a>(
     prefix: Option<&'a [u8]>,
     key: &'a [u8],
     value: &'a [u8],
@@ -305,6 +315,15 @@ fn parse_prop_var<'a>(
     }
 }
 
+fn as_prop<'a, E>(key: &'a [u8], value: &'a [u8]) -> IResult<&'a [u8], Attribute, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    let (_, key_str) = as_string(key)?;
+    let (_, value_str) = as_string(value)?;
+    Ok((key, Attribute::PropertyDefinition(key_str, value_str)))
+}
+
 pub(crate) fn attribute_from_parts<'a, E>(
     prefix: Option<&'a [u8]>,
     key: &'a [u8],
@@ -313,53 +332,54 @@ pub(crate) fn attribute_from_parts<'a, E>(
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    if let Some(attr) = parse_prop_var(prefix, key, value) {
+    if let Some(attr) = parse_uncompiled(prefix, key, value) {
         return Ok((b"", attr));
     }
 
-    match prefix {
-        Some(b"tag") => {
-            let (_, prop_ident) = as_string(key)?;
-            let (_, prop_value) = as_string(value)?;
-            return Ok((b"", Attribute::Tag(prop_ident, prop_value)));
-        }
-        Some(b"prop") => {
-            let (_, prop_ident) = as_string(key)?;
-            let (_, prop_value) = as_string(value)?;
-            return Ok((b"", Attribute::PropertyDefinition(prop_ident, prop_value)));
-        }
-        _ => (),
-    };
+    if let Some(b"tag") = prefix {
+        let (_, prop_ident) = as_string(key)?;
+        let (_, prop_value) = as_string(value)?;
+        return Ok((b"", Attribute::Tag(prop_ident, prop_value)));
+    }
 
-    let attribute = match key {
-        b"watch" => Attribute::Watch(as_string(value).map(|(_, hash)| hash)?),
-        b"id" => Attribute::Id(as_string(value).map(|(_, hash)| hash)?),
-        b"target" => Attribute::Target(as_string(value).map(|(_, hash)| hash)?),
-        b"src" => Attribute::Path(as_string(value).map(|(_, string)| string)?),
-        b"on_exit" => Attribute::Action(Action::OnExit(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        b"on_enter" => Attribute::Action(Action::OnEnter(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        b"on_press" => Attribute::Action(Action::OnPress(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        b"on_spawn" => Attribute::Action(Action::OnSpawn(
-            as_string_list(value).map(|(_, string)| string)?,
-        )),
-        any => match parse_style::<E>(prefix, any, value) {
-            Ok((_, style)) => Attribute::Style(style),
-            Err(_) => {
-                let (_, value) = as_string(value)?;
-                let (_, key) = as_string(any)?;
-                // @todo: this is bad an prevents miss spelling
-                Attribute::PropertyDefinition(key, value)
-            }
-        },
-    };
-
-    Ok((b"", attribute))
+    match key {
+        b"watch" => {
+            let (_, val) = as_string(value)?;
+            Ok((key, Attribute::Watch(val)))
+        }
+        b"id" => {
+            let (_, val) = as_string(value)?;
+            Ok((key, Attribute::Id(val)))
+        }
+        b"target" => {
+            let (_, val) = as_string(value)?;
+            Ok((key, Attribute::Target(val)))
+        }
+        b"src" => {
+            let (_, val) = as_string(value)?;
+            Ok((key, Attribute::Path(val)))
+        }
+        b"on_enter" => {
+            let (_, list) = as_string_list(value)?;
+            Ok((key, Attribute::Action(Action::OnEnter(list))))
+        }
+        b"on_exit" => {
+            let (_, list) = as_string_list(value)?;
+            Ok((key, Attribute::Action(Action::OnExit(list))))
+        }
+        b"on_press" => {
+            let (_, list) = as_string_list(value)?;
+            Ok((key, Attribute::Action(Action::OnPress(list))))
+        }
+        b"on_spawn" => {
+            let (_, list) = as_string_list(value)?;
+            Ok((key, Attribute::Action(Action::OnSpawn(list))))
+        }
+        _ => {
+            let (_, style) = parse_style(prefix, key, value)?;
+            Ok((key, Attribute::Style(style)))
+        }
+    }
 }
 
 #[rustfmt::skip]
@@ -432,7 +452,7 @@ where
                 ident,
                 ErrorKind::NoneOf,
             );
-            return Err(nom::Err::Error(E::add_context(ident, "not a valid style or attribute", err)));
+            return Err(nom::Err::Error(E::add_context(ident, "Not a valid style", err)));
         }
     };
 
@@ -600,55 +620,67 @@ fn parse_justify_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyConten
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("center"), |_| JustifyContent::Center),
-        map(tag("start"), |_| JustifyContent::Start),
-        map(tag("flex_end"), |_| JustifyContent::FlexEnd),
-        map(tag("stretch"), |_| JustifyContent::Stretch),
-        map(tag("end"), |_| JustifyContent::End),
-        map(tag("space_evenly"), |_| JustifyContent::SpaceEvenly),
-        map(tag("space_around"), |_| JustifyContent::SpaceAround),
-        map(tag("space_between"), |_| JustifyContent::SpaceBetween),
-        map(tag("flex_start"), |_| JustifyContent::FlexStart),
-    ))(input)
+    context(
+        "justifiy_content has no valid value. Try `center` `start` `flex_start` `stretch` `end` `space_evenly` `space_around` `space_between` `flex_start`",
+        alt((
+            map(tag("center"), |_| JustifyContent::Center),
+            map(tag("start"), |_| JustifyContent::Start),
+            map(tag("flex_end"), |_| JustifyContent::FlexEnd),
+            map(tag("stretch"), |_| JustifyContent::Stretch),
+            map(tag("end"), |_| JustifyContent::End),
+            map(tag("space_evenly"), |_| JustifyContent::SpaceEvenly),
+            map(tag("space_around"), |_| JustifyContent::SpaceAround),
+            map(tag("space_between"), |_| JustifyContent::SpaceBetween),
+            map(tag("flex_start"), |_| JustifyContent::FlexStart),
+        )),
+    )(input)
 }
 
 fn parse_justify_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifySelf, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("auto"), |_| JustifySelf::Auto),
-        map(tag("center"), |_| JustifySelf::Center),
-        map(tag("start"), |_| JustifySelf::Start),
-        map(tag("stretch"), |_| JustifySelf::Stretch),
-        map(tag("end"), |_| JustifySelf::End),
-        map(tag("baseline"), |_| JustifySelf::Baseline),
-    ))(input)
+    context(
+        "justifiy_self has no valid value. Try `auto` `center` `start` `stretch` `end` `baseline`",
+        alt((
+            map(tag("auto"), |_| JustifySelf::Auto),
+            map(tag("center"), |_| JustifySelf::Center),
+            map(tag("start"), |_| JustifySelf::Start),
+            map(tag("stretch"), |_| JustifySelf::Stretch),
+            map(tag("end"), |_| JustifySelf::End),
+            map(tag("baseline"), |_| JustifySelf::Baseline),
+        )),
+    )(input)
 }
 
 fn parse_flex_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexDirection, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("row"), |_| FlexDirection::Row),
-        map(tag("column"), |_| FlexDirection::Column),
-        map(tag("column_reverse"), |_| FlexDirection::ColumnReverse),
-        map(tag("row_reverse"), |_| FlexDirection::RowReverse),
-        map(tag("default"), |_| FlexDirection::DEFAULT),
-    ))(input)
+    context(
+        "flex_direction has no valid value. Try `auto` `center` `start` `stretch` `end` `baseline`",
+        alt((
+            map(tag("row"), |_| FlexDirection::Row),
+            map(tag("column"), |_| FlexDirection::Column),
+            map(tag("column_reverse"), |_| FlexDirection::ColumnReverse),
+            map(tag("row_reverse"), |_| FlexDirection::RowReverse),
+            map(tag("default"), |_| FlexDirection::DEFAULT),
+        )),
+    )(input)
 }
 
 fn parse_flex_wrap<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexWrap, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("wrap"), |_| FlexWrap::Wrap),
-        map(tag("no_wrap"), |_| FlexWrap::NoWrap),
-        map(tag("wrap_reverse"), |_| FlexWrap::WrapReverse),
-    ))(input)
+    context(
+        "flex_wrap has no valid value. Try `wrap` `no_wrap` `wrap_reverse`",
+        alt((
+            map(tag("wrap"), |_| FlexWrap::Wrap),
+            map(tag("no_wrap"), |_| FlexWrap::NoWrap),
+            map(tag("wrap_reverse"), |_| FlexWrap::WrapReverse),
+        )),
+    )(input)
 }
 
 fn as_string<'a, E>(input: &'a [u8]) -> IResult<&[u8], String, E>
@@ -696,7 +728,10 @@ fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMod
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((parse_image_tile, parse_image_slice))(input)
+    context(
+        "image_scale has no valid value. Try `10px tiled(1) tiled(1) 1` for nine slice or `true true 1` for tiled mode",
+        alt((parse_image_tile, parse_image_slice)),
+    )(input)
 }
 
 // 10px tiled tiled 1
@@ -746,7 +781,10 @@ fn parse_bool<'a, E>(input: &'a [u8]) -> IResult<&[u8], bool, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((map(tag("true"), |_| true), map(tag("false"), |_| false)))(input)
+    context(
+        "Not a valid bool, try `true` `false`",
+        alt((map(tag("true"), |_| true), map(tag("false"), |_| false))),
+    )(input)
 }
 
 // stretch
@@ -784,7 +822,7 @@ where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     context(
-        "is not a valid `UiRect`",
+        "is not a valid `UiRect`, try  all:`10px` axis:`10px 10px` full: `10px 10px 10px 10px`",
         alt((
             // 10px 10px 10px 10px
             complete(map(
@@ -858,8 +896,6 @@ where
         preceded(multispace0, take_until(")")),
         preceded(multispace0, tag(")")),
     ))(input)?;
-
-
 
     let (_, track) : (&[u8], RepeatedGridTrack) = alt((
             map(tag("auto"), |_| RepeatedGridTrack::auto::<RepeatedGridTrack>(repeat)),

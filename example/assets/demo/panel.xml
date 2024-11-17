@@ -34,7 +34,7 @@
 			<node watch="header"
 				  border_color="#FFF"
 				  hover:border_color="#008"
-				  border="4px"
+				  border="0 4px 4px 4px"
 				  background="{primary}">
 				<node flex_direction="column"
 					  row_gap="20px"
