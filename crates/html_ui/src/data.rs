@@ -202,7 +202,7 @@ pub enum StyleAttr {
     // -----
     // animations
     Delay(f32),
-    Easing(interpolation::EaseFunction),
+    Easing(EaseFunction),
     // -----
     // image
     // scale mode

@@ -14,7 +14,7 @@ pub mod prelude {
     pub use crate::auto::{AutoLoadState, HtmlAutoLoadPlugin};
     pub use crate::bindings::{ComponentBindings, FunctionBindings, HtmlComponents, HtmlFunctions};
     pub use crate::build::{
-        HtmlNode, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, Tag, Tags, TemplateProperties,
+        HtmlNode, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, Tags, TemplateProperties,
         TemplateScope, UiId, UiTarget, UiWatch,
     };
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};

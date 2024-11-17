@@ -11,7 +11,7 @@
 				hover:background="#555"
 				hover:padding="5px"
 				delay="0.1"
-				ease="sine"
+				ease="sine_out"
 				id="btn"
 				background="#0000"
 				border="2px"

@@ -1,5 +1,6 @@
 use crate::data::{Action, AttrTokens, Attribute, HtmlTemplate, StyleAttr, XNode};
 use crate::prelude::NodeType;
+use bevy::prelude::EaseFunction;
 use bevy::sprite::{BorderRect, SliceScaleMode, TextureSlicer};
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, GridAutoFlow,
@@ -450,46 +451,41 @@ where
     nom::number::complete::float(input)
 }
 
-fn parse_easing<'a, E>(input: &'a [u8]) -> IResult<&[u8], interpolation::EaseFunction, E>
+fn parse_easing<'a, E>(input: &'a [u8]) -> IResult<&[u8], EaseFunction, E>
 where
     E: nom::error::ParseError<&'a [u8]>,
 {
     match input {
-        b"cubic" => Ok((input, interpolation::EaseFunction::CubicInOut)),
-        b"bounce" => Ok((input, interpolation::EaseFunction::BounceOut)),
-        b"sine" => Ok((input, interpolation::EaseFunction::SineInOut)),
-        b"quad" => Ok((input, interpolation::EaseFunction::QuadraticInOut)),
-
-        b"quadratic_in" => Ok((input, interpolation::EaseFunction::QuadraticIn)),
-        b"quadratic_out" => Ok((input, interpolation::EaseFunction::QuadraticOut)),
-        b"quadratic_in_out" => Ok((input, interpolation::EaseFunction::QuadraticInOut)),
-        b"cubic_in" => Ok((input, interpolation::EaseFunction::CubicIn)),
-        b"cubic_out" => Ok((input, interpolation::EaseFunction::CubicOut)),
-        b"cubic_in_out" => Ok((input, interpolation::EaseFunction::CubicInOut)),
-        b"quartic_in" => Ok((input, interpolation::EaseFunction::QuarticIn)),
-        b"quartic_out" => Ok((input, interpolation::EaseFunction::QuarticOut)),
-        b"quartic_in_out" => Ok((input, interpolation::EaseFunction::QuarticInOut)),
-        b"quintic_in" => Ok((input, interpolation::EaseFunction::QuinticIn)),
-        b"quintic_out" => Ok((input, interpolation::EaseFunction::QuinticOut)),
-        b"quintic_in_out" => Ok((input, interpolation::EaseFunction::QuinticInOut)),
-        b"sine_in" => Ok((input, interpolation::EaseFunction::SineIn)),
-        b"sine_out" => Ok((input, interpolation::EaseFunction::SineOut)),
-        b"sine_in_out" => Ok((input, interpolation::EaseFunction::SineInOut)),
-        b"circular_in" => Ok((input, interpolation::EaseFunction::CircularIn)),
-        b"circular_out" => Ok((input, interpolation::EaseFunction::CircularOut)),
-        b"circular_in_out" => Ok((input, interpolation::EaseFunction::CircularInOut)),
-        b"exponential_in" => Ok((input, interpolation::EaseFunction::ExponentialIn)),
-        b"exponential_out" => Ok((input, interpolation::EaseFunction::ExponentialOut)),
-        b"exponential_in_out" => Ok((input, interpolation::EaseFunction::ExponentialInOut)),
-        b"elastic_in" => Ok((input, interpolation::EaseFunction::ElasticIn)),
-        b"elastic_out" => Ok((input, interpolation::EaseFunction::ElasticOut)),
-        b"elastic_in_out" => Ok((input, interpolation::EaseFunction::ElasticInOut)),
-        b"back_in" => Ok((input, interpolation::EaseFunction::BackIn)),
-        b"back_out" => Ok((input, interpolation::EaseFunction::BackOut)),
-        b"back_in_out" => Ok((input, interpolation::EaseFunction::BackInOut)),
-        b"bounce_in" => Ok((input, interpolation::EaseFunction::BounceIn)),
-        b"bounce_out" => Ok((input, interpolation::EaseFunction::BounceOut)),
-        b"bounce_in_out" => Ok((input, interpolation::EaseFunction::BounceInOut)),
+        b"quadratic_in" => Ok((input, EaseFunction::QuadraticIn)),
+        b"quadratic_out" => Ok((input, EaseFunction::QuadraticOut)),
+        b"quadratic_in_out" => Ok((input, EaseFunction::QuadraticInOut)),
+        b"cubic_in" => Ok((input, EaseFunction::CubicIn)),
+        b"cubic_out" => Ok((input, EaseFunction::CubicOut)),
+        b"cubic_in_out" => Ok((input, EaseFunction::CubicInOut)),
+        b"quartic_in" => Ok((input, EaseFunction::QuarticIn)),
+        b"quartic_out" => Ok((input, EaseFunction::QuarticOut)),
+        b"quartic_in_out" => Ok((input, EaseFunction::QuarticInOut)),
+        b"quintic_in" => Ok((input, EaseFunction::QuinticIn)),
+        b"quintic_out" => Ok((input, EaseFunction::QuinticOut)),
+        b"quintic_in_out" => Ok((input, EaseFunction::QuinticInOut)),
+        b"sine_in" => Ok((input, EaseFunction::SineIn)),
+        b"sine_out" => Ok((input, EaseFunction::SineOut)),
+        b"sine_in_out" => Ok((input, EaseFunction::SineInOut)),
+        b"circular_in" => Ok((input, EaseFunction::CircularIn)),
+        b"circular_out" => Ok((input, EaseFunction::CircularOut)),
+        b"circular_in_out" => Ok((input, EaseFunction::CircularInOut)),
+        b"exponential_in" => Ok((input, EaseFunction::ExponentialIn)),
+        b"exponential_out" => Ok((input, EaseFunction::ExponentialOut)),
+        b"exponential_in_out" => Ok((input, EaseFunction::ExponentialInOut)),
+        b"elastic_in" => Ok((input, EaseFunction::ElasticIn)),
+        b"elastic_out" => Ok((input, EaseFunction::ElasticOut)),
+        b"elastic_in_out" => Ok((input, EaseFunction::ElasticInOut)),
+        b"back_in" => Ok((input, EaseFunction::BackIn)),
+        b"back_out" => Ok((input, EaseFunction::BackOut)),
+        b"back_in_out" => Ok((input, EaseFunction::BackInOut)),
+        b"bounce_in" => Ok((input, EaseFunction::BounceIn)),
+        b"bounce_out" => Ok((input, EaseFunction::BounceOut)),
+        b"bounce_in_out" => Ok((input, EaseFunction::BounceInOut)),
         _ => Err(nom::Err::Error(nom::error::make_error(
             input,
             nom::error::ErrorKind::Tag,

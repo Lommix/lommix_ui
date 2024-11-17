@@ -283,6 +283,13 @@ fn update_node_style(
             .map(|t| t.fraction())
             .unwrap_or_default();
 
+        let hover_ratio = html_style
+            .computed
+            .easing
+            .map(|ease| easing_curve(0., 1., ease).sample(hover_ratio))
+            .flatten()
+            .unwrap_or(hover_ratio);
+
         for hover_style in html_style.hover.iter() {
             ui_style
                 .apply_interpolated(entity, hover_ratio, &html_style.computed, hover_style)
@@ -293,6 +300,13 @@ fn update_node_style(
             .get(entity)
             .map(|t| t.fraction())
             .unwrap_or_default();
+
+        let press_ratio = html_style
+            .computed
+            .easing
+            .map(|ease| easing_curve(0., 1., ease).sample(press_ratio))
+            .flatten()
+            .unwrap_or(press_ratio);
 
         for press_style in html_style.pressed.iter() {
             ui_style
@@ -341,8 +355,7 @@ pub struct ComputedStyle {
     pub font_size: f32,
     pub font_color: Color,
     pub delay: f32,
-    #[reflect(ignore)]
-    pub easing: Option<interpolation::EaseFunction>,
+    pub easing: Option<EaseFunction>,
 }
 
 impl Default for ComputedStyle {
@@ -357,7 +370,7 @@ impl Default for ComputedStyle {
             font_size: 12.,
             font_color: Color::WHITE,
             delay: 0.,
-            easing: Some(interpolation::EaseFunction::CubicInOut),
+            easing: Some(EaseFunction::Linear),
         }
     }
 }
