@@ -23,7 +23,7 @@ impl AssetLoader for HtmlAssetLoader {
         &self,
         reader: &mut dyn Reader,
         _settings: &Self::Settings,
-        _load_context: &mut bevy::asset::LoadContext<'_>,
+        load_context: &mut bevy::asset::LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader
@@ -31,12 +31,15 @@ impl AssetLoader for HtmlAssetLoader {
             .await
             .map_err(|err| ParseError::FailedToRead(err.to_string()))?;
 
-        match parse_template::<nom::error::VerboseError<&[u8]>>(&bytes) {
+        let file_path = load_context.path().to_str().unwrap_or_default();
+        match parse_template::<crate::error::VerboseHtmlError>(&bytes) {
             Ok((_, template)) => Ok(template),
-            Err(err) => {
-                let msg = crate::parse::convert_verbose_error(&bytes, err);
-                Err(ParseError::Nom(msg))
-            }
+            Err(err) => match err {
+                nom::Err::Incomplete(_) => Err(ParseError::Incomplete),
+                nom::Err::Error(err) | nom::Err::Failure(err) => {
+                    Err(ParseError::Nom(err.format(&bytes, file_path)))
+                }
+            },
         }
     }
 

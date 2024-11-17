@@ -39,7 +39,7 @@
 						hover:padding="10px 55px"
 						border="2px"
 						border_color="#FFF"
-						delay="0.4"
+						delay="200ms"
 						ease="bounce_out"
 						border_radius="4px"
 						padding="10px"
