@@ -4,8 +4,8 @@ use bevy::prelude::EaseFunction;
 use bevy::sprite::{BorderRect, SliceScaleMode, TextureSlicer};
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, GridAutoFlow,
-    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, NodeImageMode, Overflow,
-    OverflowAxis, PositionType, RepeatedGridTrack,
+    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, NodeImageMode, Outline,
+    Overflow, OverflowAxis, PositionType, RepeatedGridTrack,
 };
 use bevy::utils::HashMap;
 use bevy::{
@@ -23,12 +23,6 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult, Parser,
 };
-
-struct XmlAttr<'a> {
-    prefix: Option<&'a [u8]>,
-    key: &'a [u8],
-    value: &'a [u8],
-}
 
 impl std::fmt::Debug for XmlAttr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -180,6 +174,12 @@ struct Xml<'a> {
     children: Vec<Xml<'a>>,
 }
 
+struct XmlAttr<'a> {
+    prefix: Option<&'a [u8]>,
+    key: &'a [u8],
+    value: &'a [u8],
+}
+
 impl std::fmt::Debug for Xml<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -237,9 +237,11 @@ where
 
     let (input, (end_prefix, end_name)) = parse_xml_end(input)?;
     if start_name != end_name || prefix != end_prefix {
-        return Err(nom::Err::Failure(nom::error::make_error(
-            end_name,
-            nom::error::ErrorKind::TagClosure,
+        let err = E::from_error_kind(input, ErrorKind::Tag);
+        return Err(nom::Err::Failure(E::add_context(
+            input,
+            "unclosed tag",
+            err,
         )));
     }
     Ok((
@@ -315,7 +317,7 @@ fn parse_uncompiled<'a>(
     }
 }
 
-fn as_prop<'a, E>(key: &'a [u8], value: &'a [u8]) -> IResult<&'a [u8], Attribute, E>
+pub(crate) fn as_prop<'a, E>(key: &'a [u8], value: &'a [u8]) -> IResult<&'a [u8], Attribute, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -445,6 +447,7 @@ where
         b"margin" => map(parse_ui_rect, StyleAttr::Margin)(value)?,
         b"border" => map(parse_ui_rect, StyleAttr::Border)(value)?,
         b"border_radius" => map(parse_ui_rect, StyleAttr::BorderRadius)(value)?,
+        b"outline" => map(parse_outline, StyleAttr::Outline)(value)?,
         b"background" => map(parse_color, StyleAttr::Background)(value)?,
         b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
         _ => {
@@ -473,7 +476,7 @@ where
 
 fn parse_easing<'a, E>(input: &'a [u8]) -> IResult<&[u8], EaseFunction, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     match input {
         b"quadratic_in" => Ok((input, EaseFunction::QuadraticIn)),
@@ -506,40 +509,54 @@ where
         b"bounce_in" => Ok((input, EaseFunction::BounceIn)),
         b"bounce_out" => Ok((input, EaseFunction::BounceOut)),
         b"bounce_in_out" => Ok((input, EaseFunction::BounceInOut)),
-        _ => Err(nom::Err::Error(nom::error::make_error(
-            input,
-            nom::error::ErrorKind::Tag,
-        ))),
+        _ => {
+            let err = E::from_error_kind(input, ErrorKind::NoneOf);
+            Err(nom::Err::Failure(E::add_context(
+                input,
+                "Is not a valid easing function",
+                err,
+            )))
+        }
     }
 }
 
 fn parse_position_type<'a, E>(input: &'a [u8]) -> IResult<&[u8], PositionType, E>
 where
-    E: nom::error::ParseError<&'a [u8]>,
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("absolute"), |_| PositionType::Absolute),
-        map(tag("relative"), |_| PositionType::Relative),
-    ))(input)
+    context(
+        "Is not a valid `PositionType`, try `absolute` `relative`",
+        alt((
+            map(tag("absolute"), |_| PositionType::Absolute),
+            map(tag("relative"), |_| PositionType::Relative),
+        )),
+    )(input)
 }
 
 fn parse_display<'a, E>(input: &'a [u8]) -> IResult<&[u8], Display, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("none"), |_| Display::None),
-        map(tag("flex"), |_| Display::Flex),
-        map(tag("block"), |_| Display::Block),
-        map(tag("grid"), |_| Display::Grid),
-    ))(input)
+    context(
+        "Is not a valid `Display`, try `none` `flex` `block` `grid`",
+        alt((
+            map(tag("none"), |_| Display::None),
+            map(tag("flex"), |_| Display::Flex),
+            map(tag("block"), |_| Display::Block),
+            map(tag("grid"), |_| Display::Grid),
+        )),
+    )(input)
 }
 
 fn parse_overflow<'a, E>(input: &'a [u8]) -> IResult<&[u8], Overflow, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    let (input, (x, _, y)) = tuple((parse_overflow_axis, multispace0, parse_overflow_axis))(input)?;
+    let (input, (x, _, y)) = context(
+        "Is not a valid `Overflow`, try `X-Value Y-Value`, use `visible` `hidden` `clip`",
+        tuple((parse_overflow_axis, multispace0, parse_overflow_axis)),
+    )(input)?;
+
     Ok((input, Overflow { x, y }))
 }
 
@@ -558,22 +575,27 @@ fn parse_align_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignItems, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("default"), |_| AlignItems::Default),
-        map(tag("center"), |_| AlignItems::Center),
-        map(tag("start"), |_| AlignItems::Start),
-        map(tag("flex_end"), |_| AlignItems::FlexEnd),
-        map(tag("stretch"), |_| AlignItems::Stretch),
-        map(tag("end"), |_| AlignItems::End),
-        map(tag("baseline"), |_| AlignItems::Baseline),
-        map(tag("flex_start"), |_| AlignItems::FlexStart),
-    ))(input)
+    context(
+        "Is not a valid `AlignItems`, try `default` `center` `start` `flex_end` `stretch` `end` `baseline` `flex_start`",
+        alt((
+            map(tag("default"), |_| AlignItems::Default),
+            map(tag("center"), |_| AlignItems::Center),
+            map(tag("start"), |_| AlignItems::Start),
+            map(tag("flex_end"), |_| AlignItems::FlexEnd),
+            map(tag("stretch"), |_| AlignItems::Stretch),
+            map(tag("end"), |_| AlignItems::End),
+            map(tag("baseline"), |_| AlignItems::Baseline),
+            map(tag("flex_start"), |_| AlignItems::FlexStart),
+        )),
+    )(input)
 }
 
 fn parse_align_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignContent, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
+    context(
+        "Is not a valid `AlignContent`, try `space_evenly` `space_around` `space_between` `center` `start` `flex_end` `stretch` `end` `flex_start`",
     alt((
         map(tag("center"), |_| AlignContent::Center),
         map(tag("start"), |_| AlignContent::Start),
@@ -584,36 +606,42 @@ where
         map(tag("space_around"), |_| AlignContent::SpaceAround),
         map(tag("space_between"), |_| AlignContent::SpaceBetween),
         map(tag("flex_start"), |_| AlignContent::FlexStart),
-    ))(input)
+    )))(input)
 }
 
 fn parse_align_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignSelf, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("auto"), |_| AlignSelf::Auto),
-        map(tag("center"), |_| AlignSelf::Center),
-        map(tag("start"), |_| AlignSelf::Start),
-        map(tag("flex_end"), |_| AlignSelf::FlexEnd),
-        map(tag("stretch"), |_| AlignSelf::Stretch),
-        map(tag("end"), |_| AlignSelf::End),
-        map(tag("flex_start"), |_| AlignSelf::FlexStart),
-    ))(input)
+    context(
+        "Is not a valid `AlignSelf`, try `auto` `start` `flex_end` `stretch` `end` `flex_start`",
+        alt((
+            map(tag("auto"), |_| AlignSelf::Auto),
+            map(tag("center"), |_| AlignSelf::Center),
+            map(tag("start"), |_| AlignSelf::Start),
+            map(tag("flex_end"), |_| AlignSelf::FlexEnd),
+            map(tag("stretch"), |_| AlignSelf::Stretch),
+            map(tag("end"), |_| AlignSelf::End),
+            map(tag("flex_start"), |_| AlignSelf::FlexStart),
+        )),
+    )(input)
 }
 
 fn parse_justify_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyItems, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(tag("default"), |_| JustifyItems::Default),
-        map(tag("center"), |_| JustifyItems::Center),
-        map(tag("start"), |_| JustifyItems::Start),
-        map(tag("stretch"), |_| JustifyItems::Stretch),
-        map(tag("end"), |_| JustifyItems::End),
-        map(tag("baseline"), |_| JustifyItems::Baseline),
-    ))(input)
+    context(
+        "Is not a valid `JustifyItems`, try `default` `center` `start` `end` `baseline`",
+        alt((
+            map(tag("default"), |_| JustifyItems::Default),
+            map(tag("center"), |_| JustifyItems::Center),
+            map(tag("start"), |_| JustifyItems::Start),
+            map(tag("stretch"), |_| JustifyItems::Stretch),
+            map(tag("end"), |_| JustifyItems::End),
+            map(tag("baseline"), |_| JustifyItems::Baseline),
+        )),
+    )(input)
 }
 
 fn parse_justify_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyContent, E>
@@ -787,6 +815,30 @@ where
     )(input)
 }
 
+// 10px 10px color
+fn parse_outline<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Outline, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    let (input, (width, offset, color)) = context(
+        "Is not a valid outline, try `(width) (offset) (color)`",
+        tuple((
+            preceded(multispace0, parse_val),
+            preceded(multispace0, parse_val),
+            preceded(multispace0, parse_color),
+        )),
+    )(input)?;
+
+    Ok((
+        input,
+        Outline {
+            width,
+            offset,
+            color,
+        },
+    ))
+}
+
 // stretch
 // tile(1)
 fn parse_slice_scale<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
@@ -860,22 +912,25 @@ fn parse_grid_track<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridTrack, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    let (input, track) = delimited(
-        multispace0,
-        alt((
-            map(tag("auto"), |_| GridTrack::auto()),
-            map(tag("min"), |_| GridTrack::min_content()),
-            map(tag("max"), |_| GridTrack::max_content()),
-            map(tuple((float, tag("px"))), |(val, _)| GridTrack::px(val)),
-            map(tuple((float, tag("%"))), |(val, _)| GridTrack::percent(val)),
-            map(tuple((float, tag("fr"))), |(val, _)| GridTrack::fr(val)),
-            map(tuple((float, tag("flex"))), |(val, _)| GridTrack::flex(val)),
-            map(tuple((float, tag("vh"))), |(val, _)| GridTrack::vh(val)),
-            map(tuple((float, tag("vw"))), |(val, _)| GridTrack::vw(val)),
-            map(tuple((float, tag("vmin"))), |(val, _)| GridTrack::vmin(val)),
-            map(tuple((float, tag("vmax"))), |(val, _)| GridTrack::vmax(val)),
-        )),
-        multispace0,
+    let (input, track) = context(
+        "Is not a valid `GriTrack`, try `(float/int) + px/%/fr/flex/vh/vw/vmin/vmax` or `auto`, `min`, `max`",
+        delimited(
+            multispace0,
+            alt((
+                map(tag("auto"), |_| GridTrack::auto()),
+                map(tag("min"), |_| GridTrack::min_content()),
+                map(tag("max"), |_| GridTrack::max_content()),
+                map(tuple((float, tag("px"))), |(val, _)| GridTrack::px(val)),
+                map(tuple((float, tag("%"))), |(val, _)| GridTrack::percent(val)),
+                map(tuple((float, tag("fr"))), |(val, _)| GridTrack::fr(val)),
+                map(tuple((float, tag("flex"))), |(val, _)| GridTrack::flex(val)),
+                map(tuple((float, tag("vh"))), |(val, _)| GridTrack::vh(val)),
+                map(tuple((float, tag("vw"))), |(val, _)| GridTrack::vw(val)),
+                map(tuple((float, tag("vmin"))), |(val, _)| GridTrack::vmin(val)),
+                map(tuple((float, tag("vmax"))), |(val, _)| GridTrack::vmax(val)),
+            )),
+            multispace0,
+        ),
     )(input)?;
 
     Ok((input, track))
@@ -883,33 +938,58 @@ where
 
 // (5, auto)
 // (2, 150px)
-#[rustfmt::skip]
-fn parse_grid_track_repeated<'a,E>(input: &'a [u8]) -> IResult<&[u8], RepeatedGridTrack,E>
+fn parse_grid_track_repeated<'a, E>(input: &'a [u8]) -> IResult<&[u8], RepeatedGridTrack, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
+    let (input, (_, repeat, _, value, _)) = context(
+        "`RepeatedGridTrack` syntax error, try `(repeats, size)`",
+        tuple((
+            preceded(multispace0, tag("(")),
+            preceded(
+                multispace0,
+                map(parse_number, |n| u16::try_from(n).unwrap_or_default()),
+            ),
+            preceded(multispace0, tag(",")),
+            preceded(multispace0, take_until(")")),
+            preceded(multispace0, tag(")")),
+        )),
+    )(input)?;
 
-    let (input, (_,repeat,_, value ,_)) = tuple((
-        preceded(multispace0, tag("(")),
-        preceded(multispace0, map(parse_number,|n| u16::try_from(n).unwrap_or_default())),
-        preceded(multispace0, tag(",")),
-        preceded(multispace0, take_until(")")),
-        preceded(multispace0, tag(")")),
-    ))(input)?;
-
-    let (_, track) : (&[u8], RepeatedGridTrack) = alt((
-            map(tag("auto"), |_| RepeatedGridTrack::auto::<RepeatedGridTrack>(repeat)),
+    let (_, track): (&[u8], RepeatedGridTrack) = context(
+        "Is not a valid `RepeatedGridTrack`, try `(float/int) + px/%/fr/flex/vh/vw/vmin/vmax` or `auto`, `min`, `max`",
+        alt((
+            map(tag("auto"), |_| {
+                RepeatedGridTrack::auto::<RepeatedGridTrack>(repeat)
+            }),
             map(tag("min"), |_| RepeatedGridTrack::min_content(repeat)),
             map(tag("max"), |_| RepeatedGridTrack::max_content(repeat)),
-            map(tuple((float, tag("px"))), |(val, _)| RepeatedGridTrack::px(repeat,val)),
-            map(tuple((float, tag("%"))), |(val, _)| RepeatedGridTrack::percent(repeat,val)),
-            map(tuple((float, tag("fr"))), |(val, _)| RepeatedGridTrack::fr(repeat,val)),
-            map(tuple((float, tag("flex"))), |(val, _)| RepeatedGridTrack::flex(repeat,val)),
-            map(tuple((float, tag("vh"))), |(val, _)| RepeatedGridTrack::vh(repeat,val)),
-            map(tuple((float, tag("vw"))), |(val, _)| RepeatedGridTrack::vw(repeat,val)),
-            map(tuple((float, tag("vmin"))), |(val, _)| RepeatedGridTrack::vmin(repeat,val)),
-            map(tuple((float, tag("vmax"))), |(val, _)| RepeatedGridTrack::vmax(repeat,val)),
-    ))(value)?;
+            map(tuple((float, tag("px"))), |(val, _)| {
+                RepeatedGridTrack::px(repeat, val)
+            }),
+            map(tuple((float, tag("%"))), |(val, _)| {
+                RepeatedGridTrack::percent(repeat, val)
+            }),
+            map(tuple((float, tag("fr"))), |(val, _)| {
+                RepeatedGridTrack::fr(repeat, val)
+            }),
+            map(tuple((float, tag("flex"))), |(val, _)| {
+                RepeatedGridTrack::flex(repeat, val)
+            }),
+            map(tuple((float, tag("vh"))), |(val, _)| {
+                RepeatedGridTrack::vh(repeat, val)
+            }),
+            map(tuple((float, tag("vw"))), |(val, _)| {
+                RepeatedGridTrack::vw(repeat, val)
+            }),
+            map(tuple((float, tag("vmin"))), |(val, _)| {
+                RepeatedGridTrack::vmin(repeat, val)
+            }),
+            map(tuple((float, tag("vmax"))), |(val, _)| {
+                RepeatedGridTrack::vmax(repeat, val)
+            }),
+        )),
+    )(value)?;
 
     Ok((input, track))
 }
@@ -918,15 +998,18 @@ fn parse_auto_flow<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridAutoFlow, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    delimited(
-        multispace0,
-        alt((
-            map(tag("row"), |_| GridAutoFlow::Row),
-            map(tag("column"), |_| GridAutoFlow::Column),
-            map(tag("row_dense"), |_| GridAutoFlow::RowDense),
-            map(tag("column_dense"), |_| GridAutoFlow::ColumnDense),
-        )),
-        multispace0,
+    context(
+        "Is not a valid `GridAutoFlow`, try `row` `column` `row_dense` `column_dense`",
+        delimited(
+            multispace0,
+            alt((
+                map(tag("row"), |_| GridAutoFlow::Row),
+                map(tag("column"), |_| GridAutoFlow::Column),
+                map(tag("row_dense"), |_| GridAutoFlow::RowDense),
+                map(tag("column_dense"), |_| GridAutoFlow::ColumnDense),
+            )),
+            multispace0,
+        ),
     )(input)
 }
 
@@ -1053,10 +1136,14 @@ where
             ),
             |(a, _, b)| GridPlacement::end_span(a, b),
         )(input),
-        _ => Err(nom::Err::Error(nom::error::make_error(
-            input,
-            nom::error::ErrorKind::LengthValue,
-        ))),
+        _ => {
+            let err = E::from_error_kind(ident, ErrorKind::NoneOf);
+            Err(nom::Err::Failure(E::add_context(
+                input,
+                "Not a valid `GridPlacement` span",
+                err,
+            )))
+        }
     }
 }
 
@@ -1097,11 +1184,14 @@ fn parse_delay<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
-    alt((
-        map(terminated(parse_float, tag("s")), |v| v),
-        map(terminated(parse_float, tag("ms")), |v| v / 1000.),
-        map(parse_float, |v| v),
-    ))(input)
+    context(
+        "Is not a valid delay, try `(float/int)s/ms`",
+        alt((
+            map(terminated(parse_float, tag("s")), |v| v),
+            map(terminated(parse_float, tag("ms")), |v| v / 1000.),
+            map(parse_float, |v| v),
+        )),
+    )(input)
 }
 
 // rgb(1,1,1)

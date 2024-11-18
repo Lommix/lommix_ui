@@ -87,18 +87,15 @@ impl AttrTokens {
             prop_val.as_bytes(),
         ) {
             Ok(val) => val,
-            Err(_) => {
-                warn!(
-                    "failed to parse property key: `{}` val:`{}`",
-                    self.key, prop_val
-                );
-                return None;
-            }
+            Err(_) => (
+                "".as_bytes(),
+                Attribute::PropertyDefinition(self.ident.to_owned(), prop_val.to_owned()),
+            ),
         };
 
         // recursive compile, what could go wrong
-        if let Attribute::Uncompiled(prop) = attr {
-            return prop.compile(props);
+        if let Attribute::Uncompiled(attr) = attr {
+            return attr.compile(props);
         };
 
         Some(attr)
@@ -162,7 +159,7 @@ pub enum StyleAttr {
     Border(UiRect),
     BorderColor(Color),
     BorderRadius(UiRect),
-
+    Outline(Outline),
     // ------------
     // flex
     FlexDirection(FlexDirection),

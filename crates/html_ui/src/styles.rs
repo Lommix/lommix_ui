@@ -123,6 +123,7 @@ pub struct UiStyleQuery<'w, 's> {
     pub background: Query<'w, 's, &'static mut BackgroundColor>,
     pub border_radius: Query<'w, 's, &'static mut BorderRadius>,
     pub border_color: Query<'w, 's, &'static mut BorderColor>,
+    pub outline: Query<'w, 's, &'static mut Outline>,
 }
 
 impl<'w, 's> UiStyleQuery<'w, 's> {
@@ -200,6 +201,15 @@ impl<'w, 's> UiStyleQuery<'w, 's> {
             }
             StyleAttr::Padding(ui_rect) => {
                 style.padding = lerp_rect(&computed.node.padding, ui_rect, ratio)
+            }
+            StyleAttr::Outline(outline) => {
+                if let Some(regular) = &computed.outline.as_ref() {
+                    _ = self.outline.get_mut(entity).map(|mut line| {
+                        line.width = lerp_val(&regular.width, &outline.width, ratio);
+                        line.offset = lerp_val(&regular.offset, &outline.offset, ratio);
+                        line.color = lerp_color(&regular.color, &outline.color, ratio);
+                    });
+                }
             }
             StyleAttr::Border(ui_rect) => {
                 style.border = lerp_rect(&computed.node.border, ui_rect, ratio)
@@ -351,6 +361,7 @@ pub struct ComputedStyle {
     pub border_radius: UiRect,
     pub image_mode: Option<NodeImageMode>,
     pub background: Color,
+    pub outline: Option<Outline>,
     pub font: Handle<Font>,
     pub font_size: f32,
     pub font_color: Color,
@@ -366,6 +377,7 @@ impl Default for ComputedStyle {
             border_radius: UiRect::default(),
             background: Color::NONE,
             image_mode: None,
+            outline: None,
             font: Handle::default(),
             font_size: 12.,
             font_color: Color::WHITE,
@@ -492,6 +504,7 @@ impl HtmlStyle {
             StyleAttr::Delay(f) => self.computed.delay = f,
             StyleAttr::Easing(ease) => self.computed.easing = Some(ease),
             StyleAttr::ImageScaleMode(mode) => self.computed.image_mode = Some(mode),
+            StyleAttr::Outline(outline) => self.computed.outline = Some(outline),
             // StyleAttr::Font(font) => self.regular.font = server
             _ => (),
         };

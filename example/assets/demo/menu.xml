@@ -10,12 +10,13 @@
 		  padding="40px">
 
 		<!-- this is a user defined node `panel` that maps to include a another template -->
-		<panel primary="#AAF">
+		<panel primary="#AAF"
+			   title="{title}">
 			<img align_self="center"
 				 height="200px"
 				 src="bevy_bird_dark.png"/>
 
-			<panel title="Include Components">
+			<panel title="test">
 				<preview source="bevy_bird_dark.png"
 						 title="Golden sword"/>
 			</panel>
@@ -39,7 +40,7 @@
 						border="2px"
 						border_color="#FFF"
 						delay="200ms"
-						ease="bounce_out"
+						ease="cubic_in"
 						border_radius="4px"
 						padding="10px"
 						on_press="debug">
@@ -50,7 +51,8 @@
 				   primary="#401"
 				   title="Foo">
 				<node flex_direction="column">
-					<node justify_content="space_between"
+					<node
+						  justify_content="space_between"
 						  padding="0 4px"
 						  margin="0px 5px">
 						<text>Inventory</text>

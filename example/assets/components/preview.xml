@@ -2,7 +2,7 @@
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		  xsi:noNamespaceSchemaLocation="../../schema.xsd">
 
-	<property name="source"></property>
+	<property name="source">default</property>
 	<property name="title">Item title</property>
 	<property name="description">Description</property>
 	<property name="price">Price</property>

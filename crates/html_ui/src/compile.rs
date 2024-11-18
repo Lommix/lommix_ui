@@ -104,10 +104,10 @@ fn compile_context(
                         }
                         _ => {
                             error!("cannot compile to unimplementd attribute `{:?}`", compiled);
-                        } // crate::data::Attribute::Style(style_attr) => todo!(),
+                        } // crate::data::Attribute::Path(_) => todo!(),
+                          // crate::data::Attribute::Style(style_attr) => todo!(),
                           // crate::data::Attribute::Uncompiled(attr_tokens) => todo!(),
                           // crate::data::Attribute::Action(action) => todo!(),
-                          // crate::data::Attribute::Path(_) => todo!(),
                           // crate::data::Attribute::Target(_) => todo!(),
                           // crate::data::Attribute::Id(_) => todo!(),
                           // crate::data::Attribute::Watch(_) => todo!(),

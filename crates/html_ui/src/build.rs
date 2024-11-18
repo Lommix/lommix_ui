@@ -387,6 +387,12 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
             listener.clone().self_insert(self.cmd.entity(entity));
         });
 
+        // ----------------------
+        // dirty outline
+        if let Some(outline) = styles.computed.outline.as_ref() {
+            self.cmd.entity(entity).insert(outline.clone());
+        }
+
         match &node.node_type {
             // --------------------------------
             // div node
