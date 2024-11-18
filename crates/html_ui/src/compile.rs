@@ -53,7 +53,7 @@ fn compile_text(
     _ = template
         .content
         .get(**content_id)
-        .map(|raw| compile_content(raw, &props))
+        .map(|raw| compile_content(raw.trim(), &props))
         .map(|compiled| **text = compiled);
 }
 

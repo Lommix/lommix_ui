@@ -436,7 +436,7 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                     .template
                     .content
                     .get(node.content_id)
-                    .cloned()
+                    .map(|t| t.trim().to_string())
                     .unwrap_or_default();
 
                 if is_templated(&content) {
