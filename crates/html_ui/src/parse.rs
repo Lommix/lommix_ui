@@ -1,5 +1,6 @@
 use crate::data::{Action, AttrTokens, Attribute, HtmlTemplate, StyleAttr, XNode};
 use crate::prelude::NodeType;
+use crate::util::SlotMap;
 use bevy::prelude::EaseFunction;
 use bevy::sprite::{BorderRect, SliceScaleMode, TextureSlicer};
 use bevy::ui::{
@@ -51,6 +52,7 @@ where
     let mut name = None;
     let mut properties = HashMap::default();
     let mut root = vec![];
+    let mut content = SlotMap::<String>::default();
 
     for child in xml.children.drain(..) {
         match child.name {
@@ -74,7 +76,7 @@ where
                 };
             }
             _ => {
-                let (_, node) = from_raw_xml::<E>(child)?;
+                let (_, node) = from_raw_xml::<E>(child, &mut content)?;
                 root.push(node);
             }
         }
@@ -86,6 +88,7 @@ where
             name,
             properties,
             root,
+            content,
         },
     ))
 }
@@ -108,16 +111,22 @@ where
 }
 
 // try from
-fn from_raw_xml<'a, E>(mut xml: Xml<'a>) -> IResult<&[u8], XNode, E>
+fn from_raw_xml<'a, 'b, E>(
+    mut xml: Xml<'a>,
+    content_map: &'b mut SlotMap<String>,
+) -> IResult<&'a [u8], XNode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let mut xnode = XNode::default();
     let (_, node_type) = parse_node_type(xml.name)?;
     xnode.node_type = node_type;
-    xnode.content = xml
+
+    xnode.content_id = xml
         .value
-        .map(|bytes| String::from_utf8_lossy(bytes).to_string());
+        .map(|bytes| String::from_utf8_lossy(bytes).to_string())
+        .map(|raw| content_map.insert(raw))
+        .unwrap_or_default();
 
     for attr in xml.attributes.iter() {
         let (_input, compiled_attr) = match xnode.node_type {
@@ -134,16 +143,6 @@ where
             Attribute::Style(style_attr) => xnode.styles.push(style_attr),
             Attribute::PropertyDefinition(key, val) => {
                 xnode.defs.insert(key, val);
-                // match xnode.node_type {
-                //     NodeType::Include | NodeType::Custom(_) | NodeType::Property => {
-                //         ;
-                //     }
-                //     _ => {
-                //         // prop defs are not allowed, unless include or custom
-                //         let err = E::from_error_kind(attr.key, ErrorKind::Verify);
-                //         return Err(nom::Err::Error(E::add_context(attr.key, "Is not a valid attribute, custom values (properties) are only allowed on includes/custom nodes. Did you misspell a style?", err)));
-                //     }
-                // }
             }
             Attribute::Name(s) => xnode.name = Some(s),
             Attribute::Uncompiled(attr_tokens) => xnode.uncompiled.push(attr_tokens),
@@ -159,7 +158,7 @@ where
     }
 
     for child in xml.children.drain(..) {
-        let (_, node) = from_raw_xml(child)?;
+        let (_, node) = from_raw_xml(child, content_map)?;
         xnode.children.push(node);
     }
 

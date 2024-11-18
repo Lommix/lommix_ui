@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::util::{SlotId, SlotMap};
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -30,19 +31,9 @@ pub struct XNode {
     pub tags: HashMap<String, String>,
     pub defs: HashMap<String, String>,
     pub event_listener: Vec<Action>,
-    pub content: Option<String>,
+    pub content_id: SlotId,
     pub node_type: NodeType,
     pub children: Vec<XNode>,
-}
-
-impl XNode {
-    pub fn find_node(&self, hash: u64) -> &XNode {
-        Self::find(&self, hash)
-    }
-
-    fn find(curent: &XNode, hash: u64) -> &XNode {
-        todo!()
-    }
 }
 
 #[derive(Debug, Asset, TypePath)]
@@ -50,6 +41,7 @@ pub struct HtmlTemplate {
     pub name: Option<String>,
     pub properties: HashMap<String, String>,
     pub root: Vec<XNode>,
+    pub content: SlotMap<String>,
 }
 
 #[derive(Debug, Clone)]

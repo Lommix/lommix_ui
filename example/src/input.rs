@@ -17,7 +17,7 @@ pub fn main() {
 
 fn setup_scene(mut cmd: Commands, mut functions: HtmlFunctions, server: Res<AssetServer>) {
     cmd.spawn(Camera2d);
-    cmd.spawn(HtmlNode(server.load("textinput/menu.xml")));
+    cmd.spawn(HtmlNode(server.load("textinput/menu.html")));
     functions.register("submit", on_submit);
 }
 
@@ -70,7 +70,7 @@ pub struct TextInput(pub String);
 pub struct Focused;
 
 fn setup(mut components: HtmlComponents, server: Res<AssetServer>) {
-    let handle = server.load("textinput/textinput.xml");
+    let handle = server.load("textinput/textinput.html");
 
     components.register_with_spawn_fn("input", handle, |mut cmd| {
         cmd.insert((

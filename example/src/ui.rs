@@ -25,7 +25,7 @@ fn setup(
     mut html_comps: HtmlComponents,
 ) {
     cmd.spawn(Camera2d);
-    cmd.spawn(HtmlNode(server.load("demo/menu.xml")));
+    cmd.spawn(HtmlNode(server.load("demo/menu.html")));
 
     html_funcs.register("greet", greet);
     html_funcs.register("inventory", init_inventory);
@@ -33,7 +33,7 @@ fn setup(
     html_funcs.register("play_beep", play_beep);
 
     // register custom node by passing a template handle
-    html_comps.register("panel", server.load("demo/panel.xml"));
+    html_comps.register("panel", server.load("demo/panel.html"));
 
     // register a custom event system, identified by a string
     html_funcs.register("collapse", |In(entity), mut cmd: Commands| {
@@ -146,7 +146,7 @@ fn init_inventory(In(entity): In<Entity>, mut cmd: Commands, server: Res<AssetSe
     cmd.entity(entity).with_children(|cmd| {
         for i in 0..200 {
             cmd.spawn((
-                HtmlNode(server.load("demo/card.xml")),
+                HtmlNode(server.load("demo/card.html")),
                 TemplateProperties::default()
                     .with("title", &format!("item {i}"))
                     .with("bordercolor", if i % 2 == 0 { "#FFF" } else { "#F88" }),

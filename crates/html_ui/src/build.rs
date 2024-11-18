@@ -1,8 +1,9 @@
 use crate::{
-    compile::{compile_content, CompileContextEvent},
+    compile::{compile_content, CompileContentEvent, CompileContextEvent},
     data::{AttrTokens, HtmlTemplate, NodeType, XNode},
     prelude::ComponentBindings,
     styles::{HoverTimer, HtmlStyle, PressedTimer},
+    util::SlotId,
 };
 use bevy::{prelude::*, utils::HashMap};
 use nom::{
@@ -93,10 +94,9 @@ pub struct TemplateExpresions(Vec<AttrTokens>);
 #[derive(Component, Deref, DerefMut)]
 pub struct Tags(HashMap<String, String>);
 
-/// @todo:refactor, currently cloning each nodes
-/// text template as component
+/// holds ref to the raw uncompiled text content
 #[derive(Component, Deref, DerefMut)]
-pub struct RawContent(String);
+pub struct ContentId(SlotId);
 
 /// the entities owned uid hashed as u64
 #[derive(Component, Default, Hash, Deref, DerefMut, Reflect)]
@@ -244,8 +244,14 @@ fn spawn_ui(
                 _ = state.try_insert(key.to_owned(), val.clone());
             });
 
-            let mut builder =
-                TemplateBuilder::new(root_entity, cmd.reborrow(), &server, &custom_comps, &state);
+            let mut builder = TemplateBuilder::new(
+                root_entity,
+                cmd.reborrow(),
+                &server,
+                &custom_comps,
+                &state,
+                &template,
+            );
 
             if let Some(node) = template.root.first() {
                 builder.build_tree(node);
@@ -271,6 +277,7 @@ struct TemplateBuilder<'w, 's> {
     ids: HashMap<String, Entity>,
     targets: HashMap<Entity, String>,
     watch: HashMap<String, Vec<Entity>>,
+    template: &'w HtmlTemplate,
 }
 
 impl<'w, 's> TemplateBuilder<'w, 's> {
@@ -280,12 +287,14 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
         server: &'w AssetServer,
         comps: &'w ComponentBindings,
         props: &'s TemplateProperties,
+        template: &'w HtmlTemplate,
     ) -> Self {
         Self {
             cmd,
             scope,
             server,
             comps,
+            template,
             subscriber: Default::default(),
             ids: Default::default(),
             targets: Default::default(),
@@ -423,25 +432,19 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
             // --------------------------------
             // spawn image
             NodeType::Text => {
-                let content = node
+                let content = self
+                    .template
                     .content
-                    .as_ref()
-                    .map(|str| compile_content(str, &self.properties))
+                    .get(node.content_id)
+                    .cloned()
                     .unwrap_or_default();
 
-                self.cmd.entity(entity).insert((Text(content), styles));
-
-                if node
-                    .content
-                    .as_ref()
-                    .map(|s| is_templated(s.as_str()))
-                    .unwrap_or_default()
-                {
-                    self.cmd
-                        .entity(entity)
-                        .insert(RawContent(node.content.clone().unwrap_or_default()));
+                if is_templated(&content) {
+                    self.cmd.entity(entity).insert(ContentId(node.content_id));
                     self.subscriber.push(entity);
                 }
+
+                self.cmd.entity(entity).insert((Text(content), styles));
             }
             // --------------------------------
             // spawn button

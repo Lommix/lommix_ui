@@ -17,7 +17,7 @@ pub fn main() {
 fn setup_scene(mut cmd: Commands, server: Res<AssetServer>) {
     // --
     cmd.spawn(Camera2d::default());
-    cmd.spawn((HtmlNode(server.load("slider/menu.xml")), Slider(0.)));
+    cmd.spawn((HtmlNode(server.load("slider/menu.html")), Slider(0.)));
 }
 
 pub struct SliderPlugin;
@@ -33,7 +33,7 @@ fn setup_slider(
     mut html_functions: HtmlFunctions,
     server: Res<AssetServer>,
 ) {
-    let handle = server.load("slider/slider.xml");
+    let handle = server.load("slider/slider.html");
     components.register("slider", move |mut cmd| {
         cmd.insert((
             HtmlNode(handle.clone()),

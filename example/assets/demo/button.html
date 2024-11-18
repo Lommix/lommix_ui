@@ -1,0 +1,24 @@
+<template>
+    <property name="press"></property>
+    <property name="primary">#000</property>
+    <property name="secondary">#FFF</property>
+
+    <button
+        hover:background="#333"
+        pressed:background="#0aa"
+        background="{primary}"
+        height="80px"
+        width="100%"
+        on_press="{press}"
+        border="2px"
+        border_color="{secondary}"
+        hover:border_color="{primary}"
+        border_radius="5px"
+        justify_content="center"
+        align_items="center"
+        on_enter="play_beep"
+        tag:source="pop.ogg"
+    >
+        <slot />
+    </button>
+</template>

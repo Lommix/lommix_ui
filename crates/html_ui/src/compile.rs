@@ -1,8 +1,9 @@
 use crate::{
     build::{
-        RawContent, TemplateExpresions, TemplateProperties, TemplatePropertySubscriber,
+        ContentId, HtmlNode, TemplateExpresions, TemplateProperties, TemplatePropertySubscriber,
         TemplateScope,
     },
+    data::HtmlTemplate,
     styles::HtmlStyle,
 };
 use bevy::prelude::*;
@@ -17,9 +18,43 @@ impl Plugin for CompilePlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<CompileNodeEvent>();
         app.add_event::<CompileContextEvent>();
+        app.add_event::<CompileContentEvent>();
         app.add_observer(compile_node);
         app.add_observer(compile_context);
+        app.add_observer(compile_text);
     }
+}
+
+#[derive(Event)]
+pub struct CompileContentEvent;
+
+fn compile_text(
+    trigger: Trigger<CompileContentEvent>,
+    mut nodes: Query<(&ContentId, &TemplateScope, &mut Text)>,
+    root: Query<(&HtmlNode, &TemplateProperties)>,
+    templates: Res<Assets<HtmlTemplate>>,
+) {
+    let entity = trigger.entity();
+    let Ok((content_id, scope, mut text)) = nodes.get_mut(entity) else {
+        warn!("trying to compile content for {entity}, that does not have any");
+        return;
+    };
+
+    let Some((template, props)) = root
+        .get(**scope)
+        .ok()
+        .map(|(handle, props)| templates.get(&**handle).map(|d| (d, props)))
+        .flatten()
+    else {
+        warn!("{entity} has no scope!");
+        return;
+    };
+
+    _ = template
+        .content
+        .get(**content_id)
+        .map(|raw| compile_content(raw, &props))
+        .map(|compiled| **text = compiled);
 }
 
 #[derive(Event)]
@@ -28,7 +63,6 @@ fn compile_node(
     trigger: Trigger<CompileNodeEvent>,
     mut cmd: Commands,
     mut nodes: Query<(&mut HtmlStyle, &TemplateScope)>,
-    mut uncompiled_texts: Query<(&mut Text, &RawContent)>,
     mut images: Query<&mut UiImage>,
     expressions: Query<&TemplateExpresions>,
     contexts: Query<&TemplateProperties>,
@@ -75,10 +109,6 @@ fn compile_node(
                 }
             });
     }
-
-    if let Ok((mut text, raw)) = uncompiled_texts.get_mut(entity) {
-        **text = compile_content(raw, context);
-    }
 }
 
 #[derive(Event)]
@@ -87,6 +117,7 @@ pub struct CompileContextEvent;
 fn compile_context(
     trigger: Trigger<CompileContextEvent>,
     expressions: Query<(&TemplateExpresions, Option<&TemplateScope>)>,
+    text_nodes: Query<(), With<ContentId>>,
     subscriber: Query<&TemplatePropertySubscriber>,
     mut context: Query<&mut TemplateProperties>,
     mut cmd: Commands,
@@ -104,14 +135,7 @@ fn compile_context(
                         }
                         _ => {
                             error!("cannot compile to unimplementd attribute `{:?}`", compiled);
-                        } // crate::data::Attribute::Path(_) => todo!(),
-                          // crate::data::Attribute::Style(style_attr) => todo!(),
-                          // crate::data::Attribute::Uncompiled(attr_tokens) => todo!(),
-                          // crate::data::Attribute::Action(action) => todo!(),
-                          // crate::data::Attribute::Target(_) => todo!(),
-                          // crate::data::Attribute::Id(_) => todo!(),
-                          // crate::data::Attribute::Watch(_) => todo!(),
-                          // crate::data::Attribute::Tag(_, _) => todo!(),
+                        }
                     },
                     None => {
                         error!("{:#?}", expr);
@@ -132,6 +156,9 @@ fn compile_context(
                 cmd.trigger_targets(CompileContextEvent, *sub);
             } else {
                 cmd.trigger_targets(CompileNodeEvent, *sub);
+            }
+            if text_nodes.get(*sub).is_ok() {
+                cmd.trigger_targets(CompileContentEvent, *sub);
             }
         }
     }

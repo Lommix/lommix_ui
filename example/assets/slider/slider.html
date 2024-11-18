@@ -1,0 +1,37 @@
+<template>
+    <property name="width">200px</property>
+    <node
+        width="200px"
+        height="5px"
+        watch="slider_nob"
+        id="slider"
+        margin="0 20px"
+        pressed:background="#111"
+        background="#000"
+    >
+        <button
+            id="slider_nob"
+            target="slider"
+            height="30px"
+            width="30px"
+            position="absolute"
+            on_spawn="init_slider_btn"
+            left="0"
+            top="-14px"
+            background="#000"
+            pressed:border_color="#FFF"
+            pressed:height="34px"
+            pressed:width="34px"
+            pressed:top="-16px"
+            delay="0.2"
+            ease="cubic_out"
+            align_items="center"
+            justify_content="center"
+            border_color="#000"
+            border="2px"
+            border_radius="50px"
+        >
+            <text font_size="16">0.</text>
+        </button>
+    </node>
+</template>

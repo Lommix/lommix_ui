@@ -9,6 +9,7 @@ mod error;
 mod load;
 mod parse;
 mod styles;
+mod util;
 
 pub mod prelude {
     pub use crate::auto::{AutoLoadState, HtmlAutoLoadPlugin};
