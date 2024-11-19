@@ -7,9 +7,9 @@ pub fn main() {
             DefaultPlugins.set(ImagePlugin {
                 default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
             }),
-            HtmlUiPlugin::default(),
+            HuiPlugin,
+            SliderPlugin,
         ))
-        .add_plugins(SliderPlugin)
         .add_systems(Startup, setup_scene)
         .run();
 }
@@ -29,14 +29,13 @@ impl Plugin for SliderPlugin {
 }
 
 fn setup_slider(
-    mut components: ResMut<ComponentBindings>,
+    mut html_comps: HtmlComponents,
     mut html_functions: HtmlFunctions,
     server: Res<AssetServer>,
 ) {
     let handle = server.load("slider/slider.html");
-    components.register("slider", move |mut cmd| {
+    html_comps.register_with_spawn_fn("slider", handle, |mut cmd| {
         cmd.insert((
-            HtmlNode(handle.clone()),
             // add our state to the root, so way may easly have access in other templates logic by
             // just adding a `id` tag to the custom component.
             Slider(0.),
@@ -54,7 +53,6 @@ fn setup_slider(
     html_functions.register("hello", |In(_)| {
         info!("hello");
     });
-
 }
 
 #[derive(Component)]

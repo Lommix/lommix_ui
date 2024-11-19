@@ -1,61 +1,66 @@
-# Bevy Html Ui
+# Bevy_hui
 
-[WIP][MVP]
+Build `bevy_ui` design in pseudo Html. Keep your logic in bevy, while iterating fast on design
+with hot reloading. Create reusable templates in the style of Web Components.
 
-Bevy UI serialized to html. Create reusable templates with variable properties
-and simple one-shot systems to event bindings.
-
-Use attributes to describe style. Enjoy hot reloading, autocomplete, formatting and linting (schema.xsd).
-
-Because there is nothing worse than waiting on compilation.
+**starting with bevy 0.15!**
 
 https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 
-## Featuring
+## Features
 
-A keyword for every bevy related UI style. Take any Bevy naming, make it `snake_case`, you found your value.
+-   In build support for conditional styles and transitions. Hover animations by default!
+-   Any value can be a dynamic property and injected into a template at runtime. (recursive!)
+-   Simple but effective event system. Register any bevy system via function binding and use it
+    in your templates `on_press="start_game"`.
+-   No widgets, no themes. Just bevy UI serialized with all the tools necessary to build anything
+    in a reusable way.
 
--   A simple way to describe complex styles via attributes. `padding="20px 0 5% 1vw"`, `grid_template_columns="(3,auto)"`
--   Wire up your bevy systems with `onspawn`,`onenter`,`onexit`,`onpress` events.
--   Use `id`, `target` to connect elements and have access as components in bevy systems.
--   Conditional style transitions with `hover:`,`pressed:`,`active:`,`delay` & `ease`.
--   propagate style transitions with `watch`.
--   very thin dependencies.
+## Example
 
-## How To
-
-Add the plugin.
+Like most crates, don't forget to register the plugin!
 
 ```rust
-app.add_plugins(HtmlUiPlugin);
+app.add_plugins((
+    HuiPlugin,
+    // Optional auto loading. Any template this folder will register as custom component
+    // using the file name.
+    HuiAutoLoadPlugin::new(&["components"]),
+));
+
 ```
 
-Create components in html or xml, same syntax.
+## Getting Started
+
+[Bevy html syntax Cheatsheet](docs/syntax.md)
+
+Create your first component template with external properties!
 
 ```html
-<!-- /assets/my_button.xml-->
+<!-- /assets/my_button.html-->
 <template>
     <property name="action">greet</property>
     <property name="text">Press me</property>
     <property name="primary">#123</property>
     <property name="secondary">#503</property>
+
     <node padding="10px">
         <button
             id="button"
             padding="5px"
             background="{primary}"
             border_color="{primary}"
-            hover:background="{secondary}"
-            hover:border_color="{secondary}"
-            delay="0.2"
-            ease="cubic_out"
+            delay="0.2s"
+            ease="cubic_in"
             height="80px"
-            hover:height="100px"
             width="210px"
-            hover:width="230px"
             border="10px"
             border_radius="30px"
-            onpress="{action}"
+            hover:height="100px"
+            hover:background="{secondary}"
+            hover:border_color="{secondary}"
+            hover:width="230px"
+            on_press="{action}"
         >
             <text
                 watch="button"
@@ -70,15 +75,13 @@ Create components in html or xml, same syntax.
 </template>
 ```
 
-You can now use the `include` node to import your component:
+## Register your component and make a custom binding
 
-```
-<include src="my_button.xml" text="Start Game" action="start_game" />
-```
+To use your new component in any other templates, we have to register it first.
+You can either use the `HuiAutoLoadPlugin` feature (experimental), which
+is great for simple components or register the component yourself in a startup system.
 
-Or even better, register it as a custom component in a startup system to use
-it in any other template! You can also bind systems to strings, which then can
-be used inside the templates!
+This also allows for custom spawning functions. With is great if you need to add custom components as well!
 
 ```rust
 fn startup(
@@ -86,18 +89,29 @@ fn startup(
     mut html_comps: HtmlComponents,
     mut html_funcs: HtmlFunctions,
 ) {
-    html_comps.register("my_button", server.load("my_button.xml"));
+    // simple register
+    html_comps.register("my_button", server.load("my_button.html"));
+
+    // advanced register, with spawn functions
+    html_comps.register_with_spawn_fn("my_button", server.load("my_button.html"), |mut entity_commands| {
+        entity_commands.insert(MyCustomComponent);
+    })
+
+    // create a system binding that will change the game state.
+    // any (one-shot) system with `In<Entity>` is valid!
+    // the entity represents the node, the function is called on
     html_funcs.register("start_game", |In(entity): In<Entity>, mut state : ResMut<NextState<GameState>> |{
-        //any one shot system can be bound, as long as the input is an `Entity`
         state.set(GameState::Play);
     });
 
 ```
 
-And now you have a new node!
+## Putting it all together
+
+Time to be creative. Include your component in the next template.
 
 ```html
-<!-- menu.xml -->
+<!-- menu.html -->
 <template>
     <property name="title">My Game</property>
     ...
@@ -116,7 +130,9 @@ And now you have a new node!
 </template>
 ```
 
-How to load your UI root:
+## Spawning your Template
+
+required components make it super simple.
 
 ```rust
 fn setup(
@@ -124,15 +140,13 @@ fn setup(
     server: Res<AssetServer>,
 ) {
     cmd.spawn(Camera2dBundle::default());
-    cmd.spawn((
-        HtmlBundle {
-            html: HmtlNode(server.load("menu.xml")),
-            ..default()
-        },
-        TemplateState::new().with("title", "I'm injecting my values"))
-    });
+    cmd.spawn(HtmlNode(server.load("menu.html"));
 }
 ```
+
+## Hot reload and advanced examples
+
+Hot reload requires bevy `file_watcher` feature to be enabled.
 
 Checkout the examples for advanced interactions, play with the assets. Keep in mind these are
 very crude as proof of concept.
@@ -148,34 +162,23 @@ cargo run -p example --bin input
 cargo run -p example --bin slider
 ```
 
-## Syntax
+## Help wanted
 
-[checkout the full syntax here](docs/syntax.md)
+I do not plan to offer any widgets on the templating side, but I would like
+to have common components and system for a general reusable widget toolkit like
+sliders, drop downs, dragables and so on.
 
-## Autocomplete, Formatting & Linting
+Checkout the examples, if you come up with some really cool widgets, I would be happy
+to merge them into a new sub crate behind a feature flag!
 
-Not perfect, but getting there. Checkout the example on how to use the provided
-schema.xsd. Feel free to extend it to your needs.
+### More examples
 
-[schema.xsd](schema.xsd)
-
-## Goal
-
-The goal is to provide a very thin layer of UI syntax abstraction for seamless and fast iteration on your design,
-while keeping any kind of logic in bevy.
-
-## Why Xml/Html(-like)
-
-To make us of existing tooling like syntax highlights, auto format, basic linting and even autocomplete.
-
-## Trade offs
-
--   You loose control over all `Style` related Components for all nodes part of a template. Instead use `NodeStyle` which holds
-    the `regular` state and `hover`,`pressed` + `active` style attributes.
+I am not the greatest designer. I am actively looking for some really fancy and cool examples, using
+this crate to include in the example crate.
 
 ## Known limitations and Pitfalls
 
--   Do not recursive import. [mem stonks]
+-   Any manual changes to bevy's styling components will be overwritten
+-   Do not recursive import. [mem stonks, bug]
 -   One root node per component.
--   .xsd schema is broken/unfinished.
 -   docs are uncomplete and sometimes outdated.

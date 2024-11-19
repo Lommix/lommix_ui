@@ -5,8 +5,8 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            HtmlUiPlugin,
-            HtmlAutoLoadPlugin::new(&["components"]),
+            HuiPlugin,
+            HuiAutoLoadPlugin::new(&["components"]),
         ))
         .add_systems(OnEnter(AutoLoadState::Finished), setup)
         .add_systems(

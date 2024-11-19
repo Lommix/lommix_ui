@@ -12,7 +12,7 @@ mod styles;
 mod util;
 
 pub mod prelude {
-    pub use crate::auto::{AutoLoadState, HtmlAutoLoadPlugin};
+    pub use crate::auto::{AutoLoadState, HuiAutoLoadPlugin};
     pub use crate::bindings::{ComponentBindings, FunctionBindings, HtmlComponents, HtmlFunctions};
     pub use crate::build::{
         HtmlNode, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, Tags, TemplateProperties,
@@ -22,15 +22,11 @@ pub mod prelude {
     pub use crate::data::{Action, Attribute, HtmlTemplate, NodeType, StyleAttr};
     pub use crate::error::ParseError;
     pub use crate::styles::{HoverTimer, HtmlStyle, InteractionTimer, PressedTimer, UiActive};
-    pub use crate::HtmlUiPlugin;
+    pub use crate::HuiPlugin;
 }
 
-/// Xhui
-/// Xml/Html Ui for Bevy
-#[derive(Default)]
-pub struct HtmlUiPlugin;
-
-impl Plugin for HtmlUiPlugin {
+pub struct HuiPlugin;
+impl Plugin for HuiPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             load::LoaderPlugin,

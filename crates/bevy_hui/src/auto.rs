@@ -9,12 +9,12 @@ use bevy::{
 /// On startup, the folder has to load first and is not available
 /// you will have to check the `AutoLoadState`.
 #[derive(Resource, Clone)]
-pub struct HtmlAutoLoadPlugin {
+pub struct HuiAutoLoadPlugin {
     auto_load_dirs: Vec<&'static str>,
     folders: Vec<Handle<LoadedFolder>>,
 }
 
-impl HtmlAutoLoadPlugin {
+impl HuiAutoLoadPlugin {
     /// Paths start at your project root. Does not have to be part
     /// of bevy assets folder.
     pub fn new(dirs: &[&'static str]) -> Self {
@@ -32,7 +32,7 @@ pub enum AutoLoadState {
     Finished,
 }
 
-impl Plugin for HtmlAutoLoadPlugin {
+impl Plugin for HuiAutoLoadPlugin {
     fn build(&self, app: &mut App) {
         let server = app.world().resource::<AssetServer>();
         let mut cfg = self.clone();
@@ -53,7 +53,7 @@ impl Plugin for HtmlAutoLoadPlugin {
 }
 
 fn check_loading_state(
-    config: Res<HtmlAutoLoadPlugin>,
+    config: Res<HuiAutoLoadPlugin>,
     mut next: ResMut<NextState<AutoLoadState>>,
     server: Res<AssetServer>,
 ) {
@@ -66,7 +66,7 @@ fn check_loading_state(
 
 fn watch_autoload_dirs(
     mut events: EventReader<AssetEvent<LoadedFolder>>,
-    config: Res<HtmlAutoLoadPlugin>,
+    config: Res<HuiAutoLoadPlugin>,
     mut comps: HtmlComponents,
     folders: Res<Assets<LoadedFolder>>,
 ) {

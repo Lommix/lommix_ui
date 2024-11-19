@@ -130,7 +130,7 @@ where
 
     for attr in xml.attributes.iter() {
         let (_input, compiled_attr) = match xnode.node_type {
-            NodeType::Include | NodeType::Custom(_) => {
+            NodeType::Custom(_) => {
                 match attribute_from_parts::<E>(attr.prefix, attr.key, attr.value) {
                     Ok(attr) => attr,
                     Err(_) => as_prop(attr.key, attr.value)?,
@@ -286,7 +286,6 @@ where
     alt((
         map(tag("node"), |_| NodeType::Node),
         map(tag("img"), |_| NodeType::Image),
-        map(tag("include"), |_| NodeType::Include),
         map(tag("button"), |_| NodeType::Button),
         map(tag("text"), |_| NodeType::Text),
         map(tag("slot"), |_| NodeType::Slot),
@@ -1389,10 +1388,10 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::VerboseHtmlError;
     use nom::error::VerboseError;
     use test_case::test_case;
 
@@ -1425,13 +1424,12 @@ mod tests {
     #[test_case("span( 55  )", GridPlacement::span(55))]
     #[test_case("span(5)", GridPlacement::span(5))]
     fn test_grid_placement(input: &str, expected: GridPlacement) {
-        match parse_grid_placement::<VerboseError<_>>(&input.as_bytes()) {
+        match parse_grid_placement::<VerboseHtmlError>(&input.as_bytes()) {
             Ok((rem, grid)) => {
                 assert_eq!(expected, grid);
                 assert_eq!(rem.len(), 0);
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         };
@@ -1449,13 +1447,12 @@ mod tests {
     #[test_case("(1, auto)(5, 50fr)", vec![RepeatedGridTrack::auto(1), RepeatedGridTrack::fr(5,50.)])]
     #[test_case("(1, auto)", vec![RepeatedGridTrack::auto(1)])]
     fn test_repeat_tracks(input: &str, expected: Vec<RepeatedGridTrack>) {
-        match many0(parse_grid_track_repeated::<nom::error::VerboseError<_>>)(input.as_bytes()) {
+        match many0(parse_grid_track_repeated::<VerboseHtmlError>)(input.as_bytes()) {
             Ok((rem, grid)) => {
                 assert_eq!(expected, grid);
                 assert_eq!(rem.len(), 0);
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         }
@@ -1483,8 +1480,7 @@ mod tests {
             Ok((rem, _)) => {
                 assert_eq!(expected, std::str::from_utf8(rem).unwrap());
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         };
@@ -1501,8 +1497,7 @@ mod tests {
             Ok((_rem, attributes)) => {
                 dbg!(attributes);
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         };
@@ -1524,12 +1519,11 @@ mod tests {
     "#
     )]
     fn test_parse_xml_node(input: &str) {
-        match parse_xml_node::<VerboseError<_>>(&input.as_bytes()) {
+        match parse_xml_node::<VerboseHtmlError>(&input.as_bytes()) {
             Ok((_rem, node)) => {
                 dbg!(node);
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         };
@@ -1545,8 +1539,7 @@ mod tests {
             Ok((_, node)) => {
                 dbg!(node);
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         };
@@ -1561,8 +1554,7 @@ mod tests {
                 assert_eq!(rem, "".as_bytes());
                 dbg!(attrs);
             }
-            Err(err) => {
-                println!("{}", super::convert_verbose_error(input.as_bytes(), err));
+            Err(_err) => {
                 assert!(false, "");
             }
         }
@@ -1571,7 +1563,7 @@ mod tests {
     #[test_case(r#"10px stretch stretch 1"#)]
     fn test_parse_nine_slice(input: &str) {
         let (_, slice) = parse_image_slice::<nom::error::Error<_>>(input.as_bytes()).unwrap();
-        // dbg!(slice);
+        dbg!(slice);
         // let t = TextureSlicer{
         //     border: BorderRect::(Val::Px(10.)),
         //     center_scale_mode: todo!(),

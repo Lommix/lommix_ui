@@ -447,43 +447,6 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
             NodeType::Button => {
                 self.cmd.entity(entity).insert((Button, styles));
             }
-            // --------------------------------
-            // spawn include
-            NodeType::Include => {
-                // mark children
-                let template: Handle<HtmlTemplate> = node
-                    .src
-                    .as_ref()
-                    .map(|path| self.server.load(path))
-                    .unwrap_or_default();
-
-                let entity = self
-                    .cmd
-                    .entity(entity)
-                    .insert((
-                        Node::default(),
-                        HtmlNode(template),
-                        TemplateProperties(node.defs.clone()),
-                    ))
-                    .id();
-
-                if node.uncompiled.len() > 0 {
-                    self.subscriber.push(entity);
-                }
-
-                if node.children.len() > 0 {
-                    let slot_holder = self.cmd.spawn(Node::default()).id();
-                    for child_node in node.children.iter() {
-                        let child_entity = self.cmd.spawn_empty().id();
-                        self.build_node(child_entity, child_node);
-                        self.cmd.entity(slot_holder).add_child(child_entity);
-                    }
-                    self.cmd
-                        .entity(entity)
-                        .insert(UnslotedChildren(slot_holder));
-                }
-                return;
-            }
             NodeType::Custom(custom) => {
                 // mark children
                 self.comps.try_spawn(custom, entity, &mut self.cmd);

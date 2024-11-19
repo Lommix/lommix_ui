@@ -11,7 +11,6 @@ pub enum NodeType {
     Image,
     Text,
     Button,
-    Include,
     Slot,
     Template,
     Property,

@@ -10,8 +10,13 @@ use bevy_hui::prelude::*;
 
 pub fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, HtmlUiPlugin::default()))
-        .add_plugins(TextInputPlugin)
+        .add_plugins((
+            DefaultPlugins.set(ImagePlugin {
+                default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
+            }),
+            HuiPlugin,
+            TextInputPlugin,
+        ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, write_input)
         .run();
