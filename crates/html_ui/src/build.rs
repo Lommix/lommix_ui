@@ -78,12 +78,12 @@ pub struct SlotPlaceholder {
 #[reflect]
 pub struct UnslotedChildren(Entity);
 
-/// entities subscribed to the owner interaction
+/// entities subscribed to the owners interaction
 /// component
 #[derive(Component, DerefMut, Deref)]
 pub struct InteractionObverser(Vec<Entity>);
 
-/// unresolved expresssion that can be compiled
+/// unresolved expresssions that can be compiled
 /// to a solid attribute
 #[derive(Component, Reflect, Deref, DerefMut)]
 #[reflect]
@@ -471,6 +471,10 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                     ))
                     .id();
 
+                if node.uncompiled.len() > 0 {
+                    self.subscriber.push(entity);
+                }
+
                 if node.children.len() > 0 {
                     let slot_holder = self.cmd.spawn(Node::default()).id();
                     for child_node in node.children.iter() {
@@ -494,11 +498,20 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                         self.build_node(child_entity, child_node);
                         self.cmd.entity(slot_holder).add_child(child_entity);
                     }
-                    self.cmd.entity(entity).insert((
-                        UnslotedChildren(slot_holder),
-                        TemplateProperties(node.defs.clone()),
-                    ));
+
+                    self.cmd
+                        .entity(entity)
+                        .insert((UnslotedChildren(slot_holder),));
                 }
+
+                self.cmd
+                    .entity(entity)
+                    .insert(TemplateProperties(node.defs.clone()));
+
+                if node.uncompiled.len() > 0 {
+                    self.subscriber.push(entity);
+                }
+
                 return;
             }
             // --------------------------------

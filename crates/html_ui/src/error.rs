@@ -7,13 +7,13 @@ pub enum ParseError {
     #[error("failed to read bytes to end `{0}`")]
     FailedToRead(String),
 
-    #[error("provided content is not utf8")]
+    #[error("It's not utf8, what are you doing?")]
     Utf8Error,
 
     #[error("{0}")]
     Nom(String),
 
-    #[error("Failed with incomplete parse")]
+    #[error("Failed with incomplete data")]
     Incomplete,
 }
 
@@ -107,6 +107,7 @@ fn get_line_num(source: &[u8], slice: &[u8]) -> u32 {
     preceding_source.iter().filter(|&&c| c == b'\n').count() as u32 + 1
 }
 
+//dirty af
 fn get_line_parts_and_num<'a>(source: &'a [u8], slice: &'a [u8]) -> (&'a [u8], &'a [u8], u32) {
     let start = (slice.as_ptr() as usize) - (source.as_ptr() as usize);
     let start_index = start / std::mem::size_of::<u8>();

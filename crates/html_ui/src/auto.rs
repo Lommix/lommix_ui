@@ -96,7 +96,6 @@ fn watch_autoload_dirs(
                         continue;
                     };
 
-
                     comps.register(name.to_string(), template);
                     info!("registered HTML-component `{name}`");
                 }

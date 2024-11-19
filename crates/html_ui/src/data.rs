@@ -18,6 +18,7 @@ pub enum NodeType {
     Custom(String),
 }
 
+/// a single nodes data
 #[derive(Debug, Default)]
 pub struct XNode {
     pub uuid: u64,
@@ -36,6 +37,8 @@ pub struct XNode {
     pub children: Vec<XNode>,
 }
 
+/// holds a parsed template
+/// can be build as UI.
 #[derive(Debug, Asset, TypePath)]
 pub struct HtmlTemplate {
     pub name: Option<String>,
@@ -44,6 +47,8 @@ pub struct HtmlTemplate {
     pub content: SlotMap<String>,
 }
 
+/// any valid attribute that can be found
+/// on nodes.
 #[derive(Debug, Clone)]
 pub enum Attribute {
     Style(StyleAttr),
@@ -58,6 +63,7 @@ pub enum Attribute {
     Tag(String, String),
 }
 
+/// raw attribute
 #[derive(Debug, Reflect, PartialEq, Clone)]
 #[reflect]
 pub struct AttrTokens {
@@ -102,6 +108,7 @@ pub enum Action {
     OnExit(Vec<String>),
     OnSpawn(Vec<String>),
 }
+
 impl Action {
     pub fn self_insert(self, mut cmd: EntityCommands) {
         match self {
@@ -152,6 +159,7 @@ pub enum StyleAttr {
     BorderColor(Color),
     BorderRadius(UiRect),
     Outline(Outline),
+
     // ------------
     // flex
     FlexDirection(FlexDirection),
@@ -192,10 +200,8 @@ pub enum StyleAttr {
     // animations
     Delay(f32),
     Easing(EaseFunction),
+
     // -----
     // image
-    // scale mode
-    // atlas
     ImageScaleMode(NodeImageMode),
-    // ImageAtlas(TextureAtlas),
 }

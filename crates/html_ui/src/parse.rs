@@ -757,7 +757,12 @@ where
 {
     context(
         "image_scale has no valid value. Try `10px tiled(1) tiled(1) 1` for nine slice or `true true 1` for tiled mode",
-        alt((parse_image_tile, parse_image_slice)),
+        alt((
+            map(tag("auto"),|_| NodeImageMode::Auto),
+            map(tag("stretch"),|_| NodeImageMode::Stretch),
+            parse_image_tile,
+            parse_image_slice
+            )),
     )(input)
 }
 

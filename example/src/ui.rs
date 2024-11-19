@@ -25,7 +25,10 @@ fn setup(
     mut html_comps: HtmlComponents,
 ) {
     cmd.spawn(Camera2d);
-    cmd.spawn(HtmlNode(server.load("demo/menu.html")));
+    cmd.spawn((
+        HtmlNode(server.load("demo/menu.html")),
+        TemplateProperties::default().with("title", "Test-title"),
+    ));
 
     html_funcs.register("greet", greet);
     html_funcs.register("inventory", init_inventory);
