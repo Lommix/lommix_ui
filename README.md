@@ -30,9 +30,8 @@ app.add_plugins((
 
 ```
 
-## Getting Started
+## Getting Started ([Bevy html syntax Cheatsheet](docs/cheatsheet.md))
 
-[Bevy html syntax Cheatsheet](docs/syntax.md)
 
 Create your first component template with external properties!
 
@@ -169,7 +168,7 @@ to have common components and system for a general reusable widget toolkit like
 sliders, drop downs, dragables and so on.
 
 Checkout the examples, if you come up with some really cool widgets, I would be happy
-to merge them into a new sub crate behind a feature flag!
+to merge them into a
 
 ### More examples
 
