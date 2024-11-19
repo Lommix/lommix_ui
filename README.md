@@ -32,7 +32,6 @@ app.add_plugins((
 
 ## Getting Started ([Bevy html syntax Cheatsheet](docs/cheatsheet.md))
 
-
 Create your first component template with external properties!
 
 ```html
@@ -114,17 +113,29 @@ Time to be creative. Include your component in the next template.
 <template>
     <property name="title">My Game</property>
     ...
-    <img
+    <image
         display="grid"
         grid_template_columns="(2, auto)"
         src="ui_panel.png"
         image_scale_mode="10px tile(1) tile(1) 4"
-        >
-            <my_button text="Start Game" action="start_game" />
-            <my_button text="Settings" action="to_settings" />
-            <my_button text="Credits" action="to_credits" />
-            <my_button text="Exit" action="quit_game" />
-    </img>
+    >
+        <my_button
+            text="Start Game"
+            action="start_game"
+        />
+        <my_button
+            text="Settings"
+            action="to_settings"
+        />
+        <my_button
+            text="Credits"
+            action="to_credits"
+        />
+        <my_button
+            text="Exit"
+            action="quit_game"
+        />
+    </image>
     ...
 </template>
 ```
@@ -176,6 +187,9 @@ I am not the greatest designer. I am actively looking for some really fancy and 
 this crate to include in the example crate.
 
 ## Known limitations and Pitfalls
+
+**You currently cannot use propterties on the first node of a template. The first node holds
+the property state and links one above**
 
 -   Any manual changes to bevy's styling components will be overwritten
 -   Do not recursive import. [mem stonks, bug]

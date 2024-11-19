@@ -1,20 +1,25 @@
 <template>
-	<img image_mode="10px tile(1) tile(1) 4"
-		 src="ui_panel.png"
-		 padding="50px"
-		 margin="50px"
-		 flex_direction="column">
+    <image
+        image_mode="10px tile(1) tile(1) 4"
+        src="ui_panel.png"
+        padding="50px"
+        margin="50px"
+        flex_direction="column"
+    >
+        <text
+            font_size="32"
+            padding="0  20px"
+        >
+            Volume Control
+        </text>
 
-		<text font_size="32"
-			  padding="0  20px">Volume Control</text>
-
-		<text>Master</text>
-		<slider on_spawn="greet"/>
-		<text>Dialog</text>
-		<slider on_spawn="greet"/>
-		<text>sfx</text>
-		<slider on_spawn="greet"/>
-		<text>Music</text>
-		<slider on_spawn="greet"/>
-	</img>
+        <text>Master</text>
+        <slider on_spawn="greet" />
+        <text>Dialog</text>
+        <slider on_spawn="greet" />
+        <text>sfx</text>
+        <slider on_spawn="greet" />
+        <text>Music</text>
+        <slider on_spawn="greet" />
+    </image>
 </template>

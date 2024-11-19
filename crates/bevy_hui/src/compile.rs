@@ -1,7 +1,7 @@
 use crate::{
     build::{
-        ContentId, HtmlNode, TemplateExpresions, TemplateProperties, TemplatePropertySubscriber,
-        TemplateScope,
+        ContentId, HtmlNode, Tags, TemplateExpresions, TemplateProperties,
+        TemplatePropertySubscriber, TemplateScope,
     },
     data::HtmlTemplate,
     styles::HtmlStyle,
@@ -64,6 +64,7 @@ fn compile_node(
     mut cmd: Commands,
     mut nodes: Query<(&mut HtmlStyle, &TemplateScope)>,
     mut images: Query<&mut UiImage>,
+    mut tags: Query<&mut Tags>,
     expressions: Query<&TemplateExpresions>,
     contexts: Query<&TemplateProperties>,
     server: Res<AssetServer>,
@@ -75,6 +76,12 @@ fn compile_node(
         return;
     };
 
+    //@todo:fix first node properties
+    // let Some(context) = contexts.get(entity).ok().or(contexts.get(**scope).ok()) else {
+    //     warn!("Node has no context scope");
+    //     return;
+    // };
+
     let Some(context) = contexts.get(**scope).ok() else {
         warn!("Node has no context scope");
         return;
@@ -85,7 +92,6 @@ fn compile_node(
             .iter()
             .for_each(|expr| match expr.compile(context) {
                 Some(compiled) => {
-                    // info!("compiled {:?}", compiled);
                     match compiled {
                         crate::data::Attribute::Style(style_attr) => {
                             node_style.add_style_attr(style_attr)
@@ -98,12 +104,21 @@ fn compile_node(
                                 img.image = server.load(path);
                             });
                         }
+                        crate::data::Attribute::Tag(key, value) => match tags.get_mut(entity) {
+                            Ok(mut tags) => {
+                                tags.insert(key, value);
+                            }
+                            Err(_) => {
+                                warn!("node has to tags")
+                            }
+                        },
                         rest => {
                             warn!("attribute of this kind cannot be dynamic `{:?}`", rest);
                         }
                     };
                 }
                 None => {
+                    dbg!(context);
                     warn!("expression failed to compile `{:?}`", expr);
                     return;
                 }
@@ -119,13 +134,13 @@ fn compile_context(
     expressions: Query<(&TemplateExpresions, Option<&TemplateScope>)>,
     text_nodes: Query<(), With<ContentId>>,
     subscriber: Query<&TemplatePropertySubscriber>,
-    mut context: Query<&mut TemplateProperties>,
+    mut properties: Query<&mut TemplateProperties>,
     mut cmd: Commands,
 ) {
     let entity = trigger.entity();
     if let Ok((expressions, scope)) = expressions.get(entity) {
         // compile
-        if let Some(parent_context) = scope.map(|s| context.get(**s).ok()).flatten() {
+        if let Some(parent_context) = scope.map(|s| properties.get(**s).ok()).flatten() {
             let mut compiled_defintions = vec![];
             for expr in expressions.iter() {
                 match expr.compile(parent_context) {
@@ -138,21 +153,19 @@ fn compile_context(
                         }
                     },
                     None => {
-                        error!("{:#?}", expr);
+                        error!("cannot compile: {:#?}", expr);
                     }
                 }
             }
-            _ = context.get_mut(entity).map(|mut context| {
-                compiled_defintions.drain(..).for_each(|(key, value)| {
-                    context.insert(key, value);
-                });
+            _ = properties.get_mut(entity).map(|mut context| {
+                context.extend(compiled_defintions.into_iter());
             });
         };
     };
 
     if let Ok(subs) = subscriber.get(entity) {
         for sub in subs.iter() {
-            if *sub != entity && context.get(*sub).is_ok() {
+            if *sub != entity && properties.get(*sub).is_ok() {
                 cmd.trigger_targets(CompileContextEvent, *sub);
             } else {
                 cmd.trigger_targets(CompileNodeEvent, *sub);

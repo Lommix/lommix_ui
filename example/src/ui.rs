@@ -1,10 +1,14 @@
 use bevy::{input::mouse::MouseWheel, prelude::*};
+use bevy_aseprite_ultra::prelude::*;
 use bevy_hui::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(ImagePlugin {
+                default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
+            }),
+            AsepriteUltraPlugin,
             HuiPlugin,
             HuiAutoLoadPlugin::new(&["components"]),
         ))
@@ -29,35 +33,60 @@ fn setup(
         TemplateProperties::default().with("title", "Test-title"),
     ));
 
+    // register function bindings
     html_funcs.register("greet", greet);
     html_funcs.register("inventory", init_inventory);
     html_funcs.register("scrollable", init_scrollable);
     html_funcs.register("play_beep", play_beep);
-
-    // register custom node by passing a template handle
-    html_comps.register("panel", server.load("demo/panel.html"));
-
-    // register a custom event system, identified by a string
     html_funcs.register("collapse", |In(entity), mut cmd: Commands| {
         cmd.entity(entity).insert(Collapse(true));
     });
 
     html_funcs.register(
+        "attach_aseprite",
+        |In(entity), tags: Query<&Tags>, mut cmd: Commands, server: Res<AssetServer>| {
+            let Ok(tags) = tags.get(entity) else {
+                return;
+            };
+
+            let Some(ase_path) = tags.get("source") else {
+                warn!("missing `source` for aseprite component {entity}");
+                return;
+            };
+
+            let animation = tags
+                .get("animation")
+                .map(|s| Animation::tag(s))
+                .unwrap_or(Animation::default());
+
+            cmd.entity(entity).insert(AseUiAnimation {
+                aseprite: server.load(ase_path),
+                animation,
+            });
+        },
+    );
+
+    // register custom node by passing a template handle
+    html_comps.register("panel", server.load("demo/panel.html"));
+    html_comps.register("aseprite", server.load("demo/aseprite.html"));
+
+    // a function that updates a property and triggers a recompile
+    html_funcs.register(
         "debug",
         |In(entity),
          mut cmd: Commands,
-         mut state: Query<&mut TemplateProperties>,
+         mut template_props: Query<&mut TemplateProperties>,
          scopes: Query<&TemplateScope>| {
             let Ok(scope) = scopes.get(entity) else {
                 return;
             };
 
-            let Ok(mut state) = state.get_mut(**scope) else {
+            let Ok(mut props) = template_props.get_mut(**scope) else {
                 return;
             };
 
             let rng = rand::random::<u32>();
-            state.insert("title".to_string(), format!("{}", rng));
+            props.insert("title".to_string(), format!("{}", rng));
             cmd.trigger_targets(CompileContextEvent, **scope);
         },
     );

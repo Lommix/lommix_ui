@@ -91,7 +91,7 @@ pub struct TemplateExpresions(Vec<AttrTokens>);
 
 /// Any attribute prefixed with `tag:my_tag="my_value"`
 /// will be availble here.
-#[derive(Component, Deref, DerefMut)]
+#[derive(Component, Deref, DerefMut, Debug, Default)]
 pub struct Tags(HashMap<String, String>);
 
 /// holds ref to the raw uncompiled text content
@@ -362,9 +362,7 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
 
         // ----------------------
         //tags
-        if node.tags.len() > 0 {
-            self.cmd.entity(entity).insert(Tags(node.tags.clone()));
-        }
+        self.cmd.entity(entity).insert(Tags(node.tags.clone()));
 
         // ----------------------
         // connections

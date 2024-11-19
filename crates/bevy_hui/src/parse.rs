@@ -285,7 +285,7 @@ where
 {
     alt((
         map(tag("node"), |_| NodeType::Node),
-        map(tag("img"), |_| NodeType::Image),
+        map(tag("image"), |_| NodeType::Image),
         map(tag("button"), |_| NodeType::Button),
         map(tag("text"), |_| NodeType::Text),
         map(tag("slot"), |_| NodeType::Slot),
