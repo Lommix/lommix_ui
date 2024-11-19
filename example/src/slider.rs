@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_html_ui::prelude::*;
+use bevy_hui::prelude::*;
 
 pub fn main() {
     App::new()

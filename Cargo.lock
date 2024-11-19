@@ -727,7 +727,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_html_ui"
+name = "bevy_hui"
 version = "0.1.0"
 dependencies = [
  "bevy",
@@ -1994,7 +1994,7 @@ name = "example"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_html_ui",
+ "bevy_hui",
  "rand",
 ]
 

@@ -1,5 +1,5 @@
 use bevy::{input::mouse::MouseWheel, prelude::*};
-use bevy_html_ui::prelude::*;
+use bevy_hui::prelude::*;
 
 fn main() {
     App::new()
@@ -7,7 +7,6 @@ fn main() {
             DefaultPlugins,
             HtmlUiPlugin,
             HtmlAutoLoadPlugin::new(&["components"]),
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         ))
         .add_systems(OnEnter(AutoLoadState::Finished), setup)
         .add_systems(

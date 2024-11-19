@@ -1,5 +1,5 @@
 use crate::{
-    compile::{compile_content, CompileContentEvent, CompileContextEvent},
+    compile::CompileContextEvent,
     data::{AttrTokens, HtmlTemplate, NodeType, XNode},
     prelude::ComponentBindings,
     styles::{HoverTimer, HtmlStyle, PressedTimer},
@@ -249,7 +249,6 @@ fn spawn_ui(
                 cmd.reborrow(),
                 &server,
                 &custom_comps,
-                &state,
                 &template,
             );
 
@@ -272,7 +271,6 @@ struct TemplateBuilder<'w, 's> {
     server: &'w AssetServer,
     scope: Entity,
     comps: &'w ComponentBindings,
-    properties: &'s TemplateProperties,
     subscriber: TemplatePropertySubscriber,
     ids: HashMap<String, Entity>,
     targets: HashMap<Entity, String>,
@@ -286,7 +284,6 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
         cmd: Commands<'w, 's>,
         server: &'w AssetServer,
         comps: &'w ComponentBindings,
-        props: &'s TemplateProperties,
         template: &'w HtmlTemplate,
     ) -> Self {
         Self {
@@ -299,7 +296,6 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
             ids: Default::default(),
             targets: Default::default(),
             watch: Default::default(),
-            properties: &props,
         }
     }
 

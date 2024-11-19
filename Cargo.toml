@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/html_ui", "example"]
-default-members = ["crates/html_ui"]
+members = ["crates/bevy_hui", "example"]
+default-members = ["crates/bevy_hui"]
 
 [profile.dev]
 opt-level = 1

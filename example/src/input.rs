@@ -1,10 +1,12 @@
 use bevy::{
-    ecs::event::EventCursor, input::{
+    ecs::event::EventCursor,
+    input::{
         keyboard::{Key, KeyboardInput},
         mouse::MouseButtonInput,
-    }, prelude::*
+    },
+    prelude::*,
 };
-use bevy_html_ui::prelude::*;
+use bevy_hui::prelude::*;
 
 pub fn main() {
     App::new()
@@ -22,7 +24,6 @@ fn setup_scene(mut cmd: Commands, mut functions: HtmlFunctions, server: Res<Asse
 }
 
 // Example a simple submit form
-
 fn on_submit(
     In(entity): In<Entity>,
     inputs: Query<(&TextInput, &UiId)>,
@@ -51,15 +52,11 @@ fn on_submit(
 
 // ----------------------------------------------
 // Example Text Input Component Plugin
-
 pub struct TextInputPlugin;
 impl Plugin for TextInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup);
-        app.add_systems(
-            Update,
-            (focus /* , write_input */, sync_display_text, unfocus),
-        );
+        app.add_systems(Update, (focus, write_input, sync_display_text, unfocus));
     }
 }
 
@@ -72,8 +69,8 @@ pub struct Focused;
 fn setup(mut components: HtmlComponents, server: Res<AssetServer>) {
     let handle = server.load("textinput/textinput.html");
 
-    components.register_with_spawn_fn("input", handle, |mut cmd| {
-        cmd.insert((
+    components.register_with_spawn_fn("input", handle, |mut entity_cmd| {
+        entity_cmd.insert((
             // Directly adding the Textinput-Component, because the first node is the button holding
             // the input state. This saves us a `onspawn` binding
             TextInput::default(),
