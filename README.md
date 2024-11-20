@@ -1,5 +1,8 @@
 # Bevy_hui
 
+[![License: MIT or Apache 2.0](https://img.shields.io/badge/License-MIT%20or%20Apache2-blue.svg)](./LICENSE)
+[![Crate](https://img.shields.io/crates/v/bevy_hui.svg)](https://crates.io/crates/bevy_hui)
+
 Build `bevy_ui` design in pseudo Html. Keep your logic in bevy, while iterating fast on design
 with hot reloading. Create reusable templates in the style of Web Components.
 
