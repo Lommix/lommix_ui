@@ -6,6 +6,7 @@ edition = "2021"
 description = "pseudo Html templating ui crate for the bevy-engine."
 keywords = ["bevy", "ui", "xml", "html", "dsl"]
 repository = "https://github.com/Lommix/bevy_hui"
+license = "MIT OR Apache-2.0"
 
 [profile.dev]
 opt-level = 1
