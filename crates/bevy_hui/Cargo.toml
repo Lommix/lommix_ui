@@ -3,9 +3,9 @@ name = "bevy_hui"
 authors = ["Lorenz Mielke"]
 version = "0.1.0-rc.1"
 edition = "2021"
-description = "Html templating ui crate for the bevy-engine."
+description = "pseudo Html templating ui crate for the bevy-engine."
 keywords = ["bevy", "ui", "xml", "html", "dsl"]
-repository = "https://github.com/Lommix/lommix_ui"
+repository = "https://github.com/Lommix/bevy_hui"
 
 [profile.dev]
 opt-level = 1
