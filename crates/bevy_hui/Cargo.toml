@@ -18,6 +18,7 @@ bevy = { version = "0.15.0-rc.3", default-features = false, features = [
   "bevy_render",
   "bevy_ui",
   "bevy_asset",
+  "bevy_state",
   "bevy_text",
 ] }
 thiserror = "1.0.63"
