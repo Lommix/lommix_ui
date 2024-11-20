@@ -8,7 +8,7 @@ keywords = ["bevy", "ui", "xml", "html", "dsl"]
 repository = "https://github.com/Lommix/bevy_hui"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-categories = ["game-development", "ui", "bevy"]
+categories = ["game-development"]
 
 [profile.dev]
 opt-level = 1

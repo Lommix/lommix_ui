@@ -2,3 +2,4 @@
 *.bak
 notes.md
 *.sh
+!publish.sh
