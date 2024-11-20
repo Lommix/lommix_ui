@@ -74,7 +74,6 @@ pub struct AttrTokens {
 impl AttrTokens {
     pub fn compile(&self, props: &TemplateProperties) -> Option<Attribute> {
         let Some(prop_val) = props.get(&self.key) else {
-            warn!("failed to parse property, key not found `{}`", self.key);
             return None;
         };
 

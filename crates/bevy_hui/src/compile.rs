@@ -77,15 +77,15 @@ fn compile_node(
     };
 
     //@todo:fix first node properties
-    // let Some(context) = contexts.get(entity).ok().or(contexts.get(**scope).ok()) else {
-    //     warn!("Node has no context scope");
-    //     return;
-    // };
-
-    let Some(context) = contexts.get(**scope).ok() else {
+    let Some(context) = contexts.get(entity).ok().or(contexts.get(**scope).ok()) else {
         warn!("Node has no context scope");
         return;
     };
+
+    // let Some(context) = contexts.get(**scope).ok() else {
+    //     warn!("Node has no context scope");
+    //     return;
+    // };
 
     if let Ok(expressions) = expressions.get(entity) {
         expressions
@@ -139,23 +139,44 @@ fn compile_context(
 ) {
     let entity = trigger.entity();
     if let Ok((expressions, scope)) = expressions.get(entity) {
+        // ----------
+        // problem: compiling props on template root nodes
+        // always look up the tree, but sometimes the first node
+        // has props owned by its own prop context.
+
         // compile
         if let Some(parent_context) = scope.map(|s| properties.get(**s).ok()).flatten() {
             let mut compiled_defintions = vec![];
             for expr in expressions.iter() {
+                // --------------------
+                //compile from parent
                 match expr.compile(parent_context) {
                     Some(compiled) => match compiled {
                         crate::data::Attribute::PropertyDefinition(key, value) => {
                             compiled_defintions.push((key, value));
                         }
                         _ => {
-                            error!("cannot compile to unimplementd attribute `{:?}`", compiled);
+                            // error!("cannot compile to unimplementd attribute `{:?}`", compiled);
                         }
                     },
                     None => {
-                        error!("cannot compile: {:#?}", expr);
+                        // check owned props
+                        if let Ok(owned_ctx) = properties.get(entity) {
+                            match expr.compile(owned_ctx) {
+                                Some(crate::data::Attribute::PropertyDefinition(key, value)) => {
+                                    compiled_defintions.push((key, value));
+                                }
+                                _ => {
+                                    // error!("cannot compile to unimplementd attribute `{:?}`", expr);
+                                }
+                            }
+                        } else {
+                            error!("cannot compile: {:#?}", expr);
+                        }
                     }
                 }
+                // --------------------
+                // compile from self
             }
             _ = properties.get_mut(entity).map(|mut context| {
                 context.extend(compiled_defintions.into_iter());
@@ -177,6 +198,7 @@ fn compile_context(
     }
 }
 
+// this is bad, only 1 var allowed
 pub(crate) fn compile_content(input: &str, defs: &TemplateProperties) -> String {
     let mut compiled = String::new();
 
