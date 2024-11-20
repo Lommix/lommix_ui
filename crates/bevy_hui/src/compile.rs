@@ -76,16 +76,11 @@ fn compile_node(
         return;
     };
 
-    //@todo:fix first node properties
+    // check owned properties aswell
     let Some(context) = contexts.get(entity).ok().or(contexts.get(**scope).ok()) else {
         warn!("Node has no context scope");
         return;
     };
-
-    // let Some(context) = contexts.get(**scope).ok() else {
-    //     warn!("Node has no context scope");
-    //     return;
-    // };
 
     if let Ok(expressions) = expressions.get(entity) {
         expressions
