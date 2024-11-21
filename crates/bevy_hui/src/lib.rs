@@ -1,3 +1,7 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![allow(rustdoc::redundant_explicit_links)]
+#![doc = include_str!("../../../README.md")]
+
 use bevy::app::{App, Plugin};
 
 mod auto;

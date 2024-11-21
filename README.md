@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 -   Simple but effective event system. Register any bevy system via function binding and use it
     in your templates `on_press="start_game"`.
 -   No widgets, no themes. Just bevy UI serialized with all the tools necessary to build anything
-    in a reusable way.
+    in a reusable manor.
 
 ## Example
 
@@ -145,7 +145,7 @@ Time to be creative. Include your component in the next template.
 
 ## Spawning your Template
 
-required components make it super simple.
+Required components make it super simple.
 
 ```rust
 fn setup(
@@ -162,7 +162,7 @@ fn setup(
 Hot reload requires bevy `file_watcher` feature to be enabled.
 
 Checkout the examples for advanced interactions, play with the assets. Keep in mind these are
-very crude as proof of concept.
+very crude proof of concepts.
 
 ```bash
 # basic menu demo
@@ -179,7 +179,7 @@ cargo run -p example --bin slider
 
 I do not plan to offer any widgets on the templating side, but I would like
 to have common components and system for a general reusable widget toolkit like
-sliders, drop downs, dragables and so on.
+sliders, drop downs, draggable and so on.
 
 Checkout the examples, if you come up with some really cool widgets, I would be happy
 to merge them into a
@@ -191,10 +191,6 @@ this crate to include in the example crate.
 
 ## Known limitations and Pitfalls
 
-**You currently cannot use propterties on the first node of a template. The first node holds
-the property state and links one above**
-
 -   Any manual changes to bevy's styling components will be overwritten
 -   Do not recursive import. [mem stonks, bug]
 -   One root node per component.
--   docs are uncomplete and sometimes outdated.

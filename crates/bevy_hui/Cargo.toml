@@ -32,6 +32,5 @@ owo-colors = "4.1.0"
 [features]
 file_watcher = ["bevy/file_watcher", "bevy/multi_threaded"]
 
-
 [dev-dependencies]
 test-case = "3.3.1"
