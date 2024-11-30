@@ -1,4 +1,4 @@
-use bevy::{input::mouse::MouseWheel, prelude::*};
+use bevy::{image::ImageSamplerDescriptor, input::mouse::MouseWheel, prelude::*};
 use bevy_aseprite_ultra::prelude::*;
 use bevy_hui::prelude::*;
 
@@ -6,7 +6,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(ImagePlugin {
-                default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
+                default_sampler: ImageSamplerDescriptor::nearest(),
             }),
             AsepriteUltraPlugin,
             HuiPlugin,

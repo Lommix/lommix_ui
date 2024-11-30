@@ -63,7 +63,7 @@ fn compile_node(
     trigger: Trigger<CompileNodeEvent>,
     mut cmd: Commands,
     mut nodes: Query<(&mut HtmlStyle, &TemplateScope)>,
-    mut images: Query<&mut UiImage>,
+    mut images: Query<&mut ImageNode>,
     mut tags: Query<&mut Tags>,
     expressions: Query<&TemplateExpresions>,
     contexts: Query<&TemplateProperties>,

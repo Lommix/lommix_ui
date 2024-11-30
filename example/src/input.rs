@@ -1,5 +1,6 @@
 use bevy::{
     ecs::event::EventCursor,
+    image::ImageSamplerDescriptor,
     input::{
         keyboard::{Key, KeyboardInput},
         mouse::MouseButtonInput,
@@ -12,7 +13,7 @@ pub fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(ImagePlugin {
-                default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
+                default_sampler: ImageSamplerDescriptor::nearest(),
             }),
             HuiPlugin,
             TextInputPlugin,

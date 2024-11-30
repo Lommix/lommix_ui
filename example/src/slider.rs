@@ -1,11 +1,11 @@
-use bevy::prelude::*;
+use bevy::{image::ImageSamplerDescriptor, prelude::*};
 use bevy_hui::prelude::*;
 
 pub fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(ImagePlugin {
-                default_sampler: bevy::render::texture::ImageSamplerDescriptor::nearest(),
+                default_sampler: ImageSamplerDescriptor::nearest(),
             }),
             HuiPlugin,
             SliderPlugin,

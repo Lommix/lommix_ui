@@ -1,7 +1,7 @@
 use crate::{build::InteractionObverser, data::StyleAttr};
 use bevy::{
     ecs::{query::QueryEntityError, system::SystemParam},
-    prelude::*,
+    prelude::*, ui::widget::NodeImageMode,
 };
 use std::time::Duration;
 
@@ -293,10 +293,11 @@ fn update_node_style(
             .map(|t| t.fraction())
             .unwrap_or_default();
 
+
         let hover_ratio = html_style
             .computed
             .easing
-            .map(|ease| easing_curve(0., 1., ease).sample(hover_ratio))
+            .map(|ease| EasingCurve::new(0., 1., ease).sample(hover_ratio))
             .flatten()
             .unwrap_or(hover_ratio);
 
@@ -314,7 +315,7 @@ fn update_node_style(
         let press_ratio = html_style
             .computed
             .easing
-            .map(|ease| easing_curve(0., 1., ease).sample(press_ratio))
+            .map(|ease| EasingCurve::new(0., 1., ease).sample(press_ratio))
             .flatten()
             .unwrap_or(press_ratio);
 
@@ -393,11 +394,8 @@ impl Default for ComputedStyle {
 #[reflect]
 pub struct HtmlStyle {
     pub computed: ComputedStyle,
-    #[reflect(ignore)]
     pub hover: Vec<StyleAttr>,
-    #[reflect(ignore)]
     pub pressed: Vec<StyleAttr>,
-    #[reflect(ignore)]
     pub active: Vec<StyleAttr>,
 }
 

@@ -1,12 +1,14 @@
-use bevy::prelude::Deref;
+use bevy::{prelude::Deref, reflect::Reflect};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Reflect)]
+#[reflect]
 pub struct SlotMap<T> {
     data: Vec<Option<T>>,
     unused: Vec<SlotId>,
 }
 
-#[derive(Deref, Debug, Copy, Clone)]
+#[derive(Deref, Debug, Copy, Clone, Reflect)]
+#[reflect]
 pub struct SlotId(usize);
 
 impl Default for SlotId {

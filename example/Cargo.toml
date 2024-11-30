@@ -4,11 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.15.0-rc.3", features = [
-  "file_watcher",
-  "multi_threaded",
-] }
-bevy_aseprite_ultra = { git = "https://github.com/Lommix/bevy_aseprite_ultra.git", rev = "af340c6" }
+bevy = { version = "0.15", features = ["file_watcher", "multi_threaded"] }
+bevy_aseprite_ultra = "0.3.0"
 bevy_hui = { path = "../crates/bevy_hui" }
 rand = "0.8.5"
 

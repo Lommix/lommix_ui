@@ -2,9 +2,11 @@ use crate::prelude::*;
 use crate::util::{SlotId, SlotMap};
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
+use bevy::ui::widget::NodeImageMode;
 use bevy::utils::HashMap;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Reflect)]
+#[reflect]
 pub enum NodeType {
     #[default]
     Node,
@@ -18,7 +20,8 @@ pub enum NodeType {
 }
 
 /// a single nodes data
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Reflect)]
+#[reflect]
 pub struct XNode {
     pub uuid: u64,
     pub src: Option<String>,
@@ -33,12 +36,14 @@ pub struct XNode {
     pub event_listener: Vec<Action>,
     pub content_id: SlotId,
     pub node_type: NodeType,
+    #[reflect(ignore)]
     pub children: Vec<XNode>,
 }
 
 /// holds a parsed template
 /// can be build as UI.
-#[derive(Debug, Asset, TypePath)]
+#[derive(Debug, Asset, Reflect)]
+#[reflect]
 pub struct HtmlTemplate {
     pub name: Option<String>,
     pub properties: HashMap<String, String>,
@@ -126,7 +131,8 @@ impl Action {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
+#[reflect]
 pub enum StyleAttr {
     Display(Display),
     Position(PositionType),
@@ -189,10 +195,9 @@ pub enum StyleAttr {
     Background(Color),
 
     // -----
-    // @todo: blocks reflect, rethink
-    Hover(Box<StyleAttr>),
-    Pressed(Box<StyleAttr>),
-    Active(Box<StyleAttr>),
+    Hover(#[reflect(ignore)] Box<StyleAttr>),
+    Pressed(#[reflect(ignore)] Box<StyleAttr>),
+    Active(#[reflect(ignore)] Box<StyleAttr>),
 
     // -----
     // animations
@@ -202,4 +207,10 @@ pub enum StyleAttr {
     // -----
     // image
     ImageScaleMode(NodeImageMode),
+}
+
+impl Default for StyleAttr {
+    fn default() -> Self {
+        StyleAttr::Display(Display::None)
+    }
 }

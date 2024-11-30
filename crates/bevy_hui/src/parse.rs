@@ -3,10 +3,11 @@ use crate::prelude::NodeType;
 use crate::util::SlotMap;
 use bevy::prelude::EaseFunction;
 use bevy::sprite::{BorderRect, SliceScaleMode, TextureSlicer};
+use bevy::ui::widget::NodeImageMode;
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, GridAutoFlow,
-    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, NodeImageMode, Outline,
-    Overflow, OverflowAxis, PositionType, RepeatedGridTrack,
+    GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Outline, Overflow,
+    OverflowAxis, PositionType, RepeatedGridTrack,
 };
 use bevy::utils::HashMap;
 use bevy::{
@@ -93,14 +94,14 @@ where
     ))
 }
 
-fn trim_comments0<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<&[u8]>, E>
+fn trim_comments0<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Vec<&'a [u8]>, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     many0(parse_comment::<E>)(input)
 }
 
-fn parse_comment<'a, E>(input: &'a [u8]) -> IResult<&[u8], &[u8], E>
+fn parse_comment<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], &'a [u8], E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -255,7 +256,7 @@ where
     ))
 }
 
-fn parse_xml_end<'a, E>(input: &'a [u8]) -> IResult<&[u8], (Option<&[u8]>, &[u8]), E>
+fn parse_xml_end<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], (Option<&'a [u8]>, &'a [u8]), E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -265,7 +266,7 @@ where
     Ok((input, (prefix, end_tag)))
 }
 
-fn parse_xml_attr<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<XmlAttr>, E>
+fn parse_xml_attr<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Vec<XmlAttr<'a>>, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -465,14 +466,14 @@ where
     }
 }
 
-fn parse_float<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
+fn parse_float<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], f32, E>
 where
     E: nom::error::ParseError<&'a [u8]>,
 {
     nom::number::complete::float(input)
 }
 
-fn parse_easing<'a, E>(input: &'a [u8]) -> IResult<&[u8], EaseFunction, E>
+fn parse_easing<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], EaseFunction, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -518,7 +519,7 @@ where
     }
 }
 
-fn parse_position_type<'a, E>(input: &'a [u8]) -> IResult<&[u8], PositionType, E>
+fn parse_position_type<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], PositionType, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -531,7 +532,7 @@ where
     )(input)
 }
 
-fn parse_display<'a, E>(input: &'a [u8]) -> IResult<&[u8], Display, E>
+fn parse_display<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Display, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -546,7 +547,7 @@ where
     )(input)
 }
 
-fn parse_overflow<'a, E>(input: &'a [u8]) -> IResult<&[u8], Overflow, E>
+fn parse_overflow<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Overflow, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -558,7 +559,7 @@ where
     Ok((input, Overflow { x, y }))
 }
 
-fn parse_overflow_axis<'a, E>(input: &'a [u8]) -> IResult<&[u8], OverflowAxis, E>
+fn parse_overflow_axis<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], OverflowAxis, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -569,7 +570,7 @@ where
     ))(input)
 }
 
-fn parse_align_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignItems, E>
+fn parse_align_items<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], AlignItems, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -588,7 +589,7 @@ where
     )(input)
 }
 
-fn parse_align_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignContent, E>
+fn parse_align_content<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], AlignContent, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -607,7 +608,7 @@ where
     )))(input)
 }
 
-fn parse_align_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], AlignSelf, E>
+fn parse_align_self<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], AlignSelf, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -625,7 +626,7 @@ where
     )(input)
 }
 
-fn parse_justify_items<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyItems, E>
+fn parse_justify_items<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], JustifyItems, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -642,7 +643,7 @@ where
     )(input)
 }
 
-fn parse_justify_content<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifyContent, E>
+fn parse_justify_content<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], JustifyContent, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -662,7 +663,7 @@ where
     )(input)
 }
 
-fn parse_justify_self<'a, E>(input: &'a [u8]) -> IResult<&[u8], JustifySelf, E>
+fn parse_justify_self<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], JustifySelf, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -679,7 +680,7 @@ where
     )(input)
 }
 
-fn parse_flex_direction<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexDirection, E>
+fn parse_flex_direction<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], FlexDirection, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -695,7 +696,7 @@ where
     )(input)
 }
 
-fn parse_flex_wrap<'a, E>(input: &'a [u8]) -> IResult<&[u8], FlexWrap, E>
+fn parse_flex_wrap<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], FlexWrap, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -709,14 +710,14 @@ where
     )(input)
 }
 
-fn as_string<'a, E>(input: &'a [u8]) -> IResult<&[u8], String, E>
+fn as_string<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], String, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map(rest, |v| String::from_utf8_lossy(v).to_string())(input)
 }
 
-fn as_string_list<'a, E>(input: &'a [u8]) -> IResult<&[u8], Vec<String>, E>
+fn as_string_list<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Vec<String>, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -732,7 +733,7 @@ where
 }
 
 // parse xml prefix
-fn parse_prefix0<'a, E>(input: &'a [u8]) -> IResult<&[u8], Option<&[u8]>, E>
+fn parse_prefix0<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Option<&'a [u8]>, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -743,14 +744,14 @@ where
 }
 
 // parses snake case identifier
-fn take_snake<'a, E>(input: &'a [u8]) -> IResult<&[u8], &[u8], E>
+fn take_snake<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], &'a [u8], E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     take_while(|b: u8| b.is_ascii_alphabetic() || b == b'_')(input)
 }
 
-fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMode, E>
+fn parse_image_scale_mode<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], NodeImageMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -766,7 +767,7 @@ where
 }
 
 // 10px tiled tiled 1
-fn parse_image_slice<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMode, E>
+fn parse_image_slice<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], NodeImageMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -788,7 +789,7 @@ where
     ))
 }
 
-fn parse_image_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], NodeImageMode, E>
+fn parse_image_tile<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], NodeImageMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -808,7 +809,7 @@ where
     ))
 }
 
-fn parse_bool<'a, E>(input: &'a [u8]) -> IResult<&[u8], bool, E>
+fn parse_bool<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], bool, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -844,21 +845,21 @@ where
 
 // stretch
 // tile(1)
-fn parse_slice_scale<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
+fn parse_slice_scale<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], SliceScaleMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     alt((parse_stretch, parse_tile))(input)
 }
 
-fn parse_stretch<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
+fn parse_stretch<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], SliceScaleMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     map(tag("stretch"), |_| SliceScaleMode::Stretch)(input)
 }
 
-fn parse_tile<'a, E>(input: &'a [u8]) -> IResult<&[u8], SliceScaleMode, E>
+fn parse_tile<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], SliceScaleMode, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -872,7 +873,7 @@ where
 /// 20px/% single
 /// 10px/% 10px axis
 /// 10px 10px 10px 10px rect
-fn parse_ui_rect<'a, E>(input: &'a [u8]) -> IResult<&[u8], UiRect, E>
+fn parse_ui_rect<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], UiRect, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -911,7 +912,7 @@ where
 }
 
 // grid_template_rows="auto 10% 10%"
-fn parse_grid_track<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridTrack, E>
+fn parse_grid_track<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], GridTrack, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -941,7 +942,7 @@ where
 
 // (5, auto)
 // (2, 150px)
-fn parse_grid_track_repeated<'a, E>(input: &'a [u8]) -> IResult<&[u8], RepeatedGridTrack, E>
+fn parse_grid_track_repeated<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], RepeatedGridTrack, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -997,7 +998,7 @@ where
     Ok((input, track))
 }
 
-fn parse_auto_flow<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridAutoFlow, E>
+fn parse_auto_flow<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], GridAutoFlow, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1016,7 +1017,7 @@ where
     )(input)
 }
 
-fn parse_str<'a, E>(input: &'a [u8]) -> IResult<&[u8], &str, E>
+fn parse_str<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], &'a str, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1029,7 +1030,7 @@ where
     }
 }
 
-fn parse_number<'a, E>(input: &'a [u8]) -> IResult<&[u8], i64, E>
+fn parse_number<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], i64, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1050,7 +1051,7 @@ where
 // auto
 // start_span(5,5)
 // end_span(5,5)
-fn parse_grid_placement<'a, E>(input: &'a [u8]) -> IResult<&[u8], GridPlacement, E>
+fn parse_grid_placement<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], GridPlacement, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1151,7 +1152,7 @@ where
 }
 
 /// 10px 10%
-fn parse_val<'a, E>(input: &'a [u8]) -> IResult<&[u8], Val, E>
+fn parse_val<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Val, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1174,7 +1175,7 @@ where
     )(input)
 }
 
-fn parse_px<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
+fn parse_px<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], f32, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1183,7 +1184,7 @@ where
 
 // 100ms
 // 3s
-fn parse_delay<'a, E>(input: &'a [u8]) -> IResult<&[u8], f32, E>
+fn parse_delay<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], f32, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1202,7 +1203,7 @@ where
 // #000000
 // #FFF
 #[rustfmt::skip]
-fn parse_color<'a,E>(input: &'a [u8]) -> IResult<&[u8], Color,E>
+fn parse_color<'a,E>(input: &'a [u8]) -> IResult<&'a [u8], Color,E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1222,7 +1223,7 @@ where
 }
 
 // rgba(1,1,1,1)
-fn parse_rgba_color<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+fn parse_rgba_color<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Color, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1238,7 +1239,7 @@ where
 }
 
 // rgb(1,1,1)
-fn parse_rgb_color<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+fn parse_rgb_color<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Color, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1254,7 +1255,7 @@ where
 }
 
 // #FFFFFFFF (with alpha)
-fn color_hex8_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+fn color_hex8_parser<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Color, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1275,7 +1276,7 @@ where
 }
 
 // #FFFFFF
-fn color_hex6_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+fn color_hex6_parser<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Color, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1296,7 +1297,7 @@ where
 }
 
 // #FFFF (with alpha)
-fn color_hex4_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+fn color_hex4_parser<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Color, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1318,7 +1319,7 @@ where
 
 // short
 // #FFF
-fn color_hex3_parser<'a, E>(input: &'a [u8]) -> IResult<&[u8], Color, E>
+fn color_hex3_parser<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Color, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1339,7 +1340,7 @@ where
 }
 
 /// FF
-fn hex_byte<'a, E>(input: &'a [u8]) -> IResult<&[u8], u8, E>
+fn hex_byte<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], u8, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
@@ -1347,7 +1348,7 @@ where
 }
 
 /// F
-fn hex_nib<'a, E>(input: &'a [u8]) -> IResult<&[u8], u8, E>
+fn hex_nib<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], u8, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {

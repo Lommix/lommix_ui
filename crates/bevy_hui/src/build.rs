@@ -406,7 +406,7 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
             // spawn image
             NodeType::Image => {
                 self.cmd.entity(entity).insert((
-                    UiImage {
+                    ImageNode {
                         image: node
                             .src
                             .as_ref()
