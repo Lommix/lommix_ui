@@ -9,15 +9,50 @@
         row_gap="15px"
     >
         <text font_size="32">Widget Demo Scene</text>
-
-        <node display="grid">
+        <node
+            display="grid"
+            row_gap="5px"
+        >
             <text font_size="20">Minimal slider</text>
-            <slider />
+            <node
+                column_gap="5px"
+                height="200px"
+            >
+                <vslider target="t0">
+                    <text id="t0" font_size="20">0.00</text>
+                </vslider>
+
+                <vslider target="t1">
+                    <text id="t1" font_size="20">0.00</text>
+                </vslider>
+
+                <vslider target="t2">
+                    <text id="t2" font_size="20">0.00</text>
+                </vslider>
+
+            </node>
+            <node width="300px" column_gap="5px">
+                <hslider target="t3" />
+                <text id="t3" font_size="20">0.00</text>
+
+                <hslider target="t4" />
+                <text id="t4" font_size="20">0.00</text>
+            </node>
         </node>
 
         <node display="grid">
             <text font_size="20">Minimal input</text>
             <input />
+        </node>
+
+
+        <node display="grid">
+            <text font_size="20">Minimal select</text>
+            <select>
+				<option value="option 1" />
+				<option value="option 2" />
+				<option value="option 3" />
+			</select>
         </node>
     </node>
 </template>

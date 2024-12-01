@@ -9,11 +9,42 @@ use bevy_hui::prelude::*;
 
 /// # Input Component Plugin
 ///
+///
+/// ## defintion:
+///
 /// A input node is just a button with a text child.
 /// follow these instructions to make it work for your
 /// template.
 ///
+/// ## instruction:
+///
+/// -   add the `HuiInputWidgetPlugin`
+/// -   create a template/custom component.
+/// -   attach the init_input function to the root node
+/// -   use optional `tag:filter="text/number"` (similar to `type` in html)
+/// -   define a `target` on the root node. The target can be any Text node
+///     in the template. This will display the current value
+/// -   the input consumes any key events, when `UiActive` is attached.
+///     you can use conditional styles with `active:border_color="..`
+///
+/// ## Minimal template example:
+///
 /// ```html
+/// <template>
+///     <button
+///         on_spawn="init_input"
+///         target="text_value"
+/// 		tag:filter="text"
+///         background="#222"
+///         border="2px"
+/// 		min_height="40px"
+///         border_color="#555"
+///         padding="5px"
+///         active:border_color="#FFF"
+///     >
+///         <text id="text_value" font_size="20">Placeholder</text>
+///     </button>
+/// </template>
 /// ```
 pub struct HuiInputWidgetPlugin;
 impl Plugin for HuiInputWidgetPlugin {

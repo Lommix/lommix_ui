@@ -1,0 +1,23 @@
+<template>
+    <button
+        on_spawn="init_select"
+        target="options"
+        display="grid"
+        row_gap="5px"
+		padding="5px"
+        width="100%"
+        background="#333"
+    >
+        <text font_size="20">None</text>
+        <node
+            display="none"
+			top="30px"
+            id="options"
+            position="absolute"
+            background="#333"
+            padding="5px"
+        >
+            <slot />
+        </node>
+    </button>
+</template>

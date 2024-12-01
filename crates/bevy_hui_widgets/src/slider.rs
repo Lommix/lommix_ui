@@ -2,20 +2,21 @@ use bevy::prelude::*;
 use bevy_hui::prelude::*;
 
 /// # Slider Component Plugin
-/// A slider is a node of certain size
-/// with an absolute button as child. The button
-/// can be dragged on a fixed axis.
 ///
-/// Instructions:
+/// ## definition:
+///
+/// A slider is a node with an absolute button as child.
+/// The button can be dragged on a fixed axis. The slider state/value
+/// is stored on the root node.
+///
+/// ## Instructions
+///
 /// -   add the `HuiSliderWidgetPlugin`
 /// -   create a template/custom component.
 /// -   attach the init_slider function to the root node
-/// -   the root node holds the `Slider` component with the
-///     current value. It must own an absolute button child.
-/// -   when using your slider component, attach another `on_spawn` fn to
-///     mark it for your intended use. example: `MasterVolumeSlider`
+/// -   add an optional `tag:axis="x/y"`
 ///
-/// minimal template example:
+/// ## Minimal template example:
 ///
 /// ```html
 ///<template>
@@ -24,7 +25,7 @@ use bevy_hui::prelude::*;
 ///        tag:axis="x"
 ///        width="255px"
 ///        height="20px"
-///		background="#000"
+///        background="#000"
 ///    >
 ///        <button
 ///            background="#00F"
@@ -40,9 +41,24 @@ impl Plugin for HuiSliderWidgetPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<SliderAxis>();
         app.register_type::<Slider>();
+        app.register_type::<SliderChangedEvent>();
+        app.add_event::<SliderChangedEvent>();
         app.add_systems(Startup, setup);
-        app.add_systems(Update, update_drag);
+        app.add_systems(
+            Update,
+            (
+                update_drag,
+                update_slider_value.run_if(on_event::<SliderChangedEvent>),
+            ),
+        );
     }
+}
+
+#[derive(Event, Reflect)]
+#[reflect]
+pub struct SliderChangedEvent {
+    pub slider: Entity,
+    pub value: f32,
 }
 
 pub const TAG_AXIS: &'static str = "axis";
@@ -125,13 +141,13 @@ fn init_slider(
 }
 
 fn update_drag(
+    mut slider_events: EventWriter<SliderChangedEvent>,
     mut events: EventReader<bevy::input::mouse::MouseMotion>,
     mut nobs: Query<(Entity, &SliderNob, &mut HtmlStyle, &Interaction)>,
-    mut sliders: Query<&mut Slider>,
+    sliders: Query<&Slider>,
     computed_nodes: Query<&ComputedNode>,
 ) {
     for event in events.read() {
-        let delta_x = event.delta.x;
         nobs.iter_mut()
             .filter(|(_, _, _, interaction)| matches!(interaction, Interaction::Pressed))
             .for_each(|(nob_entity, nob, mut style, _)| {
@@ -143,23 +159,67 @@ fn update_drag(
                     return;
                 };
 
-                let current_pos = match style.computed.node.left {
-                    Val::Px(pos) => pos,
-                    _ => 0.,
+                let Ok(slider) = sliders.get(nob.slider) else {
+                    return;
                 };
 
-                let max_pos = slider_computed.unrounded_size().x
-                    * slider_computed.inverse_scale_factor()
-                    - nob_computed.unrounded_size().x * nob_computed.inverse_scale_factor();
+                match slider.axis {
+                    SliderAxis::Horizontal => {
+                        let current_pos = match style.computed.node.left {
+                            Val::Px(pos) => pos,
+                            _ => 0.,
+                        };
 
-                let next_pos = (current_pos + delta_x).min(max_pos).max(0.);
-                style.computed.node.left = Val::Px(next_pos);
+                        let max_pos = slider_computed.unrounded_size().x
+                            * slider_computed.inverse_scale_factor()
+                            - nob_computed.unrounded_size().x * nob_computed.inverse_scale_factor();
 
-                let slider_value = next_pos / max_pos;
+                        let next_pos = (current_pos
+                            + event.delta.x / slider_computed.inverse_scale_factor())
+                        .min(max_pos)
+                        .max(0.);
 
-                _ = sliders.get_mut(nob.slider).map(|mut slider| {
-                    slider.value = slider_value;
-                });
+                        let slider_value = next_pos / max_pos;
+                        style.computed.node.left = Val::Px(next_pos);
+                        slider_events.send(SliderChangedEvent {
+                            slider: nob.slider,
+                            value: slider_value,
+                        });
+                    }
+                    SliderAxis::Vertical => {
+                        let current_pos = match style.computed.node.bottom {
+                            Val::Px(pos) => pos,
+                            _ => 0.,
+                        };
+
+                        let max_pos = slider_computed.unrounded_size().y
+                            * slider_computed.inverse_scale_factor()
+                            - nob_computed.unrounded_size().y * nob_computed.inverse_scale_factor();
+
+                        let next_pos = (current_pos
+                            - event.delta.y / slider_computed.inverse_scale_factor())
+                        .min(max_pos)
+                        .max(0.);
+
+                        let slider_value = next_pos / max_pos;
+                        style.computed.node.bottom = Val::Px(next_pos);
+                        slider_events.send(SliderChangedEvent {
+                            slider: nob.slider,
+                            value: slider_value,
+                        });
+                    }
+                };
             });
+    }
+}
+
+fn update_slider_value(
+    mut events: EventReader<SliderChangedEvent>,
+    mut sliders: Query<&mut Slider>,
+) {
+    for event in events.read() {
+        _ = sliders.get_mut(event.slider).map(|mut slider| {
+            slider.value = event.value;
+        });
     }
 }
