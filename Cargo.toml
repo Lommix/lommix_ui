@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/bevy_hui", "example"]
+members = ["crates/bevy_hui", "crates/bevy_hui_widgets", "example"]
 default-members = ["crates/bevy_hui"]
 
 [profile.dev]

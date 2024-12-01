@@ -182,7 +182,7 @@ to have common components and system for a general reusable widget toolkit like
 sliders, drop downs, draggable and so on.
 
 Checkout the examples, if you come up with some really cool widgets, I would be happy
-to merge them into a
+to include them into the upcoming `bevy_hui_widgets` crate.
 
 ### More examples
 

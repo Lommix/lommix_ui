@@ -19,7 +19,6 @@ pub fn main() {
             TextInputPlugin,
         ))
         .add_systems(Startup, setup_scene)
-        .add_systems(Update, write_input)
         .run();
 }
 
@@ -128,21 +127,16 @@ fn unfocus(
 
 fn write_input(
     mut cmd: Commands,
-    key_events: Res<Events<KeyboardInput>>,
-    mut reader: Local<EventCursor<KeyboardInput>>,
+    mut events: EventReader<KeyboardInput>,
     mut text_inputs: Query<(Entity, &mut TextInput), With<Focused>>,
 ) {
     if text_inputs.is_empty() {
         return;
     }
 
-    if reader.clone().read(&key_events).next().is_none() {
-        return;
-    }
-
-    for input in reader.clone().read(&key_events) {
+    for input in events.read() {
         if !input.state.is_pressed() {
-            return;
+            continue;
         }
 
         match input.logical_key {
@@ -164,13 +158,11 @@ fn write_input(
             Key::Space => {
                 text_inputs
                     .iter_mut()
-                    .for_each(|(_, mut txt)| txt.0.push_str(" "));
+                    .for_each(|(_, mut txt)| txt.0.push(' '));
             }
             _ => (),
         }
     }
-
-    reader.clear(&key_events);
 }
 
 fn sync_display_text(
