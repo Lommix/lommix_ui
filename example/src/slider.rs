@@ -64,17 +64,16 @@ pub enum SliderNob {
     Rested,
 }
 fn update_state(mut sliders: Query<(&Interaction, &mut SliderNob), Changed<Interaction>>) {
-    sliders.iter_mut().for_each(|(interaction, mut state)| {
-        // --
-        match interaction {
+    sliders
+        .iter_mut()
+        .for_each(|(interaction, mut state)| match interaction {
             Interaction::Pressed => {
                 *state = SliderNob::Dragged;
             }
             _ => {
                 *state = SliderNob::Rested;
             }
-        }
-    });
+        });
 }
 
 fn update_drag(
