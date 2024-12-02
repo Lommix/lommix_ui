@@ -39,7 +39,7 @@ impl std::fmt::Debug for XmlAttr<'_> {
     }
 }
 
-pub(crate) fn parse_template<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], HtmlTemplate, E>
+pub fn parse_template<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], HtmlTemplate, E>
 where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {

@@ -27,6 +27,8 @@ pub mod prelude {
     pub use crate::error::ParseError;
     pub use crate::styles::{HoverTimer, HtmlStyle, InteractionTimer, PressedTimer, UiActive};
     pub use crate::HuiPlugin;
+    pub use crate::error::VerboseHtmlError;
+    pub use crate::parse::parse_template;
 }
 
 pub struct HuiPlugin;

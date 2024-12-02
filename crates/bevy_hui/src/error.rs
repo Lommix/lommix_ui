@@ -26,6 +26,13 @@ pub struct VerboseHtmlError<'a> {
     trace: Vec<HtmlError<'a>>,
 }
 
+impl std::fmt::Debug for VerboseHtmlError<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let err_str = self.format(b"", "");
+        write!(f, "{}", err_str)
+    }
+}
+
 #[allow(unused_must_use)]
 impl<'a> VerboseHtmlError<'a> {
     pub fn format(&'a self, source: &'a [u8], file: &str) -> String {

@@ -194,3 +194,5 @@ this crate to include in the example crate.
 -   Any manual changes to bevy's styling components will be overwritten
 -   Do not recursive import. [mem stonks, bug]
 -   One root node per component.
+-   Reloading a component template sometimes breaks logic on a higher level template. Simply reloading
+    the higher level template fixes this for now. Needs further investigation.

@@ -1,7 +1,7 @@
 [package]
 name = "bevy_hui"
 authors = ["Lorenz Mielke"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "pseudo Html templating ui crate for the bevy-engine."
 keywords = ["bevy", "ui", "xml", "html", "dsl"]
