@@ -207,6 +207,7 @@ pub enum StyleAttr {
     // -----
     // image
     ImageScaleMode(NodeImageMode),
+    ImageRegion(Rect),
 }
 
 impl Default for StyleAttr {

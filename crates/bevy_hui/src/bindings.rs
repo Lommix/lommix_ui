@@ -103,7 +103,7 @@ impl ComponentBindings {
 /// let system_id = app.register_system(|entity: In<Entity>| {})
 /// FunctionBindings.register("start_game", system_id);
 /// `
-#[derive(Resource, Default, Deref, DerefMut)]
+#[derive(Resource, Default, Deref, DerefMut, Debug)]
 pub struct FunctionBindings(HashMap<String, SystemId<In<Entity>>>);
 
 impl FunctionBindings {

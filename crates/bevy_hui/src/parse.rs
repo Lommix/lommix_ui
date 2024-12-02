@@ -1,6 +1,7 @@
 use crate::data::{Action, AttrTokens, Attribute, HtmlTemplate, StyleAttr, XNode};
 use crate::prelude::NodeType;
 use crate::util::SlotMap;
+use bevy::math::{Rect, Vec2};
 use bevy::prelude::EaseFunction;
 use bevy::sprite::{BorderRect, SliceScaleMode, TextureSlicer};
 use bevy::ui::widget::NodeImageMode;
@@ -449,6 +450,7 @@ where
         b"outline" => map(parse_outline, StyleAttr::Outline)(value)?,
         b"background" => map(parse_color, StyleAttr::Background)(value)?,
         b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
+        b"image_region" => map(parse_rect, StyleAttr::ImageRegion)(value)?,
         _ => {
             let err = E::from_error_kind(
                 ident,
@@ -908,6 +910,46 @@ where
                 UiRect::all(all)
             })),
         )),
+    )(input)
+}
+
+/// A simple [bevy::math::Rect]
+/// `(10,10)(10,10)`
+fn parse_rect<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Rect, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    context(
+        "Is not a valid `Rect`, try `(float,float)(float,float)` -> min max",
+        map(
+            tuple((
+                preceded(multispace0, parse_vec2),
+                preceded(multispace0, parse_vec2),
+            )),
+            |(min, max)| Rect::from_corners(min, max),
+        ),
+    )(input)
+}
+
+/// A simple [bevy::math::Vec2]
+/// `(10.2,10.1)`
+fn parse_vec2<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], Vec2, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    context(
+        "Is not a valid Vec2, try `(float,float)`",
+        map(
+            delimited(
+                tag("("),
+                tuple((
+                    preceded(multispace0, parse_float),
+                    preceded(tag(","), preceded(multispace0, parse_float)),
+                )),
+                tag(")"),
+            ),
+            |(x, y)| Vec2::new(x, y),
+        ),
     )(input)
 }
 

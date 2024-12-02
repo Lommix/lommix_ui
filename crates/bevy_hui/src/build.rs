@@ -418,6 +418,7 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                             .as_ref()
                             .cloned()
                             .unwrap_or_default(),
+                        rect: styles.computed.image_region.clone(),
                         ..default()
                     },
                     styles,
