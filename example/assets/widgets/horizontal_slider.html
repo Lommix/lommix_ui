@@ -1,0 +1,21 @@
+<template>
+    <image
+        on_spawn="init_slider"
+        tag:axis="x"
+        image_mode="10px tile(2) tile(2) 16"
+        src="ui_panel_atlas.png"
+        image_region="(32,0)(64,32)"
+        height="20px"
+        width="100%"
+        background="#222"
+    >
+        <button
+            background="#111"
+            pressed:background="#555"
+            position="absolute"
+            width="20px"
+            height="20px"
+            border_radius="20px"
+        ></button>
+    </image>
+</template>

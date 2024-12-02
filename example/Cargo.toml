@@ -7,15 +7,12 @@ edition = "2021"
 bevy = { version = "0.15", features = ["file_watcher", "multi_threaded"] }
 bevy_aseprite_ultra = "0.3.0"
 bevy_hui = { path = "../crates/bevy_hui" }
+bevy_hui_widgets = { path = "../crates/bevy_hui_widgets" }
 rand = "0.8.5"
 
 [[bin]]
-name = "input"
-path = "src/input.rs"
-
-[[bin]]
-name = "slider"
-path = "src/slider.rs"
+name = "widgets"
+path = "src/widgets.rs"
 
 [[bin]]
 name = "ui"

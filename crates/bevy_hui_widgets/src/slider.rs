@@ -43,7 +43,7 @@ impl Plugin for HuiSliderWidgetPlugin {
         app.register_type::<Slider>();
         app.register_type::<SliderChangedEvent>();
         app.add_event::<SliderChangedEvent>();
-        app.add_systems(Startup, setup);
+        app.add_systems(PreStartup, setup);
         app.add_systems(
             Update,
             (
@@ -122,7 +122,9 @@ fn init_slider(
         })
         .flatten()
     else {
-        error!("Your slider needs to have a button child, which will be the draggable nob");
+        error!(
+            "Your slider needs to have an absolute button child, which will be the draggable nob"
+        );
         return;
     };
 

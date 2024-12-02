@@ -1,5 +1,8 @@
 <template>
-    <node
+    <image
+        image_mode="10px tile(2) tile(2) 16"
+        src="ui_panel_atlas.png"
+        image_region="(64,0)(96,32)"
         on_spawn="init_slider"
         tag:axis="y"
         height="100%"
@@ -7,14 +10,15 @@
         background="#222"
     >
         <button
-            background="#00F"
-            pressed:background="#0F0"
+            background="#000"
+            pressed:background="#F0F"
             position="absolute"
             width="50px"
             height="20px"
+			border_radius="5px"
             bottom="0"
         >
             <slot />
         </button>
-    </node>
+    </image>
 </template>

@@ -157,22 +157,22 @@ fn setup(
 }
 ```
 
-## Hot reload and advanced examples
+## Examples and Widgets
 
-Hot reload requires bevy `file_watcher` feature to be enabled.
+In addition to the base crate there is also the `bevy_hui_widgets` crate. It offers some basic
+widgets functionality without providing a template. Each Widget requires some kind of setup/hierarchy
+to work, but the user is in full control over the Template and can style and extend it however they see
+fit.
 
-Checkout the examples for advanced interactions, play with the assets. Keep in mind these are
-very crude proof of concepts.
+Imagine html `<select>`, but you provide the template and style of the underlying buttons and containers.
+Checkout the widget example.
 
 ```bash
 # basic menu demo
 cargo run -p example --bin ui
 
-# simple text inputs with a submit form
-cargo run -p example --bin input
-
-# simple sliders
-cargo run -p example --bin slider
+# using the widget helper crate to make some basic widgets like sliders, inputs, selections
+cargo run -p example --bin widgets
 ```
 
 ## Help wanted

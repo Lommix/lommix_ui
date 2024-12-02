@@ -1974,6 +1974,7 @@ dependencies = [
  "bevy",
  "bevy_aseprite_ultra",
  "bevy_hui",
+ "bevy_hui_widgets",
  "rand",
 ]
 

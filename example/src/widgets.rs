@@ -5,28 +5,30 @@ use bevy_hui_widgets::prelude::*;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(ImagePlugin {
+                default_sampler: bevy::image::ImageSamplerDescriptor::nearest(),
+            }),
             HuiPlugin,
             HuiSliderWidgetPlugin,
             HuiInputWidgetPlugin,
             HuiSelectWidgetPlugin,
         ))
-        .add_systems(Startup, (register_widgets, setup_scene).chain())
+        .add_systems(Startup, (register_widgets, setup_scene))
         .add_systems(Update, update_slider_target_text)
         .run();
 }
 
 fn register_widgets(mut html_comps: HtmlComponents, server: Res<AssetServer>) {
-    html_comps.register("vslider", server.load("vertical_slider.html"));
-    html_comps.register("hslider", server.load("horizontal_slider.html"));
-    html_comps.register("input", server.load("input.html"));
-    html_comps.register("select", server.load("select.html"));
-    html_comps.register("option", server.load("option.html"));
+    html_comps.register("vslider", server.load("widgets/vertical_slider.html"));
+    html_comps.register("hslider", server.load("widgets/horizontal_slider.html"));
+    html_comps.register("input", server.load("widgets/input.html"));
+    html_comps.register("select", server.load("widgets/select.html"));
+    html_comps.register("option", server.load("widgets/option.html"));
 }
 
 fn setup_scene(mut cmd: Commands, server: Res<AssetServer>) {
     cmd.spawn(Camera2d);
-    cmd.spawn(HtmlNode(server.load("widgets_demo.html")));
+    cmd.spawn(HtmlNode(server.load("widgets/widgets_demo.html")));
 }
 
 // -----------------
