@@ -3,8 +3,8 @@
 - added support for `overflow_clip_margin`
 
 - added new `on_changed` function binding attribute for all nodes.
-  Does nothing by default. Must be triggered by the user. This notify change, when
-  building custom widgets.
+  Does nothing by default. Must be triggered by the user. For notifying change in
+  custom widgets.
 
 - added `scroll` to overflow values.
 

@@ -157,6 +157,8 @@ fn setup(
 
 ## Examples and Widgets
 
+[experimental widget crate on crates.io](https://crates.io/crates/bevy_hui_widgets)
+
 In addition to the base crate there is also the `bevy_hui_widgets` crate. It offers some basic
 widgets functionality without providing a template. Each Widget requires some kind of setup/hierarchy
 to work, but the user is in full control over the Template and can style and extend it however they see
