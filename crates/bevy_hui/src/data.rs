@@ -142,6 +142,7 @@ pub enum StyleAttr {
     Display(Display),
     Position(PositionType),
     Overflow(Overflow),
+    OverflowClipMargin(OverflowClipMargin),
     Left(Val),
     Right(Val),
     Top(Val),

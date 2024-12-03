@@ -6,18 +6,16 @@
 Build `bevy_ui` design in pseudo Html. Keep your logic in bevy, while iterating fast on design
 with hot reloading. Create reusable templates in the style of Web Components.
 
-**starting with bevy 0.15!**
-
 https://github.com/user-attachments/assets/4eb22305-7762-404e-9093-806b6a155ede
 
 ## Features
 
--   In build support for conditional styles and transitions. Hover animations by default!
--   Any value can be a dynamic property and injected into a template at runtime. (recursive!)
--   Simple but effective event system. Register any bevy system via function binding and use it
-    in your templates `on_press="start_game"`.
--   No widgets, no themes. Just bevy UI serialized with all the tools necessary to build anything
-    in a reusable manor.
+- In build support for conditional styles and transitions. Hover animations by default!
+- Any value can be a dynamic property and injected into a template at runtime. (recursive!)
+- Simple but effective event system. Register any bevy system via function binding and use it
+  in your templates `on_press="start_game"`.
+- No widgets, no themes. Just bevy UI serialized with all the tools necessary to build anything
+  in a reusable manor.
 
 ## Example
 
@@ -191,8 +189,8 @@ this crate to include in the example crate.
 
 ## Known limitations and Pitfalls
 
--   Any manual changes to bevy's styling components will be overwritten
--   Do not recursive import. [mem stonks, bug]
--   One root node per component.
--   Reloading a component template sometimes breaks logic on a higher level template. Simply reloading
-    the higher level template fixes this for now. Needs further investigation.
+- Any manual changes to bevy's styling components will be overwritten
+- Do not recursive import. [mem stonks, bug]
+- One root node per component.
+- Reloading a component template sometimes breaks logic on a higher level template. Simply reloading
+  the higher level template fixes this for now. Needs further investigation.

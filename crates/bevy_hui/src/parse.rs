@@ -8,7 +8,7 @@ use bevy::ui::widget::NodeImageMode;
 use bevy::ui::{
     AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, GridAutoFlow,
     GridPlacement, GridTrack, JustifyContent, JustifyItems, JustifySelf, Outline, Overflow,
-    OverflowAxis, PositionType, RepeatedGridTrack,
+    OverflowAxis, OverflowClipBox, OverflowClipMargin, PositionType, RepeatedGridTrack,
 };
 use bevy::utils::HashMap;
 use bevy::{
@@ -424,6 +424,7 @@ where
         b"position" => map(parse_position_type, StyleAttr::Position)(value)?,
         b"display" => map(parse_display, StyleAttr::Display)(value)?,
         b"overflow" => map(parse_overflow, StyleAttr::Overflow)(value)?,
+        b"overflow_clip_margin" => map(parse_overflow_margin, StyleAttr::OverflowClipMargin)(value)?,
 
         // align & justify
         b"align_self" => map(parse_align_self, StyleAttr::AlignSelf)(value)?,
@@ -554,6 +555,36 @@ where
             map(tag("flex"), |_| Display::Flex),
             map(tag("block"), |_| Display::Block),
             map(tag("grid"), |_| Display::Grid),
+        )),
+    )(input)
+}
+
+fn parse_overflow_margin<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], OverflowClipMargin, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    context(
+        "Is not a valid `OverflowClipMargin`, try `content_box (float)` `padding_box (float)` `border_box (float)`",
+        map(
+            tuple((
+                parse_overflow_visual_box,
+                preceded(multispace0, parse_float),
+            )),
+            |(visual_box, margin)| OverflowClipMargin { visual_box, margin },
+        ),
+    )(input)
+}
+
+fn parse_overflow_visual_box<'a, E>(input: &'a [u8]) -> IResult<&'a [u8], OverflowClipBox, E>
+where
+    E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
+{
+    context(
+        "Is not a valid `OverflowClipBox`, try `content_box` `padding_box` `border_box`",
+        alt((
+            map(tag("content_box"), |_| OverflowClipBox::ContentBox),
+            map(tag("padding_box"), |_| OverflowClipBox::PaddingBox),
+            map(tag("border_box"), |_| OverflowClipBox::BorderBox),
         )),
     )(input)
 }

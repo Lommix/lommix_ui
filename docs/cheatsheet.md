@@ -30,6 +30,7 @@
 | position              | `absolute`, `relative`                                                                                   |
 | display               | `none`, `flex`, `block`, `grid`                                                                          |
 | overflow              | `X Y` (xAxis yAxis) with values: `hidden` `visible` `clip` `scroll`                                      |
+| overflow_clip_margin  | `content_box float` `padding_box float` `border_box float`                                      |
 | align_self            | `auto` `start` `flex_end` `stretch` `end` `flex_start`                                                   |
 | align_items           | `default` `center` `start` `flex_end` `stretch` `end` `baseline` `flex_start`                            |
 | align_content         | `space_evenly` `space_around` `space_between` `center` `start` `flex_end` `stretch` `end` `flex_start`   |
@@ -91,6 +92,10 @@ transition animation in combination with `ease` and `delay`
 | `active:..`       | active if has component `UiActive` |
 
 ## Events
+
+Each event accepts a list of comma separated function bindings
+
+`on_spawn="my_func, my_second_func"`
 
 | Html        | Explanation                                         |
 | ----------- | --------------------------------------------------- |

@@ -1,4 +1,6 @@
-# 0.1.1
+# 0.2.0
+
+- added support for `overflow_clip_margin`
 
 - added new `on_changed` function binding attribute for all nodes.
   Does nothing by default. Must be triggered by the user. This notify change, when

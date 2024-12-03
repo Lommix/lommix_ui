@@ -489,6 +489,9 @@ impl HtmlStyle {
             StyleAttr::Display(display) => self.computed.node.display = display,
             StyleAttr::Position(position_type) => self.computed.node.position_type = position_type,
             StyleAttr::Overflow(overflow) => self.computed.node.overflow = overflow,
+            StyleAttr::OverflowClipMargin(overflow_clip) => {
+                self.computed.node.overflow_clip_margin = overflow_clip
+            }
             StyleAttr::Left(val) => self.computed.node.left = val,
             StyleAttr::Right(val) => self.computed.node.right = val,
             StyleAttr::Top(val) => self.computed.node.top = val,
