@@ -196,12 +196,15 @@ fn write_input(
 }
 
 fn sync_text_preview(
-    inputs: Query<(&TextInput, &UiTarget), Changed<TextInput>>,
+    mut cmd: Commands,
+    inputs: Query<(Entity, &TextInput, &UiTarget), Changed<TextInput>>,
     mut texts: Query<&mut Text>,
 ) {
-    for (text_input, target) in inputs.iter() {
+    for (entity, text_input, target) in inputs.iter() {
         _ = texts.get_mut(**target).map(|mut text| {
             text.0.clone_from(&text_input.value);
-        })
+        });
+
+        cmd.trigger_targets(UiChangedEvent, entity);
     }
 }

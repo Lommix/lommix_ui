@@ -26,6 +26,7 @@ impl Plugin for BuildPlugin {
             .register_type::<OnUiEnter>()
             .register_type::<OnUiPress>()
             .register_type::<OnUiSpawn>()
+            .register_type::<OnUiChange>()
             .register_type::<UiTarget>()
             .register_type::<UiId>()
             .register_type::<SlotPlaceholder>()
@@ -141,6 +142,12 @@ pub struct OnUiEnter(pub Vec<String>);
 #[derive(Component, Debug, Deref, DerefMut, Reflect)]
 #[reflect]
 pub struct OnUiExit(pub Vec<String>);
+
+/// Eventlistener for a user triggered Change Event
+/// This can be when building a widgets
+#[derive(Component, Debug, Deref, DerefMut, Reflect)]
+#[reflect]
+pub struct OnUiChange(pub Vec<String>);
 
 /// Html Ui Node
 /// pass it a handle, it will spawn an UI.

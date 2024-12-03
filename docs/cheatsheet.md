@@ -29,7 +29,7 @@
 | --------------------- | -------------------------------------------------------------------------------------------------------- |
 | position              | `absolute`, `relative`                                                                                   |
 | display               | `none`, `flex`, `block`, `grid`                                                                          |
-| overflow              | `X Y` (xAxis yAxis) with values: `hidden` `visible` `clip` `scroll`                                                                           |
+| overflow              | `X Y` (xAxis yAxis) with values: `hidden` `visible` `clip` `scroll`                                      |
 | align_self            | `auto` `start` `flex_end` `stretch` `end` `flex_start`                                                   |
 | align_items           | `default` `center` `start` `flex_end` `stretch` `end` `baseline` `flex_start`                            |
 | align_content         | `space_evenly` `space_around` `space_between` `center` `start` `flex_end` `stretch` `end` `flex_start`   |
@@ -92,14 +92,15 @@ transition animation in combination with `ease` and `delay`
 
 ## Events
 
-| Html       | Explanation                          |
-| ---------- | ------------------------------------ |
-| `on_spawn` | called on spawning                   |
-| `on_press` | called on `Interaction::Press`       |
-| `on_enter` | called on enter `Interaction::Hover` |
-| `on_exit`  | called on enter `Interaction::None`  |
+| Html        | Explanation                                         |
+| ----------- | --------------------------------------------------- |
+| `on_spawn`  | called on spawning                                  |
+| `on_press`  | called on `Interaction::Press`                      |
+| `on_enter`  | called on enter `Interaction::Hover`                |
+| `on_exit`   | called on enter `Interaction::None`                 |
+| `on_change` | triggered by the user. Used to build custom widgets |
 
-## Special Integration Helpers
+## Special Helpers
 
 These are local to the template and cannot be referenced outside.
 

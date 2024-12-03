@@ -13,7 +13,7 @@ fn main() {
             HuiInputWidgetPlugin,
             HuiSelectWidgetPlugin,
         ))
-        .add_systems(Startup, (register_widgets, setup_scene))
+        .add_systems(Startup, (register_widgets, setup_scene, register_user_functions))
         .add_systems(Update, update_slider_target_text)
         .run();
 }
@@ -29,6 +29,40 @@ fn register_widgets(mut html_comps: HtmlComponents, server: Res<AssetServer>) {
 fn setup_scene(mut cmd: Commands, server: Res<AssetServer>) {
     cmd.spawn(Camera2d);
     cmd.spawn(HtmlNode(server.load("widgets/widgets_demo.html")));
+}
+
+/// If you trigger the [bevy_hui::prelude::UiChangedEvent] in your widget
+/// code, you can bind custom functions in html to this event.
+fn register_user_functions(mut html_funcs: HtmlFunctions) {
+    html_funcs.register(
+        "notify_slider_change",
+        |In(entity), sliders: Query<&Slider>| {
+            let Ok(slider) = sliders.get(entity) else {
+                return;
+            };
+            info!("Slider {entity} changed, new value: {:.2}", slider.value);
+        },
+    );
+
+    html_funcs.register(
+        "notify_input_change",
+        |In(entity), sliders: Query<&TextInput>| {
+            let Ok(input) = sliders.get(entity) else {
+                return;
+            };
+            info!("Input {entity} changed, new value: `{}`", input.value);
+        },
+    );
+
+    html_funcs.register(
+        "notify_select_change",
+        |In(entity), sliders: Query<&SelectInput>| {
+            let Ok(select) = sliders.get(entity) else {
+                return;
+            };
+            info!("Select {entity} changed, new value: {:?}", select.value);
+        },
+    );
 }
 
 // -----------------

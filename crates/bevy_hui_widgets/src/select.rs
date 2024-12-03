@@ -29,7 +29,7 @@ impl Plugin for HuiSelectWidgetPlugin {
 #[reflect]
 pub struct SelectInput {
     // points to the current select node
-    value: Option<Entity>,
+    pub value: Option<Entity>,
 }
 
 #[derive(Component, Debug, Reflect)]
@@ -110,6 +110,7 @@ fn selection(
 }
 
 fn update_selection(
+    mut cmd: Commands,
     mut events: EventReader<SelectionChangedEvent>,
     mut texts: Query<&mut Text>,
     children: Query<&Children>,
@@ -136,5 +137,7 @@ fn update_selection(
             .get(event.option)
             .map(|tags| tags.get("value").map(|s| s.as_str()).unwrap_or_default())
             .map(|t| text.0 = t.into());
+
+        cmd.trigger_targets(UiChangedEvent, event.select);
     }
 }

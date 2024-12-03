@@ -111,6 +111,7 @@ pub enum Action {
     OnEnter(Vec<String>),
     OnExit(Vec<String>),
     OnSpawn(Vec<String>),
+    OnChange(Vec<String>),
 }
 
 impl Action {
@@ -127,6 +128,9 @@ impl Action {
             }
             Action::OnSpawn(fn_id) => {
                 cmd.insert(crate::prelude::OnUiSpawn(fn_id));
+            }
+            Action::OnChange(fn_id) => {
+                cmd.insert(crate::prelude::OnUiChange(fn_id));
             }
         }
     }

@@ -377,6 +377,10 @@ where
             let (_, list) = as_string_list(value)?;
             Ok((key, Attribute::Action(Action::OnSpawn(list))))
         }
+        b"on_change" => {
+            let (_, list) = as_string_list(value)?;
+            Ok((key, Attribute::Action(Action::OnChange(list))))
+        }
         _ => {
             let (_, style) = parse_style(prefix, key, value)?;
             Ok((key, Attribute::Style(style)))

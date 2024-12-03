@@ -84,7 +84,7 @@ impl From<&str> for SliderAxis {
 #[derive(Component, Reflect)]
 #[reflect]
 pub struct Slider {
-    value: f32,
+    pub value: f32,
     axis: SliderAxis,
 }
 
@@ -216,12 +216,14 @@ fn update_drag(
 }
 
 fn update_slider_value(
+    mut cmd: Commands,
     mut events: EventReader<SliderChangedEvent>,
-    mut sliders: Query<&mut Slider>,
+    mut sliders: Query<(Entity, &mut Slider)>,
 ) {
     for event in events.read() {
-        _ = sliders.get_mut(event.slider).map(|mut slider| {
+        _ = sliders.get_mut(event.slider).map(|(entity, mut slider)| {
             slider.value = event.value;
+            cmd.trigger_targets(UiChangedEvent, entity);
         });
     }
 }

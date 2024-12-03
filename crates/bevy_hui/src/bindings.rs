@@ -8,11 +8,24 @@ use bevy::{
 pub struct BindingPlugin;
 impl Plugin for BindingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<FunctionBindings>();
-        app.init_resource::<ComponentBindings>();
-        app.add_systems(Update, (observe_interactions, observe_on_spawn));
+        app.init_resource::<FunctionBindings>()
+            .init_resource::<ComponentBindings>()
+            .add_event::<UiChangedEvent>()
+            .add_systems(Update, (observe_interactions, observe_on_spawn))
+            .add_observer(observe_node_changed);
     }
 }
+
+/// A user triggered event to notify about a change. This
+/// will trigger any attached [crate::build::OnUiChange]
+/// via an entity obverser function binding.
+///
+/// In template `on_change="my_func_binging"`
+///
+/// commonly used to build widgets like sliders/input that should
+/// react to any change
+#[derive(Event)]
+pub struct UiChangedEvent;
 
 pub type SpawnFunction = dyn Fn(EntityCommands) + Send + Sync + 'static;
 
@@ -169,4 +182,23 @@ fn observe_interactions(
             },
         }
     });
+}
+
+/// runs any attached `on_change` function when the user
+/// triggers the [UiChangedEvent] on the target enttiy.
+fn observe_node_changed(
+    trigger: Trigger<UiChangedEvent>,
+    mut cmd: Commands,
+    on_change: Query<&crate::prelude::OnUiChange>,
+    function_bindings: Res<FunctionBindings>,
+) {
+    let entity = trigger.entity();
+
+    let Ok(funcs) = on_change.get(entity) else {
+        return;
+    };
+
+    for fn_str in funcs.iter() {
+        function_bindings.maybe_run(fn_str, entity, &mut cmd);
+    }
 }

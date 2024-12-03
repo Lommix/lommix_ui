@@ -26,9 +26,13 @@
                     shadow_offset="5px 10px"
                     shadow_blur="6px"
                     shadow_spread="5px"
+                    delay="200ms"
+                    ease="cubic_in"
                 >
                     <text
                         font_size="24"
+                        pressed:font_size="32"
+                        delay="100ms"
                         watch="shadow_btn"
                         hover:font_color="#F00"
                     >
@@ -99,12 +103,10 @@
                         <text>[ scroll ]</text>
                     </node>
                     <button
-                        on_spawn="scrollable"
-                        tag:scroll_speed="1000"
                         target="inventory"
                         width="420px"
                         height="300px"
-                        overflow="hidden hidden"
+                        overflow="hidden scroll"
                         align_content="center"
                         justify_content="center"
                     >

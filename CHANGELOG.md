@@ -1,5 +1,9 @@
 # 0.1.1
 
+- added new `on_changed` function binding attribute for all nodes.
+  Does nothing by default. Must be triggered by the user. This notify change, when
+  building custom widgets.
+
 - added `scroll` to overflow values.
 
 - added `shadow_color`,`shadow_blur`,`shadow_spread` and `shadow_offset` for the new box shadow.

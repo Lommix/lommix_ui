@@ -17,18 +17,20 @@ mod util;
 
 pub mod prelude {
     pub use crate::auto::{AutoLoadState, HuiAutoLoadPlugin};
-    pub use crate::bindings::{ComponentBindings, FunctionBindings, HtmlComponents, HtmlFunctions};
+    pub use crate::bindings::{
+        ComponentBindings, FunctionBindings, HtmlComponents, HtmlFunctions, UiChangedEvent,
+    };
     pub use crate::build::{
-        HtmlNode, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, Tags, TemplateProperties,
+        HtmlNode, OnUiChange, OnUiEnter, OnUiExit, OnUiPress, OnUiSpawn, Tags, TemplateProperties,
         TemplateScope, UiId, UiTarget, UiWatch,
     };
     pub use crate::compile::{CompileContextEvent, CompileNodeEvent};
     pub use crate::data::{Action, Attribute, HtmlTemplate, NodeType, StyleAttr};
     pub use crate::error::ParseError;
-    pub use crate::styles::{HoverTimer, HtmlStyle, InteractionTimer, PressedTimer, UiActive};
-    pub use crate::HuiPlugin;
     pub use crate::error::VerboseHtmlError;
     pub use crate::parse::parse_template;
+    pub use crate::styles::{HoverTimer, HtmlStyle, InteractionTimer, PressedTimer, UiActive};
+    pub use crate::HuiPlugin;
 }
 
 pub struct HuiPlugin;
