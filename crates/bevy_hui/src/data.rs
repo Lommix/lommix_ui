@@ -53,7 +53,8 @@ pub struct HtmlTemplate {
 
 /// any valid attribute that can be found
 /// on nodes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
+#[reflect]
 pub enum Attribute {
     Style(StyleAttr),
     PropertyDefinition(String, String),

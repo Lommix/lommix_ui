@@ -20,7 +20,7 @@ impl Plugin for TransitionPlugin {
 
 /// interpolation timer for
 /// transitions
-#[derive(Component, Default, Reflect)]
+#[derive(Component, Clone, Default, Reflect)]
 #[reflect]
 pub struct InteractionTimer {
     elapsed: Duration,
@@ -371,7 +371,7 @@ fn update_node_style(
     }
 }
 
-#[derive(Component, Reflect, Default, Deref, DerefMut)]
+#[derive(Component, Reflect, Clone, Default, Deref, DerefMut)]
 #[reflect]
 pub struct PressedTimer(InteractionTimer);
 
@@ -381,7 +381,7 @@ impl PressedTimer {
     }
 }
 
-#[derive(Component, Default, Reflect, Deref, DerefMut)]
+#[derive(Component, Default, Clone, Reflect, Deref, DerefMut)]
 #[reflect]
 pub struct HoverTimer(InteractionTimer);
 
@@ -391,7 +391,7 @@ impl HoverTimer {
     }
 }
 
-#[derive(Debug, Reflect)]
+#[derive(Debug, Reflect, Clone)]
 #[reflect]
 pub struct ComputedStyle {
     pub node: Node,
@@ -431,7 +431,7 @@ impl Default for ComputedStyle {
 
 /// this components holds all relevant style
 /// attributes.
-#[derive(Component, Default, Debug, Reflect)]
+#[derive(Component, Default, Clone, Debug, Reflect)]
 #[reflect]
 pub struct HtmlStyle {
     pub computed: ComputedStyle,

@@ -16,26 +16,31 @@ use std::time::Duration;
 pub struct BuildPlugin;
 impl Plugin for BuildPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (hotreload, spawn_ui, move_children_to_slot).chain());
-        app.register_type::<TemplatePropertySubscriber>();
-        app.register_type::<TemplateExpresions>();
-        app.register_type::<TemplateProperties>();
-        app.register_type::<TemplateScope>();
-        app.register_type::<OnUiExit>();
-        app.register_type::<OnUiEnter>();
-        app.register_type::<OnUiPress>();
-        app.register_type::<OnUiSpawn>();
-        app.register_type::<UiTarget>();
-        app.register_type::<UiId>();
-        app.register_type::<SlotPlaceholder>();
-        app.register_type::<UnslotedChildren>();
-        app.register_type::<HtmlNode>();
+        app.add_systems(Update, (hotreload, spawn_ui, move_children_to_slot).chain())
+            .register_type::<TemplatePropertySubscriber>()
+            .register_type::<TemplateExpresions>()
+            .register_type::<TemplateProperties>()
+            .register_type::<TemplateScope>()
+            .register_type::<Tags>()
+            .register_type::<OnUiExit>()
+            .register_type::<OnUiEnter>()
+            .register_type::<OnUiPress>()
+            .register_type::<OnUiSpawn>()
+            .register_type::<UiTarget>()
+            .register_type::<UiId>()
+            .register_type::<SlotPlaceholder>()
+            .register_type::<UnslotedChildren>()
+            .register_type::<HtmlNode>()
+            .register_type::<super::data::XNode>()
+            .register_type::<super::data::HtmlTemplate>()
+            .register_type::<super::data::StyleAttr>()
+            .register_type::<super::data::Action>();
     }
 }
 
 /// Holds the reference to the template root entity,
 /// which owns the template properties
-#[derive(Component, Clone, Deref, DerefMut, Copy, Reflect)]
+#[derive(Component, Clone, Deref, Debug, DerefMut, Copy, Reflect)]
 #[reflect]
 pub struct TemplateScope(Entity);
 
@@ -56,7 +61,7 @@ impl TemplateProperties {
 
 /// Entites that need to be notified, when the
 /// template properties change.
-#[derive(Component, Clone, Default, Deref, DerefMut, Reflect)]
+#[derive(Component, Clone, Default, Debug, Deref, DerefMut, Reflect)]
 #[reflect]
 pub struct TemplatePropertySubscriber(pub Vec<Entity>);
 
@@ -65,7 +70,7 @@ pub struct InsideSlot {
     owner: Entity,
 }
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Debug)]
 #[reflect]
 pub struct SlotPlaceholder {
     owner: Entity,
@@ -74,24 +79,25 @@ pub struct SlotPlaceholder {
 /// ref to unresolved nodes that
 /// need to move to the `<slot/>`
 /// when the template is loaded.
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Debug)]
 #[reflect]
 pub struct UnslotedChildren(Entity);
 
 /// entities subscribed to the owners interaction
 /// component
-#[derive(Component, DerefMut, Deref)]
+#[derive(Component, DerefMut, Debug, Deref)]
 pub struct InteractionObverser(Vec<Entity>);
 
 /// unresolved expresssions that can be compiled
 /// to a solid attribute
-#[derive(Component, Reflect, Deref, DerefMut)]
+#[derive(Component, Reflect, Deref, Debug, DerefMut)]
 #[reflect]
 pub struct TemplateExpresions(Vec<AttrTokens>);
 
 /// Any attribute prefixed with `tag:my_tag="my_value"`
 /// will be availble here.
-#[derive(Component, Deref, DerefMut, Debug, Default)]
+#[derive(Component, Deref, DerefMut, Debug, Default, Reflect)]
+#[reflect]
 pub struct Tags(HashMap<String, String>);
 
 /// holds ref to the raw uncompiled text content
@@ -99,17 +105,17 @@ pub struct Tags(HashMap<String, String>);
 pub struct ContentId(SlotId);
 
 /// the entities owned uid hashed as u64
-#[derive(Component, Default, Hash, Deref, DerefMut, Reflect)]
+#[derive(Component, Debug, Default, Hash, Deref, DerefMut, Reflect)]
 #[reflect]
 pub struct UiId(String);
 
 /// the entity behind `id` in `target="id"`
-#[derive(Component, DerefMut, Deref, Reflect)]
+#[derive(Component, Debug, DerefMut, Deref, Reflect)]
 #[reflect]
 pub struct UiTarget(pub Entity);
 
 /// watch interaction of another entity
-#[derive(Component, DerefMut, Deref, Reflect)]
+#[derive(Component, Debug, DerefMut, Deref, Reflect)]
 #[reflect]
 pub struct UiWatch(pub Entity);
 
@@ -117,28 +123,28 @@ pub struct UiWatch(pub Entity);
 pub struct FullyBuild;
 
 /// Eventlistener interaction transition to Hover
-#[derive(Component, Deref, DerefMut, Reflect)]
+#[derive(Component, Debug, Deref, DerefMut, Reflect)]
 #[reflect]
 pub struct OnUiPress(pub Vec<String>);
 
 /// Eventlistener on spawning node
-#[derive(Component, DerefMut, Deref, Reflect)]
+#[derive(Component, Debug, DerefMut, Deref, Reflect)]
 #[reflect]
 pub struct OnUiSpawn(pub Vec<String>);
 
 /// Eventlistener for interaction transition to Hover
-#[derive(Component, DerefMut, Deref, Reflect)]
+#[derive(Component, Debug, DerefMut, Deref, Reflect)]
 #[reflect]
 pub struct OnUiEnter(pub Vec<String>);
 
 /// Eventlistener for interaction transition to None
-#[derive(Component, Deref, DerefMut, Reflect)]
+#[derive(Component, Debug, Deref, DerefMut, Reflect)]
 #[reflect]
 pub struct OnUiExit(pub Vec<String>);
 
 /// Html Ui Node
 /// pass it a handle, it will spawn an UI.
-#[derive(Component, Default, Deref, DerefMut, Reflect)]
+#[derive(Component, Debug, Default, Deref, DerefMut, Reflect)]
 #[require(Node, TemplateProperties)]
 #[reflect]
 pub struct HtmlNode(pub Handle<HtmlTemplate>);
