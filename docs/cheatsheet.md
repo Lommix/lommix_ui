@@ -29,7 +29,7 @@
 | --------------------- | -------------------------------------------------------------------------------------------------------- |
 | position              | `absolute`, `relative`                                                                                   |
 | display               | `none`, `flex`, `block`, `grid`                                                                          |
-| overflow              | `hidden visible` (xAxis yAxis)                                                                           |
+| overflow              | `X Y` (xAxis yAxis) with values: `hidden` `visible` `clip` `scroll`                                                                           |
 | align_self            | `auto` `start` `flex_end` `stretch` `end` `flex_start`                                                   |
 | align_items           | `default` `center` `start` `flex_end` `stretch` `end` `baseline` `flex_start`                            |
 | align_content         | `space_evenly` `space_around` `space_between` `center` `start` `flex_end` `stretch` `end` `flex_start`   |
@@ -51,6 +51,11 @@
 | grid_row              | `auto` `span(u16)` `start_span(i16,u16)` `end_span(i16,u16)` `end(i16)` `start(i16)`                     |
 | grid_column           | `auto` `start_span(5,5)` `end_span(5,5)` `end(5)` `start(5)`                                             |
 | image_mode            | `auto` `stretch` slice: `20px tiled(scale) stretch scale` tiled: `bool bool scale` **(scale=float)**     |
+| image_region          | `(float,float)(float,float)` = min->max image region rect                                                |
+| shadow_color          | ref `Color`                                                                                              |
+| shadow_blur           | ref `Val`                                                                                                |
+| shadow_spread         | ref `Val`                                                                                                |
+| shadow_offset         | ref `Val` `Val` shadow_offset="10px 10px"                                                                |
 | font                  | asset path                                                                                               |
 | font_color            | ref `Color`                                                                                              |
 | font_size             | float                                                                                                    |

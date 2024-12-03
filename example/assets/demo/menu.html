@@ -9,13 +9,35 @@
             primary="#AAF"
             title="{title}"
         >
-            <image
-                align_self="center"
-                height="200px"
-                src="bevy_bird_dark.png"
-            />
+            <panel
+                title="box shadow"
+                primary="#FFF"
+            >
+                <button
+                    id="shadow_btn"
+                    padding="20px 5px"
+                    margin="20px"
+                    border_radius="5px"
+                    background="#515"
+                    hover:background="#618"
+                    justify_content="center"
+                    shadow_color="#000"
+                    hover:shadow_color="#F00"
+                    shadow_offset="5px 10px"
+                    shadow_blur="6px"
+                    shadow_spread="5px"
+                >
+                    <text
+                        font_size="24"
+                        watch="shadow_btn"
+                        hover:font_color="#F00"
+                    >
+                        Button
+                    </text>
+                </button>
+            </panel>
 
-            <panel title="test">
+            <panel title="Item card">
                 <!-- properties can drip down the component tree -->
                 <preview
                     source="bevy_bird_dark.png"

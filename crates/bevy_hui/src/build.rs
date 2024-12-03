@@ -347,6 +347,12 @@ impl<'w, 's> TemplateBuilder<'w, 's> {
                 styles.computed.delay.max(0.01),
             )));
 
+        // ---------------------
+        // shadow
+        if let Some(shadow) = styles.computed.shadow {
+            self.cmd.entity(entity).insert(shadow.clone());
+        }
+
         if entity != self.scope {
             self.cmd.entity(entity).insert(TemplateScope(self.scope));
         }

@@ -193,6 +193,10 @@ pub enum StyleAttr {
     // -----
     // color
     Background(Color),
+    ShadowColor(Color),
+    ShadowOffset(Val, Val),
+    ShadowSpread(Val),
+    ShadowBlur(Val),
 
     // -----
     Hover(#[reflect(ignore)] Box<StyleAttr>),

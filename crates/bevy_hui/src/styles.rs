@@ -1,7 +1,8 @@
 use crate::{build::InteractionObverser, data::StyleAttr};
 use bevy::{
     ecs::{query::QueryEntityError, system::SystemParam},
-    prelude::*, ui::widget::NodeImageMode,
+    prelude::*,
+    ui::widget::NodeImageMode,
 };
 use std::time::Duration;
 
@@ -123,6 +124,7 @@ pub struct UiStyleQuery<'w, 's> {
     pub background: Query<'w, 's, &'static mut BackgroundColor>,
     pub border_radius: Query<'w, 's, &'static mut BorderRadius>,
     pub border_color: Query<'w, 's, &'static mut BorderColor>,
+    pub shadow: Query<'w, 's, &'static mut BoxShadow>,
     pub outline: Query<'w, 's, &'static mut Outline>,
 }
 
@@ -151,6 +153,12 @@ impl<'w, 's> UiStyleQuery<'w, 's> {
             radius.bottom_right = computed.border_radius.bottom;
             radius.bottom_left = computed.border_radius.left;
         });
+
+        if let Some(computed_shadow) = computed.shadow {
+            _ = self.shadow.get_mut(entity).map(|mut shadow| {
+                *shadow = computed_shadow;
+            });
+        }
 
         _ = self.border_color.get_mut(entity).map(|mut color| {
             color.0 = computed.border_color;
@@ -272,6 +280,36 @@ impl<'w, 's> UiStyleQuery<'w, 's> {
                     txt.font = self.server.load(h);
                 });
             }
+            StyleAttr::ShadowColor(color) => {
+                if let Some(computed_shadow) = computed.shadow {
+                    _ = self.shadow.get_mut(entity).map(|mut shadow| {
+                        shadow.color = lerp_color(&computed_shadow.color, color, ratio)
+                    });
+                }
+            }
+            StyleAttr::ShadowOffset(x, y) => {
+                if let Some(computed_shadow) = computed.shadow {
+                    _ = self.shadow.get_mut(entity).map(|mut shadow| {
+                        shadow.x_offset = lerp_val(&computed_shadow.x_offset, x, ratio);
+                        shadow.y_offset = lerp_val(&computed_shadow.y_offset, y, ratio);
+                    });
+                }
+            }
+            StyleAttr::ShadowBlur(blur) => {
+                if let Some(computed_shadow) = computed.shadow {
+                    _ = self.shadow.get_mut(entity).map(|mut shadow| {
+                        shadow.blur_radius = lerp_val(&computed_shadow.blur_radius, blur, ratio);
+                    });
+                }
+            }
+            StyleAttr::ShadowSpread(spread) => {
+                if let Some(computed_shadow) = computed.shadow {
+                    _ = self.shadow.get_mut(entity).map(|mut shadow| {
+                        shadow.spread_radius =
+                            lerp_val(&computed_shadow.spread_radius, spread, ratio);
+                    });
+                }
+            }
             _ => (),
         }
 
@@ -292,7 +330,6 @@ fn update_node_style(
             .get(entity)
             .map(|t| t.fraction())
             .unwrap_or_default();
-
 
         let hover_ratio = html_style
             .computed
@@ -362,6 +399,7 @@ pub struct ComputedStyle {
     pub border_radius: UiRect,
     pub image_mode: Option<NodeImageMode>,
     pub image_region: Option<Rect>,
+    pub shadow: Option<BoxShadow>,
     pub background: Color,
     pub outline: Option<Outline>,
     pub font: Handle<Font>,
@@ -379,6 +417,7 @@ impl Default for ComputedStyle {
             border_radius: UiRect::default(),
             background: Color::NONE,
             image_mode: None,
+            shadow: None,
             image_region: None,
             outline: None,
             font: Handle::default(),
@@ -506,6 +545,44 @@ impl HtmlStyle {
             StyleAttr::ImageScaleMode(mode) => self.computed.image_mode = Some(mode),
             StyleAttr::ImageRegion(rect) => self.computed.image_region = Some(rect),
             StyleAttr::Outline(outline) => self.computed.outline = Some(outline),
+
+            StyleAttr::ShadowSpread(spread_radius) => match self.computed.shadow.as_mut() {
+                Some(shadow) => shadow.spread_radius = spread_radius,
+                None => {
+                    self.computed.shadow = Some(BoxShadow {
+                        spread_radius,
+                        ..default()
+                    })
+                }
+            },
+            StyleAttr::ShadowBlur(blur_radius) => match self.computed.shadow.as_mut() {
+                Some(shadow) => shadow.blur_radius = blur_radius,
+                None => {
+                    self.computed.shadow = Some(BoxShadow {
+                        blur_radius,
+                        ..default()
+                    });
+                }
+            },
+            StyleAttr::ShadowColor(color) => match self.computed.shadow.as_mut() {
+                Some(shadow) => shadow.color = color,
+                None => {
+                    self.computed.shadow = Some(BoxShadow { color, ..default() });
+                }
+            },
+            StyleAttr::ShadowOffset(x, y) => match self.computed.shadow.as_mut() {
+                Some(shadow) => {
+                    shadow.x_offset = x;
+                    shadow.y_offset = y;
+                }
+                None => {
+                    self.computed.shadow = Some(BoxShadow {
+                        x_offset: x,
+                        y_offset: y,
+                        ..default()
+                    });
+                }
+            },
             // StyleAttr::Font(font) => self.regular.font = server
             _ => (),
         };

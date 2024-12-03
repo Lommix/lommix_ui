@@ -394,6 +394,29 @@ where
     E: ParseError<&'a [u8]> + ContextError<&'a [u8]>,
 {
     let (input, style) = match ident {
+        b"bottom" => map(parse_val, StyleAttr::Bottom)(value)?,
+        b"top" => map(parse_val, StyleAttr::Top)(value)?,
+        b"right" => map(parse_val, StyleAttr::Right)(value)?,
+        b"left" => map(parse_val, StyleAttr::Left)(value)?,
+        b"height" => map(parse_val, StyleAttr::Height)(value)?,
+        b"width" => map(parse_val, StyleAttr::Width)(value)?,
+        b"padding" => map(parse_ui_rect, StyleAttr::Padding)(value)?,
+        b"margin" => map(parse_ui_rect, StyleAttr::Margin)(value)?,
+        b"border" => map(parse_ui_rect, StyleAttr::Border)(value)?,
+        b"border_radius" => map(parse_ui_rect, StyleAttr::BorderRadius)(value)?,
+        b"outline" => map(parse_outline, StyleAttr::Outline)(value)?,
+        b"background" => map(parse_color, StyleAttr::Background)(value)?,
+        b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
+        b"font" => map(as_string, StyleAttr::Font)(value)?,
+        b"font_color" => map(parse_color, StyleAttr::FontColor)(value)?,
+        b"font_size" => map(parse_float, StyleAttr::FontSize)(value)?,
+        b"max_height" => map(parse_val, StyleAttr::MaxHeight)(value)?,
+        b"max_width" => map(parse_val, StyleAttr::MaxWidth)(value)?,
+        b"min_height" => map(parse_val, StyleAttr::MinHeight)(value)?,
+        b"min_width" => map(parse_val, StyleAttr::MinWidth)(value)?,
+        b"delay" => map(parse_delay, StyleAttr::Delay)(value)?,
+        b"ease" => map(parse_easing, StyleAttr::Easing)(value)?,
+        b"image_region" => map(parse_rect, StyleAttr::ImageRegion)(value)?,
         b"position" => map(parse_position_type, StyleAttr::Position)(value)?,
         b"display" => map(parse_display, StyleAttr::Display)(value)?,
         b"overflow" => map(parse_overflow, StyleAttr::Overflow)(value)?,
@@ -427,30 +450,12 @@ where
         //slices
         b"image_mode" => map(parse_image_scale_mode, |v| StyleAttr::ImageScaleMode(v))(value)?,
 
-        // values
-        b"font" => map(as_string, StyleAttr::Font)(value)?,
-        b"font_color" => map(parse_color, StyleAttr::FontColor)(value)?,
-        b"font_size" => map(parse_float, StyleAttr::FontSize)(value)?,
-        b"delay" => map(parse_delay, StyleAttr::Delay)(value)?,
-        b"ease" => map(parse_easing, StyleAttr::Easing)(value)?,
-        b"max_height" => map(parse_val, StyleAttr::MaxHeight)(value)?,
-        b"max_width" => map(parse_val, StyleAttr::MaxWidth)(value)?,
-        b"min_height" => map(parse_val, StyleAttr::MinHeight)(value)?,
-        b"min_width" => map(parse_val, StyleAttr::MinWidth)(value)?,
-        b"bottom" => map(parse_val, StyleAttr::Bottom)(value)?,
-        b"top" => map(parse_val, StyleAttr::Top)(value)?,
-        b"right" => map(parse_val, StyleAttr::Right)(value)?,
-        b"left" => map(parse_val, StyleAttr::Left)(value)?,
-        b"height" => map(parse_val, StyleAttr::Height)(value)?,
-        b"width" => map(parse_val, StyleAttr::Width)(value)?,
-        b"padding" => map(parse_ui_rect, StyleAttr::Padding)(value)?,
-        b"margin" => map(parse_ui_rect, StyleAttr::Margin)(value)?,
-        b"border" => map(parse_ui_rect, StyleAttr::Border)(value)?,
-        b"border_radius" => map(parse_ui_rect, StyleAttr::BorderRadius)(value)?,
-        b"outline" => map(parse_outline, StyleAttr::Outline)(value)?,
-        b"background" => map(parse_color, StyleAttr::Background)(value)?,
-        b"border_color" => map(parse_color, StyleAttr::BorderColor)(value)?,
-        b"image_region" => map(parse_rect, StyleAttr::ImageRegion)(value)?,
+        //shadow
+        b"shadow_color" => map(parse_color, StyleAttr::ShadowColor)(value)?,
+        b"shadow_offset" => map(tuple((parse_val,preceded(multispace0,parse_val))),|(x,y)| StyleAttr::ShadowOffset(x,y))(value)?,
+        b"shadow_blur" => map(parse_val, StyleAttr::ShadowBlur)(value)?,
+        b"shadow_spread" => map(parse_val, StyleAttr::ShadowSpread)(value)?,
+
         _ => {
             let err = E::from_error_kind(
                 ident,
@@ -569,6 +574,7 @@ where
         map(tag("visible"), |_| OverflowAxis::Visible),
         map(tag("hidden"), |_| OverflowAxis::Hidden),
         map(tag("clip"), |_| OverflowAxis::Clip),
+        map(tag("scroll"), |_| OverflowAxis::Scroll),
     ))(input)
 }
 

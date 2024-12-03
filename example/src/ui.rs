@@ -1,4 +1,9 @@
-use bevy::{image::ImageSamplerDescriptor, input::mouse::MouseWheel, prelude::*};
+use bevy::{
+    image::ImageSamplerDescriptor,
+    input::mouse::MouseWheel,
+    prelude::*,
+    remote::{http::RemoteHttpPlugin, RemotePlugin},
+};
 use bevy_aseprite_ultra::prelude::*;
 use bevy_hui::prelude::*;
 
@@ -8,6 +13,8 @@ fn main() {
             DefaultPlugins.set(ImagePlugin {
                 default_sampler: ImageSamplerDescriptor::nearest(),
             }),
+            RemotePlugin::default(),
+            RemoteHttpPlugin::default(),
             AsepriteUltraPlugin,
             HuiPlugin,
             HuiAutoLoadPlugin::new(&["components"]),
@@ -67,7 +74,10 @@ fn setup(
     );
 
     // register custom node by passing a template handle
-    html_comps.register("panel", server.load("demo/panel.html"));
+    html_comps.register_with_spawn_fn("panel", server.load("demo/panel.html"), |mut cmd| {
+        cmd.insert(Name::new("Panel"));
+    });
+
     html_comps.register("aseprite", server.load("demo/aseprite.html"));
 
     // a function that updates a property and triggers a recompile
