@@ -292,7 +292,7 @@ where
         map(tag("text"), |_| NodeType::Text),
         map(tag("slot"), |_| NodeType::Slot),
         map(tag("template"), |_| NodeType::Template),
-        map(take_while1(|u: u8| u.is_ascii_alphabetic()), |val| {
+        map(rest, |val| {
             let custom = String::from_utf8_lossy(val).to_string();
             NodeType::Custom(custom)
         }),
